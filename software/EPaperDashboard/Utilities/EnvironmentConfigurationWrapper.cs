@@ -18,6 +18,8 @@ public sealed class EnvironmentConfigurationWrapper : IEnvironmentConfiguration
     public TimeSpan DashboardScheduleCheckInterval => EnvironmentConfiguration.DashboardScheduleCheckInterval;
     public TimeSpan DashboardMissedScheduleTolerance => EnvironmentConfiguration.DashboardMissedScheduleTolerance;
     public string ConfigDir => EnvironmentConfiguration.ConfigDir;
+    public string? DatabaseProvider => EnvironmentConfiguration.DatabaseProvider;
+    public string? DatabaseConnectionString => EnvironmentConfiguration.DatabaseConnectionString;
     public string DataProtectionKeysDir => EnvironmentConfiguration.DataProtectionKeysDir;
     public bool FirmwareUpdateEnabled => EnvironmentConfiguration.FirmwareUpdateEnabled;
     public string FirmwareReleaseProvider => EnvironmentConfiguration.FirmwareReleaseProvider;

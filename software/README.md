@@ -57,6 +57,8 @@ Install via the [izBoard Home Assistant Add-on repository](https://github.com/iz
 | `SUPERUSER_PASSWORD` | Yes (standalone) | Initial superuser account password |
 | `TZ` | Recommended | Timezone (e.g. `Europe/London`) |
 | `APP_MODE` | No | Deployment mode: `standalone` (default) or `addon` |
+| `DATABASE_PROVIDER` | No | `litedb` (default) or `postgresql`. Independent of `APP_MODE`. |
+| `DATABASE_CONNECTION_STRING` | PostgreSQL only | Npgsql connection string for an existing PostgreSQL database. |
 | `HOMEASSISTANT_HOST` | No | Home Assistant URL (auto-detected in add-on mode) |
 | `RENDERING_COMPONENT_REPOSITORY` | No | GitHub repository that publishes the optional rendering component (default: `izdev-digital/e-paper-dashboard`) |
 | `RENDERING_COMPONENT_RELEASE_TAG` | No | Override the component release tag; normally set by the official image |
@@ -78,7 +80,16 @@ For HTTPS, the display verifies the server certificate against its embedded trus
 
 ### Data
 
-Application data (database, uploaded images, firmware cache) is stored in `/data`. Mount this path as a persistent volume.
+With the default LiteDB backend, the database is stored in `/data/epaperdashboard.db`. Uploaded images, firmware cache, configuration, and data-protection keys also live in `/data`. Mount this path as a persistent volume for either backend.
+
+For a fresh PostgreSQL deployment, set `DATABASE_PROVIDER=postgresql` and `DATABASE_CONNECTION_STRING` in `software/.env` (or `/data/options.json`). For example:
+
+```text
+DATABASE_PROVIDER=postgresql
+DATABASE_CONNECTION_STRING=Host=postgres.example;Database=izboard;Username=izboard;Password=replace-me
+```
+
+Create the database and user beforehand. On startup the app creates its tables and indexes, so the database user needs permission to create objects in its schema. The app does not import LiteDB data; choose the backend before creating data. PostgreSQL stores users, dashboards, devices, and pairing sessions. `/data` remains required for files and data-protection keys. A shared PostgreSQL database alone does not make multiple app replicas safe: scheduled jobs run in each app process, and uploaded images and keys need shared storage.
 
 ### Optional rendering component
 

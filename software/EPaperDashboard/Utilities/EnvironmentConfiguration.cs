@@ -5,6 +5,8 @@ namespace EPaperDashboard.Utilities;
 public static class EnvironmentConfiguration
 {
 	private const string AppModeKey = "APP_MODE";
+	private const string DatabaseProviderKey = "DATABASE_PROVIDER";
+	private const string DatabaseConnectionStringKey = "DATABASE_CONNECTION_STRING";
 	private const string ClientUrlKey = "CLIENT_URL";
 	private const string HomeAssistantHostKey = "HOME_ASSISTANT_HOST";
 	private const string SuperuserUsernameKey = "SUPERUSER_USERNAME";
@@ -61,6 +63,8 @@ public static class EnvironmentConfiguration
 		TimeSpan.FromMinutes(GetIntFromEnvOrConfig(DashboardMissedScheduleToleranceMinutesKey, 15)));
 
 	private static readonly Lazy<string> _configDir = new(() => "/data");
+	private static readonly Lazy<string?> _databaseProvider = new(() => GetStringFromEnvOrConfig(DatabaseProviderKey));
+	private static readonly Lazy<string?> _databaseConnectionString = new(() => GetStringFromEnvOrConfig(DatabaseConnectionStringKey));
 
 	private static readonly Lazy<bool> _firmwareUpdateEnabled = new(() =>
 	{
@@ -99,6 +103,8 @@ public static class EnvironmentConfiguration
 	public static TimeSpan DashboardMissedScheduleTolerance => _dashboardMissedScheduleTolerance.Value;
 
 	public static string ConfigDir => _configDir.Value;
+	public static string? DatabaseProvider => _databaseProvider.Value;
+	public static string? DatabaseConnectionString => _databaseConnectionString.Value;
 
 	public static string DataProtectionKeysDir => Path.Combine(ConfigDir, "DataProtection-Keys");
 

@@ -1,0 +1,158 @@
+using System.Text.Json;
+using Npgsql;
+using NpgsqlTypes;
+
+namespace EPaperDashboard.Data.PostgreSql;
+
+/// <summary>
+/// PostgreSQL infrastructure shared by the repository implementations. Each operation owns a
+/// pooled connection unless it is running inside an IUnitOfWork transaction.
+/// </summary>
+internal sealed class PostgresDbContext(DatabaseSettings settings) : IPersistenceInitializer, IDisposable
+{
+    private readonly NpgsqlDataSource _dataSource = NpgsqlDataSource.Create(settings.ConnectionString!);
+    private readonly AsyncLocal<NpgsqlConnection?> _transactionConnection = new();
+    private readonly AsyncLocal<NpgsqlTransaction?> _transaction = new();
+
+    internal bool InTransaction => _transaction.Value is not null;
+
+    public void Initialize()
+    {
+        const string schema = """
+            CREATE TABLE IF NOT EXISTS izboard_users (
+                id text PRIMARY KEY,
+                username text NOT NULL UNIQUE,
+                is_super_user boolean NOT NULL,
+                document jsonb NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS izboard_dashboards (
+                id text PRIMARY KEY,
+                user_id text NOT NULL,
+                document jsonb NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS ix_izboard_dashboards_user_id
+                ON izboard_dashboards (user_id);
+            CREATE TABLE IF NOT EXISTS izboard_devices (
+                id text PRIMARY KEY,
+                user_id text NOT NULL,
+                dashboard_id text NOT NULL,
+                device_identifier text NOT NULL,
+                api_key text NOT NULL,
+                document jsonb NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS ix_izboard_devices_user_id
+                ON izboard_devices (user_id);
+            CREATE INDEX IF NOT EXISTS ix_izboard_devices_dashboard_id
+                ON izboard_devices (dashboard_id);
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_izboard_devices_identifier
+                ON izboard_devices (device_identifier) WHERE device_identifier <> '';
+            CREATE UNIQUE INDEX IF NOT EXISTS ux_izboard_devices_api_key
+                ON izboard_devices (api_key) WHERE api_key <> '';
+            CREATE TABLE IF NOT EXISTS izboard_pairing_sessions (
+                id text PRIMARY KEY,
+                code text NOT NULL UNIQUE,
+                expires_at timestamptz NOT NULL,
+                is_completed boolean NOT NULL,
+                document jsonb NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS ix_izboard_pairing_sessions_expiry
+                ON izboard_pairing_sessions (expires_at);
+            """;
+
+        WithConnection(connection =>
+        {
+            using var command = new NpgsqlCommand(schema, connection);
+            command.ExecuteNonQuery();
+            return true;
+        });
+    }
+
+    internal T? FindOne<T>(string sql, params NpgsqlParameter[] parameters) where T : class =>
+        WithConnection(connection =>
+        {
+            using var command = CreateCommand(connection, sql, parameters);
+            using var reader = command.ExecuteReader();
+            return reader.Read() ? Deserialize<T>(reader.GetString(0)) : null;
+        });
+
+    internal List<T> FindMany<T>(string sql, params NpgsqlParameter[] parameters) where T : class =>
+        WithConnection(connection =>
+        {
+            using var command = CreateCommand(connection, sql, parameters);
+            using var reader = command.ExecuteReader();
+            var results = new List<T>();
+            while (reader.Read())
+                results.Add(Deserialize<T>(reader.GetString(0)));
+            return results;
+        });
+
+    internal bool Exists(string sql, params NpgsqlParameter[] parameters) =>
+        WithConnection(connection =>
+        {
+            using var command = CreateCommand(connection, sql, parameters);
+            return (bool)command.ExecuteScalar()!;
+        });
+
+    internal void Execute(string sql, params NpgsqlParameter[] parameters)
+    {
+        WithConnection(connection =>
+        {
+            using var command = CreateCommand(connection, sql, parameters);
+            command.ExecuteNonQuery();
+            return true;
+        });
+    }
+
+    internal T ExecuteInTransaction<T>(Func<T> operation)
+    {
+        if (InTransaction)
+            throw new InvalidOperationException("Nested persistence transactions are not supported");
+
+        using var connection = _dataSource.OpenConnection();
+        using var transaction = connection.BeginTransaction();
+        _transactionConnection.Value = connection;
+        _transaction.Value = transaction;
+        try
+        {
+            var result = operation();
+            transaction.Commit();
+            return result;
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
+        finally
+        {
+            _transaction.Value = null;
+            _transactionConnection.Value = null;
+        }
+    }
+
+    internal static NpgsqlParameter Parameter(string name, object value) => new(name, value);
+
+    internal static NpgsqlParameter DocumentParameter<T>(T value) =>
+        new("document", NpgsqlDbType.Jsonb) { Value = JsonSerializer.Serialize(value) };
+
+    private T WithConnection<T>(Func<NpgsqlConnection, T> operation)
+    {
+        if (_transactionConnection.Value is { } transactionConnection)
+            return operation(transactionConnection);
+
+        using var connection = _dataSource.OpenConnection();
+        return operation(connection);
+    }
+
+    private NpgsqlCommand CreateCommand(NpgsqlConnection connection, string sql, NpgsqlParameter[] parameters)
+    {
+        var command = new NpgsqlCommand(sql, connection, _transaction.Value);
+        command.Parameters.AddRange(parameters);
+        return command;
+    }
+
+    private static T Deserialize<T>(string json) where T : class =>
+        JsonSerializer.Deserialize<T>(json) ?? throw new JsonException($"Database document is not a {typeof(T).Name}");
+
+    public void Dispose() => _dataSource.Dispose();
+}

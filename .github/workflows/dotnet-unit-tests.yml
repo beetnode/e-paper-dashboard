@@ -6,6 +6,19 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: izboard_test
+          POSTGRES_PASSWORD: test-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d izboard_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout code
@@ -20,6 +33,8 @@ jobs:
         run: dotnet restore software/EPaperDashboard.sln
 
       - name: Run unit tests
+        env:
+          TEST_POSTGRES_CONNECTION_STRING: Host=localhost;Port=5432;Database=izboard_test;Username=postgres;Password=test-only-password
         run: |
           dotnet test software/EPaperDashboard.UnitTests/EPaperDashboard.UnitTests.csproj \
             --configuration Release \

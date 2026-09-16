@@ -1,6 +1,7 @@
 using LiteDB;
 using EPaperDashboard.Models;
 using EPaperDashboard.Utilities;
+using EPaperDashboard.Data;
 using SystemTextJson = System.Text.Json;
 
 namespace EPaperDashboard.Data.LiteDb;
@@ -9,7 +10,7 @@ namespace EPaperDashboard.Data.LiteDb;
 /// Internal LiteDB connection context. Only used by LiteDB repository implementations.
 /// Business logic must never take a direct dependency on this class.
 /// </summary>
-internal sealed class LiteDbContext : IDisposable
+internal sealed class LiteDbContext : IPersistenceInitializer, IDisposable
 {
     private readonly LiteDatabase _db;
 
@@ -63,6 +64,8 @@ internal sealed class LiteDbContext : IDisposable
     internal void BeginTransaction() => _db.BeginTrans();
     internal void Commit() => _db.Commit();
     internal void Rollback() => _db.Rollback();
+
+    public void Initialize() { } // Opening the context performs LiteDB initialization.
 
     public void Dispose() => _db.Dispose();
 

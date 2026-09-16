@@ -12,6 +12,8 @@ public interface IEnvironmentConfiguration
     TimeSpan DashboardScheduleCheckInterval { get; }
     TimeSpan DashboardMissedScheduleTolerance { get; }
     string ConfigDir { get; }
+    string? DatabaseProvider { get; }
+    string? DatabaseConnectionString { get; }
     string DataProtectionKeysDir { get; }
     bool FirmwareUpdateEnabled { get; }
     string FirmwareReleaseProvider { get; }
