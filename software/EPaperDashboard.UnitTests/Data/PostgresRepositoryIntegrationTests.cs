@@ -1,8 +1,11 @@
 using System.Text.Json;
 using EPaperDashboard.Data;
 using EPaperDashboard.Data.PostgreSql;
+using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using Xunit;
 
 namespace EPaperDashboard.UnitTests.Data;
@@ -17,9 +20,9 @@ public class PostgresRepositoryIntegrationTests
     {
         var connectionString = Environment.GetEnvironmentVariable("TEST_POSTGRES_CONNECTION_STRING")!;
 
-        using var context = new PostgresDbContext(new DatabaseSettings(DatabaseProvider.PostgreSql, connectionString));
-        context.Initialize();
-        context.Initialize();
+        using var services = CreateMigratedServices(connectionString);
+        services.GetRequiredService<IPersistenceInitializer>().Initialize();
+        var context = services.GetRequiredService<PostgresDbContext>();
 
         var users = new PostgresUserRepository(context);
         var dashboards = new PostgresDashboardRepository(context);
@@ -100,8 +103,8 @@ public class PostgresRepositoryIntegrationTests
     {
         var connectionString = Environment.GetEnvironmentVariable("TEST_POSTGRES_CONNECTION_STRING")!;
 
-        using var context = new PostgresDbContext(new DatabaseSettings(DatabaseProvider.PostgreSql, connectionString));
-        context.Initialize();
+        using var services = CreateMigratedServices(connectionString);
+        var context = services.GetRequiredService<PostgresDbContext>();
         var users = new PostgresUserRepository(context);
         var dashboards = new PostgresDashboardRepository(context);
         var unitOfWork = new PostgresUnitOfWork(context);
@@ -125,8 +128,8 @@ public class PostgresRepositoryIntegrationTests
     public void UnitOfWork_CommitsWritesAcrossRepositories()
     {
         var connectionString = Environment.GetEnvironmentVariable("TEST_POSTGRES_CONNECTION_STRING")!;
-        using var context = new PostgresDbContext(new DatabaseSettings(DatabaseProvider.PostgreSql, connectionString));
-        context.Initialize();
+        using var services = CreateMigratedServices(connectionString);
+        var context = services.GetRequiredService<PostgresDbContext>();
         var users = new PostgresUserRepository(context);
         var dashboards = new PostgresDashboardRepository(context);
         var unitOfWork = new PostgresUnitOfWork(context);
@@ -151,6 +154,55 @@ public class PostgresRepositoryIntegrationTests
             dashboards.Delete(dashboard.Id);
             users.Delete(user.Id);
         }
+    }
+
+    [PostgresFact]
+    public void Migrations_BaselineExistingSchemaWithoutLosingData()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("TEST_POSTGRES_CONNECTION_STRING")!;
+        var schema = $"migration_{Guid.NewGuid():N}";
+        using var connection = new NpgsqlConnection(connectionString);
+        connection.Open();
+        using var createSchema = new NpgsqlCommand($"CREATE SCHEMA {schema}", connection);
+        createSchema.ExecuteNonQuery();
+
+        try
+        {
+            var schemaConnectionString = new NpgsqlConnectionStringBuilder(connectionString) { SearchPath = schema }.ConnectionString;
+            Parallel.Invoke(
+                () => { using var first = CreateMigratedServices(schemaConnectionString); },
+                () => { using var second = CreateMigratedServices(schemaConnectionString); });
+            using var services = CreateMigratedServices(schemaConnectionString);
+            var users = services.GetRequiredService<IUserRepository>();
+            var user = new User { Username = "preserved-user", PasswordHash = "preserved-hash" };
+            users.Insert(user);
+
+            // The previous initializer created the same tables without migration history.
+            using var removeHistory = new NpgsqlCommand($"DROP TABLE {schema}.izboard_schema_versions", connection);
+            removeHistory.ExecuteNonQuery();
+
+            services.GetRequiredService<IPersistenceInitializer>().Initialize();
+            services.GetRequiredService<IPersistenceInitializer>().Initialize();
+
+            users.FindById(user.Id).Value.PasswordHash.Should().Be("preserved-hash");
+            using var versions = new NpgsqlCommand($"SELECT COUNT(*) FROM {schema}.izboard_schema_versions WHERE version = 1", connection);
+            versions.ExecuteScalar().Should().Be(1L);
+        }
+        finally
+        {
+            using var dropSchema = new NpgsqlCommand($"DROP SCHEMA {schema} CASCADE", connection);
+            dropSchema.ExecuteNonQuery();
+        }
+    }
+
+    private static ServiceProvider CreateMigratedServices(string connectionString)
+    {
+        var services = new ServiceCollection()
+            .AddLogging()
+            .AddPersistence(new DatabaseSettings(DatabaseProvider.PostgreSql, connectionString))
+            .BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
+        services.GetRequiredService<IPersistenceInitializer>().Initialize();
+        return services;
     }
 }
 

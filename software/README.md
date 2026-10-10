@@ -89,7 +89,9 @@ DATABASE_PROVIDER=postgresql
 DATABASE_CONNECTION_STRING=Host=postgres.example;Database=izboard;Username=izboard;Password=replace-me
 ```
 
-Create the database and user beforehand. On startup the app creates its tables and indexes, so the database user needs permission to create objects in its schema. The app does not import LiteDB data; choose the backend before creating data. PostgreSQL stores users, dashboards, devices, and pairing sessions. `/data` remains required for files and data-protection keys. A shared PostgreSQL database alone does not make multiple app replicas safe: scheduled jobs run in each app process, and uploaded images and keys need shared storage.
+Create the database and user beforehand. On startup the app applies versioned PostgreSQL schema migrations, so the database user needs permission to create and alter objects in its schema. Existing PostgreSQL databases created by earlier builds are recorded as schema version 1 without deleting their data. The app does not import LiteDB data; choose the backend before creating data. PostgreSQL stores users, dashboards, devices, and pairing sessions. `/data` remains required for files and data-protection keys. A shared PostgreSQL database alone does not make multiple app replicas safe: scheduled jobs run in each app process, and uploaded images and keys need shared storage.
+
+PostgreSQL schema changes use FluentMigrator classes under `Data/PostgreSql`. Add a new migration with a unique, increasing `[Migration(...)]` version; do not edit migrations that have already shipped. Startup applies pending migrations before deployment setup and stops if a migration fails. Applied versions are stored in `izboard_schema_versions` in the connection's current schema. A PostgreSQL advisory lock serializes migration runs. LiteDB initialization is independent of this runner. JSON document format changes may also require data updates or backwards-compatible deserialization.
 
 ### Optional rendering component
 

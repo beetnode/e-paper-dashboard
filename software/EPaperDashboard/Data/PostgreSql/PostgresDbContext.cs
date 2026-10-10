@@ -8,64 +8,13 @@ namespace EPaperDashboard.Data.PostgreSql;
 /// PostgreSQL infrastructure shared by the repository implementations. Each operation owns a
 /// pooled connection unless it is running inside an IUnitOfWork transaction.
 /// </summary>
-internal sealed class PostgresDbContext(DatabaseSettings settings) : IPersistenceInitializer, IDisposable
+internal sealed class PostgresDbContext(DatabaseSettings settings) : IDisposable
 {
     private readonly NpgsqlDataSource _dataSource = NpgsqlDataSource.Create(settings.ConnectionString!);
     private readonly AsyncLocal<NpgsqlConnection?> _transactionConnection = new();
     private readonly AsyncLocal<NpgsqlTransaction?> _transaction = new();
 
     internal bool InTransaction => _transaction.Value is not null;
-
-    public void Initialize()
-    {
-        const string schema = """
-            CREATE TABLE IF NOT EXISTS izboard_users (
-                id text PRIMARY KEY,
-                username text NOT NULL UNIQUE,
-                is_super_user boolean NOT NULL,
-                document jsonb NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS izboard_dashboards (
-                id text PRIMARY KEY,
-                user_id text NOT NULL,
-                document jsonb NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS ix_izboard_dashboards_user_id
-                ON izboard_dashboards (user_id);
-            CREATE TABLE IF NOT EXISTS izboard_devices (
-                id text PRIMARY KEY,
-                user_id text NOT NULL,
-                dashboard_id text NOT NULL,
-                device_identifier text NOT NULL,
-                api_key text NOT NULL,
-                document jsonb NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS ix_izboard_devices_user_id
-                ON izboard_devices (user_id);
-            CREATE INDEX IF NOT EXISTS ix_izboard_devices_dashboard_id
-                ON izboard_devices (dashboard_id);
-            CREATE UNIQUE INDEX IF NOT EXISTS ux_izboard_devices_identifier
-                ON izboard_devices (device_identifier) WHERE device_identifier <> '';
-            CREATE UNIQUE INDEX IF NOT EXISTS ux_izboard_devices_api_key
-                ON izboard_devices (api_key) WHERE api_key <> '';
-            CREATE TABLE IF NOT EXISTS izboard_pairing_sessions (
-                id text PRIMARY KEY,
-                code text NOT NULL UNIQUE,
-                expires_at timestamptz NOT NULL,
-                is_completed boolean NOT NULL,
-                document jsonb NOT NULL
-            );
-            CREATE INDEX IF NOT EXISTS ix_izboard_pairing_sessions_expiry
-                ON izboard_pairing_sessions (expires_at);
-            """;
-
-        WithConnection(connection =>
-        {
-            using var command = new NpgsqlCommand(schema, connection);
-            command.ExecuteNonQuery();
-            return true;
-        });
-    }
 
     internal T? FindOne<T>(string sql, params NpgsqlParameter[] parameters) where T : class =>
         WithConnection(connection =>
