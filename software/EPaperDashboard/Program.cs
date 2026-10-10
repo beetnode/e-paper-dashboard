@@ -4,7 +4,7 @@ using EPaperDashboard.Services.Providers;
 using EPaperDashboard.Services.Providers.HomeAssistant;
 using EPaperDashboard.Services.Ai;
 using EPaperDashboard.Utilities;
-using EPaperDashboard.Data.LiteDb;
+using EPaperDashboard.Data;
 using EPaperDashboard.Data.Repositories;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using EPaperDashboard.Services;
@@ -23,6 +23,19 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 
+// Maintenance is a separate process: no web host, background jobs, or deployment setup.
+if (args.Contains("--maintenance"))
+{
+    if (args.Length != 1)
+    {
+        Console.Error.WriteLine("Use --maintenance without other command-line arguments");
+        Environment.ExitCode = 1;
+        return;
+    }
+    Environment.ExitCode = DatabaseMaintenanceCommand.Run(new EnvironmentConfigurationWrapper());
+    return;
+}
+
 // The same slim image runs the restricted sidecar, keeping both hosts on the exact app build.
 // Exit before app configuration, databases, authentication, or application routes are initialized.
 if (args.Contains("--rendering-host"))
@@ -40,6 +53,19 @@ var builder = WebApplication.CreateBuilder(args);
 
 var environmentConfiguration = new EnvironmentConfigurationWrapper();
 builder.Services.AddSingleton<IEnvironmentConfiguration>(environmentConfiguration);
+DatabaseSettings databaseSettings;
+try
+{
+	databaseSettings = DatabaseSettings.Parse(
+		environmentConfiguration.DatabaseProvider,
+		environmentConfiguration.DatabaseConnectionString);
+}
+catch (ArgumentException exception)
+{
+	Console.Error.WriteLine($"Configuration Error: {exception.Message}");
+	Environment.Exit(1);
+	return;
+}
 
 // Register deployment strategy based on APP_MODE via a single shared factory (used again below
 // for pre-container validation, so the mode→type mapping only lives in one place).
@@ -132,12 +158,6 @@ builder.Services
 	.AddSingleton<PlaywrightComponentRuntime>()
 	.AddHostedService(sp => sp.GetRequiredService<PlaywrightComponentManager>())
 	.AddSingleton<IImageFactory, ImageFactory>()
-	.AddSingleton<LiteDbContext>()
-	.AddSingleton<IUserRepository, LiteDbUserRepository>()
-	.AddSingleton<IDashboardRepository, LiteDbDashboardRepository>()
-	.AddSingleton<IDeviceRepository, LiteDbDeviceRepository>()
-	.AddSingleton<IPairingSessionRepository, LiteDbPairingSessionRepository>()
-	.AddSingleton<IUnitOfWork, LiteDbUnitOfWork>()
 	.AddSingleton<UserService>()
 	.AddSingleton<DashboardService>()
 	.AddSingleton<DeviceService>()
@@ -190,6 +210,8 @@ builder.Services
 	.AddSingleton<DeviceLastSeenTracker>()
 	.AddHostedService<DashboardScheduleMonitorService>()
 	.AddHostedService<AiPreGenerationService>();
+
+builder.Services.AddPersistence(databaseSettings);
 
 // Firmware update services
 if (EnvironmentConfiguration.FirmwareUpdateEnabled)
@@ -271,7 +293,18 @@ builder.Services.Configure<RazorPagesOptions>(options =>
 	options.Conventions.AllowAnonymousToPage("/Privacy");
 });
 
-var app = builder.Build();
+await using var app = builder.Build();
+
+try
+{
+    app.Services.GetRequiredService<IPersistenceInitializer>().Initialize();
+}
+catch (Exception exception)
+{
+    Console.Error.WriteLine($"Database initialization failed: {exception.Message}");
+    Environment.ExitCode = 1;
+    return;
+}
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 var strategy = app.Services.GetRequiredService<IDeploymentStrategy>();
