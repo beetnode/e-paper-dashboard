@@ -23,6 +23,19 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 
+// Maintenance is a separate process: no web host, background jobs, or deployment setup.
+if (args.Contains("--maintenance"))
+{
+    if (args.Length != 1)
+    {
+        Console.Error.WriteLine("Use --maintenance without other command-line arguments");
+        Environment.ExitCode = 1;
+        return;
+    }
+    Environment.ExitCode = DatabaseMaintenanceCommand.Run(new EnvironmentConfigurationWrapper());
+    return;
+}
+
 // The same slim image runs the restricted sidecar, keeping both hosts on the exact app build.
 // Exit before app configuration, databases, authentication, or application routes are initialized.
 if (args.Contains("--rendering-host"))
@@ -280,9 +293,18 @@ builder.Services.Configure<RazorPagesOptions>(options =>
 	options.Conventions.AllowAnonymousToPage("/Privacy");
 });
 
-var app = builder.Build();
+await using var app = builder.Build();
 
-app.Services.GetRequiredService<IPersistenceInitializer>().Initialize();
+try
+{
+    app.Services.GetRequiredService<IPersistenceInitializer>().Initialize();
+}
+catch (Exception exception)
+{
+    Console.Error.WriteLine($"Database initialization failed: {exception.Message}");
+    Environment.ExitCode = 1;
+    return;
+}
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 var strategy = app.Services.GetRequiredService<IDeploymentStrategy>();

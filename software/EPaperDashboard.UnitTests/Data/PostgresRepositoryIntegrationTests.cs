@@ -169,21 +169,20 @@ public class PostgresRepositoryIntegrationTests
         try
         {
             var schemaConnectionString = new NpgsqlConnectionStringBuilder(connectionString) { SearchPath = schema }.ConnectionString;
-            Parallel.Invoke(
-                () => { using var first = CreateMigratedServices(schemaConnectionString); },
-                () => { using var second = CreateMigratedServices(schemaConnectionString); });
-            using var services = CreateMigratedServices(schemaConnectionString);
-            var users = services.GetRequiredService<IUserRepository>();
             var user = new User { Username = "preserved-user", PasswordHash = "preserved-hash" };
-            users.Insert(user);
+            using (var previousServices = CreateMigratedServices(schemaConnectionString))
+                previousServices.GetRequiredService<IUserRepository>().Insert(user);
 
             // The previous initializer created the same tables without migration history.
             using var removeHistory = new NpgsqlCommand($"DROP TABLE {schema}.izboard_schema_versions", connection);
             removeHistory.ExecuteNonQuery();
 
-            services.GetRequiredService<IPersistenceInitializer>().Initialize();
-            services.GetRequiredService<IPersistenceInitializer>().Initialize();
+            Migrate(schemaConnectionString);
+            Migrate(schemaConnectionString);
 
+            using var services = CreateServices(schemaConnectionString);
+            services.GetRequiredService<IPersistenceInitializer>().Initialize();
+            var users = services.GetRequiredService<IUserRepository>();
             users.FindById(user.Id).Value.PasswordHash.Should().Be("preserved-hash");
             using var versions = new NpgsqlCommand($"SELECT COUNT(*) FROM {schema}.izboard_schema_versions WHERE version = 1", connection);
             versions.ExecuteScalar().Should().Be(1L);
@@ -197,12 +196,128 @@ public class PostgresRepositoryIntegrationTests
 
     private static ServiceProvider CreateMigratedServices(string connectionString)
     {
-        var services = new ServiceCollection()
+        Migrate(connectionString);
+        var services = CreateServices(connectionString);
+        try
+        {
+            services.GetRequiredService<IPersistenceInitializer>().Initialize();
+            return services;
+        }
+        catch
+        {
+            services.Dispose();
+            throw;
+        }
+    }
+
+    private static ServiceProvider CreateServices(string connectionString) => new ServiceCollection()
+        .AddLogging()
+        .AddPersistence(new DatabaseSettings(DatabaseProvider.PostgreSql, connectionString))
+        .BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
+
+    private static void Migrate(string connectionString)
+    {
+        using var services = new ServiceCollection()
             .AddLogging()
-            .AddPersistence(new DatabaseSettings(DatabaseProvider.PostgreSql, connectionString))
+            .AddDatabaseMaintenance(new DatabaseSettings(DatabaseProvider.PostgreSql, connectionString))
             .BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
-        services.GetRequiredService<IPersistenceInitializer>().Initialize();
-        return services;
+        services.GetRequiredService<IDatabaseMaintenance>().Migrate();
+    }
+
+    [PostgresFact]
+    public void Startup_RequiresMatchingSchemaWithoutApplyingMigrations()
+    {
+        WithEmptySchema(connectionString =>
+        {
+            using (var services = CreateServices(connectionString))
+            {
+                Action start = () => services.GetRequiredService<IPersistenceInitializer>().Initialize();
+                start.Should().Throw<InvalidOperationException>().WithMessage("*--maintenance*");
+                using var connection = new NpgsqlConnection(connectionString);
+                connection.Open();
+                using var tables = new NpgsqlCommand("SELECT to_regclass('izboard_users') IS NULL", connection);
+                tables.ExecuteScalar().Should().Be(true);
+            }
+
+            Migrate(connectionString);
+            using (var connection = new NpgsqlConnection(connectionString))
+            {
+                connection.Open();
+                using var futureVersion = new NpgsqlCommand("UPDATE izboard_schema_versions SET version = 2", connection);
+                futureVersion.ExecuteNonQuery();
+            }
+
+            using var oldApp = CreateServices(connectionString);
+            Action startOldApp = () => oldApp.GetRequiredService<IPersistenceInitializer>().Initialize();
+            startOldApp.Should().Throw<InvalidOperationException>().WithMessage("*matching app release*");
+            Action migrateOldApp = () => Migrate(connectionString);
+            migrateOldApp.Should().Throw<InvalidOperationException>().WithMessage("*matching app release*");
+            using var check = new NpgsqlConnection(connectionString);
+            check.Open();
+            using var unchanged = new NpgsqlCommand("SELECT version FROM izboard_schema_versions", check);
+            unchanged.ExecuteScalar().Should().Be(2L);
+        });
+    }
+
+    [PostgresFact]
+    public void Maintenance_AndRunningServiceExcludeEachOther()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("TEST_POSTGRES_CONNECTION_STRING")!;
+        using (var services = CreateMigratedServices(connectionString))
+        {
+            Action migrate = () => Migrate(connectionString);
+            migrate.Should().Throw<InvalidOperationException>().WithMessage("*Stop all app instances*");
+        }
+
+        using var maintenance = PostgresDatabaseLease.Acquire(
+            new DatabaseSettings(DatabaseProvider.PostgreSql, connectionString), maintenance: true);
+        using var app = CreateServices(connectionString);
+        Action start = () => app.GetRequiredService<IPersistenceInitializer>().Initialize();
+        start.Should().Throw<InvalidOperationException>().WithMessage("*maintenance is in progress*");
+    }
+
+    [PostgresFact]
+    public void InitialSchema_PreservesPartialUniqueIndexesAndTimestampType()
+    {
+        WithEmptySchema(connectionString =>
+        {
+            using var services = CreateMigratedServices(connectionString);
+            var devices = services.GetRequiredService<IDeviceRepository>();
+            devices.Insert(new Device());
+            devices.Insert(new Device());
+            devices.Insert(new Device { ApiKey = "unique-key", DeviceIdentifier = "unique-device" });
+            Action duplicateKey = () => devices.Insert(new Device { ApiKey = "unique-key" });
+            duplicateKey.Should().Throw<PostgresException>().Which.SqlState.Should().Be("23505");
+            Action duplicateIdentifier = () => devices.Insert(new Device { DeviceIdentifier = "unique-device" });
+            duplicateIdentifier.Should().Throw<PostgresException>().Which.SqlState.Should().Be("23505");
+
+            using var connection = new NpgsqlConnection(connectionString);
+            connection.Open();
+            using var type = new NpgsqlCommand("""
+                SELECT data_type FROM information_schema.columns
+                WHERE table_schema = current_schema() AND table_name = 'izboard_pairing_sessions' AND column_name = 'expires_at'
+                """, connection);
+            type.ExecuteScalar().Should().Be("timestamp with time zone");
+        });
+    }
+
+    private static void WithEmptySchema(Action<string> test)
+    {
+        var connectionString = Environment.GetEnvironmentVariable("TEST_POSTGRES_CONNECTION_STRING")!;
+        var schema = $"migration_{Guid.NewGuid():N}";
+        using var connection = new NpgsqlConnection(connectionString);
+        connection.Open();
+        using var createSchema = new NpgsqlCommand($"CREATE SCHEMA {schema}", connection);
+        createSchema.ExecuteNonQuery();
+        try
+        {
+            test(new NpgsqlConnectionStringBuilder(connectionString) { SearchPath = schema }.ConnectionString);
+        }
+        finally
+        {
+            using var dropSchema = new NpgsqlCommand($"DROP SCHEMA {schema} CASCADE", connection);
+            dropSchema.ExecuteNonQuery();
+        }
     }
 }
 

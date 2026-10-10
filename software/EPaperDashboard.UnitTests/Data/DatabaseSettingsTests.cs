@@ -5,6 +5,7 @@ using EPaperDashboard.Data.Repositories;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using FluentMigrator.Runner;
 
 namespace EPaperDashboard.UnitTests.Data;
 
@@ -59,5 +60,7 @@ public class DatabaseSettingsTests
             .Should().Be(ServiceLifetime.Singleton);
         services.Single(service => service.ServiceType == typeof(IUnitOfWork))
             .Should().NotBeNull();
+        services.Should().NotContain(service => service.ServiceType == typeof(IMigrationRunner));
+        services.Should().NotContain(service => service.ServiceType == typeof(IDatabaseMaintenance));
     }
 }

@@ -89,9 +89,24 @@ DATABASE_PROVIDER=postgresql
 DATABASE_CONNECTION_STRING=Host=postgres.example;Database=izboard;Username=izboard;Password=replace-me
 ```
 
-Create the database and user beforehand. On startup the app applies versioned PostgreSQL schema migrations, so the database user needs permission to create and alter objects in its schema. Existing PostgreSQL databases created by earlier builds are recorded as schema version 1 without deleting their data. The app does not import LiteDB data; choose the backend before creating data. PostgreSQL stores users, dashboards, devices, and pairing sessions. `/data` remains required for files and data-protection keys. A shared PostgreSQL database alone does not make multiple app replicas safe: scheduled jobs run in each app process, and uploaded images and keys need shared storage.
+Create the database and user beforehand, then run maintenance before the first start and before each app upgrade. The maintenance database user needs permission to create and alter objects in its schema. Existing PostgreSQL databases created by earlier builds are recorded as schema version 1 without deleting their data. The app does not import LiteDB data; choose the backend before creating data. PostgreSQL stores users, dashboards, devices, and pairing sessions. `/data` remains required for files and data-protection keys. A shared PostgreSQL database alone does not make multiple app replicas safe: scheduled jobs run in each app process, and uploaded images and keys need shared storage.
 
-PostgreSQL schema changes use FluentMigrator classes under `Data/PostgreSql`. Add a new migration with a unique, increasing `[Migration(...)]` version; do not edit migrations that have already shipped. Startup applies pending migrations before deployment setup and stops if a migration fails. Applied versions are stored in `izboard_schema_versions` in the connection's current schema. A PostgreSQL advisory lock serializes migration runs. LiteDB initialization is independent of this runner. JSON document format changes may also require data updates or backwards-compatible deserialization.
+#### PostgreSQL maintenance
+
+Stop all app instances before running maintenance. For Docker Compose, select the new image version through `IZBOARD_APP_IMAGE`, then run these steps in order:
+
+```shell
+docker compose -f docker-compose.base.yml stop app
+docker compose -f docker-compose.base.yml run --rm --no-deps app dotnet EPaperDashboard.dll --maintenance
+# Run only after maintenance exits successfully:
+docker compose -f docker-compose.base.yml up -d app
+```
+
+For a direct deployment, stop the service and run `dotnet EPaperDashboard.dll --maintenance` from the new version's directory with `DATABASE_PROVIDER` and `DATABASE_CONNECTION_STRING` configured. Restart the service only after exit code 0. Maintenance does not start HTTP listeners, background jobs, or initial account setup; it needs only database configuration. Exit code 1 means maintenance failed and the service must remain stopped until the issue is resolved.
+
+Normal startup only checks the schema and refuses to serve requests if migrations are missing or the database belongs to a different app schema version. A database lock prevents maintenance while an app instance is running and prevents an app from starting during maintenance. Normal startup never applies migrations. LiteDB initialization is independent of maintenance.
+
+PostgreSQL schema changes, including the first schema, use FluentMigrator's fluent API under `Data/PostgreSql`. Add a new migration with a unique, increasing `[Migration(...)]` version; do not edit migrations that have already shipped. Applied versions are stored in `izboard_schema_versions` in the connection's current schema. JSON document format changes may also require data updates or backwards-compatible deserialization.
 
 ### Optional rendering component
 
