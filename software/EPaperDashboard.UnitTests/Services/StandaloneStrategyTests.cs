@@ -13,8 +13,6 @@ public class StandaloneStrategyTests
     {
         var config = new Mock<IEnvironmentConfiguration>();
         config.SetupGet(c => c.ClientUri).Returns(new Uri("https://example.com"));
-        config.SetupGet(c => c.SuperUserUsername).Returns("admin");
-        config.SetupGet(c => c.SuperUserPassword).Returns("password");
         config.SetupGet(c => c.StateSigningKey).Returns("signing-key");
         return config;
     }
@@ -55,20 +53,6 @@ public class StandaloneStrategyTests
         var sut = CreateSut(config.Object);
 
         sut.ValidateConfiguration().IsFailure.Should().BeTrue();
-    }
-
-    [Fact]
-    public void ValidateConfiguration_MissingSuperuserCredentials_ReturnsFailureNamingBoth()
-    {
-        var config = CreateValidConfig();
-        config.SetupGet(c => c.SuperUserUsername).Returns((string?)null);
-        config.SetupGet(c => c.SuperUserPassword).Returns((string?)null);
-        var sut = CreateSut(config.Object);
-
-        var result = sut.ValidateConfiguration();
-
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().Contain("SUPERUSER_USERNAME").And.Contain("SUPERUSER_PASSWORD");
     }
 
     [Fact]

@@ -1,6 +1,5 @@
-using EPaperDashboard.Models.Rendering;
+using EPaperDashboard.RenderingComponent;
 using EPaperDashboard.Services.Components.Playwright;
-using EPaperDashboard.Services.Rendering;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,10 +10,10 @@ namespace EPaperDashboard.Controllers;
 [Authorize]
 public sealed class PlaywrightComponentController(
     PlaywrightComponentManager componentManager,
-    IPageToImageRenderingService renderingService,
-    PlaywrightComponentRuntime runtime) : ControllerBase
+    PlaywrightComponentRuntime runtime) : BaseApiController
 {
     [HttpGet]
+    [Authorize(Policy = "SuperUserOnly")]
     public async Task<ActionResult<PlaywrightComponentStatus>> GetStatus()
     {
         var component = componentManager.GetActiveComponent();
@@ -49,14 +48,21 @@ public sealed class PlaywrightComponentController(
     [Authorize(Policy = "SuperUserOnly")]
     public async Task<IActionResult> Test()
     {
-        var result = await renderingService.RenderHtmlAsync(
-            "<!doctype html><html><body style=\"margin:0;background:#fff;color:#000\">izBoard</body></html>",
-            new Size(200, 100), HttpContext.RequestAborted);
-        if (result.IsFailure)
-            return StatusCode(500, new { message = result.Error });
-
-        using var image = result.Value;
-        return Ok(new { message = "Rendering component tested successfully." });
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(HttpContext.RequestAborted);
+        timeout.CancelAfter(TimeSpan.FromSeconds(150));
+        try
+        {
+            using var lease = await runtime.AcquireRenderAsync(timeout.Token);
+            var component = componentManager.GetActiveComponent();
+            if (component is null) return Conflict(new { message = "The rendering component is not ready." });
+            await runtime.RunAsync(component, new RenderRequest("html", 200, 100,
+                Html: "<!doctype html><html><body>izBoard</body></html>"), timeout.Token);
+            return Ok(new { message = "Rendering component tested successfully." });
+        }
+        catch (InvalidOperationException)
+        {
+            return StatusCode(503, new { message = "The rendering component test failed. Check the renderer logs." });
+        }
     }
 
     [HttpDelete]

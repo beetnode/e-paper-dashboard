@@ -55,7 +55,7 @@ public class UserServiceTests
         var result = sut.TryCreateUser("alice", "pw");
 
         result.Should().BeFalse();
-        users.Verify(r => r.Insert(It.IsAny<User>()), Times.Never);
+        users.Verify(r => r.TryInsert(It.IsAny<User>()), Times.Never);
     }
 
     [Fact]
@@ -64,7 +64,7 @@ public class UserServiceTests
         var (sut, users, _) = CreateSut();
         users.Setup(r => r.ExistsByUsername("bob")).Returns(false);
         User? inserted = null;
-        users.Setup(r => r.Insert(It.IsAny<User>())).Callback<User>(u => inserted = u);
+        users.Setup(r => r.TryInsert(It.IsAny<User>())).Callback<User>(u => inserted = u).Returns(true);
 
         var result = sut.TryCreateUser("bob", "pw123");
 

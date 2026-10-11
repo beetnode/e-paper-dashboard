@@ -52,12 +52,6 @@ public class HostModeStrategy : IDeploymentStrategy
         if (clientUrlError is not null)
             missingConfigs.Add(clientUrlError);
 
-        if (string.IsNullOrWhiteSpace(_environmentConfiguration.SuperUserUsername))
-            missingConfigs.Add("SUPERUSER_USERNAME");
-
-        if (string.IsNullOrWhiteSpace(_environmentConfiguration.SuperUserPassword))
-            missingConfigs.Add("SUPERUSER_PASSWORD");
-
         if (string.IsNullOrWhiteSpace(_environmentConfiguration.StateSigningKey))
             missingConfigs.Add("STATE_SIGNING_KEY");
 
@@ -78,18 +72,7 @@ public class HostModeStrategy : IDeploymentStrategy
 
     public void PerformInitialSetup(IServiceProvider serviceProvider)
     {
-        var userService = serviceProvider.GetRequiredService<UserService>();
-        if (!userService.HasSuperUser()
-            && _environmentConfiguration.SuperUserUsername != null
-            && _environmentConfiguration.SuperUserPassword != null)
-        {
-            userService.TryCreateUser(
-                _environmentConfiguration.SuperUserUsername,
-                _environmentConfiguration.SuperUserPassword,
-                isSuperUser: true);
 
-            _logger.LogInformation("Created superuser: {Username}", _environmentConfiguration.SuperUserUsername);
-        }
     }
 
     public void ApplyMiddleware(IApplicationBuilder app, IWebHostEnvironment environment) { }

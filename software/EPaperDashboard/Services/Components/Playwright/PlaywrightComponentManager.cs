@@ -62,13 +62,14 @@ public sealed class PlaywrightComponentManager : BackgroundService
         }
     }
 
-    public bool StartInstallation()
+    public bool StartInstallation(bool onlyIfNeeded = false)
     {
         if (!IsRuntimeSupported())
             throw new PlatformNotSupportedException("The rendering component is currently available for Linux x64 and arm64 only.");
 
         lock (_statusLock)
         {
+            if (onlyIfNeeded && _status.State == PlaywrightComponentState.Installed) return false;
             if (_uninstalling || _installationTask is { IsCompleted: false })
                 return false;
 

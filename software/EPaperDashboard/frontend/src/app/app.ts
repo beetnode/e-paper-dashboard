@@ -31,6 +31,11 @@ export class App implements OnInit {
 
   ngOnInit(): void {
     this.authService.checkAuth();
+    this.authService.getSetupStatus().subscribe({
+      next: status => {
+        if (status.setupRequired) this.router.navigate(['/setup']);
+      }
+    });
   }
 
   logout(): void {

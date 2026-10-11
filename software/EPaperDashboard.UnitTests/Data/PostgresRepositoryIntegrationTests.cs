@@ -243,7 +243,7 @@ public class PostgresRepositoryIntegrationTests
             using (var connection = new NpgsqlConnection(connectionString))
             {
                 connection.Open();
-                using var futureVersion = new NpgsqlCommand("UPDATE izboard_schema_versions SET version = 2", connection);
+                using var futureVersion = new NpgsqlCommand("UPDATE izboard_schema_versions SET version = version + 100", connection);
                 futureVersion.ExecuteNonQuery();
             }
 
@@ -255,7 +255,7 @@ public class PostgresRepositoryIntegrationTests
             using var check = new NpgsqlConnection(connectionString);
             check.Open();
             using var unchanged = new NpgsqlCommand("SELECT version FROM izboard_schema_versions", check);
-            unchanged.ExecuteScalar().Should().Be(2L);
+            unchanged.ExecuteScalar().Should().BeOneOf(101L, 102L);
         });
     }
 
@@ -298,6 +298,37 @@ public class PostgresRepositoryIntegrationTests
                 WHERE table_schema = current_schema() AND table_name = 'izboard_pairing_sessions' AND column_name = 'expires_at'
                 """, connection);
             type.ExecuteScalar().Should().Be("timestamp with time zone");
+        });
+    }
+
+    [PostgresFact]
+    public void Setup_IsAtomicAcrossConnectionsAndStaysClosedAfterDeletion()
+    {
+        WithEmptySchema(connectionString =>
+        {
+            using var services = CreateMigratedServices(connectionString);
+            var settings = new DatabaseSettings(DatabaseProvider.PostgreSql, connectionString);
+            var results = new bool[12];
+            Parallel.For(0, results.Length, i =>
+            {
+                using var context = new PostgresDbContext(settings);
+                results[i] = new PostgresUserRepository(context).TryCreateAdministrator(new User { Username = "admin-" + i });
+            });
+            results.Count(result => result).Should().Be(1);
+            var users = services.GetRequiredService<IUserRepository>();
+            var admin = users.GetAll().Should().ContainSingle().Subject;
+            admin.IsSuperUser.Should().BeTrue();
+            users.SetRenderingEnabled(admin.Id, false);
+            users.GetRenderingEnabled(admin.Id).Should().BeFalse();
+            users.Delete(admin.Id);
+            users.IsSetupComplete().Should().BeTrue();
+            users.TryCreateAdministrator(new User { Username = "attacker" }).Should().BeFalse();
+            Parallel.For(0, results.Length, i =>
+            {
+                using var context = new PostgresDbContext(settings);
+                results[i] = new PostgresUserRepository(context).TryInsert(new User { Username = "same-user" });
+            });
+            results.Count(result => result).Should().Be(1);
         });
     }
 

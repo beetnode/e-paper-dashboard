@@ -14,8 +14,6 @@ public class HostModeStrategyTests
     {
         var config = new Mock<IEnvironmentConfiguration>();
         config.SetupGet(c => c.ClientUri).Returns(new Uri("https://example.com"));
-        config.SetupGet(c => c.SuperUserUsername).Returns("admin");
-        config.SetupGet(c => c.SuperUserPassword).Returns("password");
         config.SetupGet(c => c.StateSigningKey).Returns("signing-key");
         config.SetupGet(c => c.HomeAssistantHost).Returns("http://homeassistant.local:8123");
         return config;
@@ -30,19 +28,6 @@ public class HostModeStrategyTests
         var sut = CreateSut(CreateValidConfig().Object);
 
         sut.ValidateConfiguration().IsSuccess.Should().BeTrue();
-    }
-
-    [Fact]
-    public void ValidateConfiguration_MissingSuperuserPassword_ReturnsFailure()
-    {
-        var config = CreateValidConfig();
-        config.SetupGet(c => c.SuperUserPassword).Returns((string?)null);
-        var sut = CreateSut(config.Object);
-
-        var result = sut.ValidateConfiguration();
-
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().Contain("SUPERUSER_PASSWORD");
     }
 
     [Fact]

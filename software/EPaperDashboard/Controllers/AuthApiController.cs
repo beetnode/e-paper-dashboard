@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 using EPaperDashboard.Services;
 using EPaperDashboard.Models;
@@ -16,10 +17,39 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
     private readonly UserService _userService = userService;
     private readonly IDeploymentStrategy _deploymentStrategy = deploymentStrategy;
 
+    [HttpGet("setup")]
+    [AllowAnonymous]
+    public IActionResult GetSetupStatus()
+    {
+        var localAccounts = _deploymentStrategy.IsUserManagementEnabled;
+        var setupComplete = localAccounts && _userService.IsSetupComplete();
+        return Ok(new
+        {
+            setupRequired = localAccounts && !setupComplete,
+            registrationEnabled = setupComplete
+        });
+    }
+
+    [HttpPost("setup")]
+    [AllowAnonymous]
+    [EnableRateLimiting("AccountCreation")]
+    public async Task<IActionResult> Setup([FromBody] RegisterRequest request)
+    {
+        if (!_deploymentStrategy.IsUserManagementEnabled) return Forbid();
+        var error = UserService.ValidateCredentials(request.Username, request.Password);
+        if (error is not null) return BadRequest(new { message = error });
+        if (!_userService.TryCreateAdministrator(request.Username, request.Password))
+            return Conflict(new { message = "Service setup is already complete. Sign in or create a regular account." });
+        return await Login(new LoginRequest(request.Username.Trim(), request.Password));
+    }
+
     [HttpPost("login")]
     [AllowAnonymous]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
+        if (!_deploymentStrategy.IsUserManagementEnabled) return Forbid();
+        if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrEmpty(request.Password))
+            return Unauthorized(new { message = "Invalid username or password." });
         if (!_userService.IsUserValid(request.Username, request.Password))
         {
             return Unauthorized(new { message = "Invalid username or password." });
@@ -46,14 +76,22 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
             id = user.Value.Id.ToString(),
             username = user.Value.Username,
             nickname = user.Value.Nickname,
-            isSuperUser = user.Value.IsSuperUser
+            isSuperUser = user.Value.IsSuperUser,
+            deploymentMode = _deploymentStrategy.Mode.ToString().ToLowerInvariant()
         });
     }
 
     [HttpPost("register")]
     [AllowAnonymous]
+    [EnableRateLimiting("AccountCreation")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
+        if (!_deploymentStrategy.IsUserManagementEnabled) return Forbid();
+        if (!_userService.IsSetupComplete())
+            return Conflict(new { message = "Create the service administrator through initial setup first." });
+        var error = UserService.ValidateCredentials(request.Username, request.Password);
+        if (error is not null) return BadRequest(new { message = error });
+        request = request with { Username = request.Username.Trim() };
         var existingUser = _userService.GetUserByUsername(request.Username);
         if (existingUser.HasValue)
         {
@@ -86,7 +124,8 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
             id = user.Value.Id.ToString(),
             username = user.Value.Username,
             nickname = user.Value.Nickname,
-            isSuperUser = user.Value.IsSuperUser
+            isSuperUser = user.Value.IsSuperUser,
+            deploymentMode = _deploymentStrategy.Mode.ToString().ToLowerInvariant()
         });
     }
 

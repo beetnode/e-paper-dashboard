@@ -87,18 +87,21 @@ public sealed class PlaywrightComponentRuntime
         timeout.CancelAfter(TimeSpan.FromSeconds(150));
         using var client = CreateSocketClient(_socketPath);
         await VerifyHostAsync(client, timeout.Token);
+        var jobId = Guid.NewGuid();
         using var message = new HttpRequestMessage(HttpMethod.Post, "http://renderer/render")
         {
             Content = JsonContent.Create(new RemoteRenderRequest(
                 Path.GetRelativePath(_componentRoot, component.RootPath), Constants.AppVersion,
-                request with { OutputPath = null }))
+                request with { OutputPath = null }, jobId))
         };
         HttpResponseMessage response;
         try { response = await client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, timeout.Token); }
         catch
         {
-            // Do not release the app's lifecycle lease while an aborted remote worker still runs.
-            await DrainRemoteAsync(CancellationToken.None);
+            // Wait only for this worker; cancellation must not drain other users' renders.
+            using var cleanupTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(160));
+            using var cancellation = await client.PostAsync($"http://renderer/cancel/{jobId}", null, cleanupTimeout.Token);
+            cancellation.EnsureSuccessStatusCode();
             throw;
         }
         using var responseLease = response;
@@ -170,7 +173,7 @@ public sealed class PlaywrightComponentRuntime
         using var response = await client.GetAsync("http://renderer/health", token);
         response.EnsureSuccessStatusCode();
         var health = await response.Content.ReadFromJsonAsync<RenderingHostHealth>(token);
-        if (health is null || health.ProtocolVersion != 2 || !health.SandboxRequired
+        if (health is null || health.ProtocolVersion != 2 || !health.SandboxRequired || !health.SupportsJobCancellation
             || health.RuntimeIdentifier != PlaywrightComponentManager.GetRuntimeIdentifier()
             || PlaywrightComponentManager.NormalizeVersion(health.AppVersion) != PlaywrightComponentManager.NormalizeVersion(Constants.AppVersion))
             throw new InvalidOperationException("The renderer container must match the application build and require browser sandboxing.");

@@ -21,17 +21,25 @@ internal static class RenderingComponentHost
             options.ListenUnixSocket(SocketPath);
         });
         builder.Services.AddSingleton<PlaywrightComponentRuntime>();
+        builder.Services.AddSingleton<RemoteRenderJobs>();
         var app = builder.Build();
         app.MapGet("/health", () => new RenderingHostHealth(
-            Constants.AppVersion, PlaywrightComponentManager.GetRuntimeIdentifier(), 2, true));
+            Constants.AppVersion, PlaywrightComponentManager.GetRuntimeIdentifier(), 2, true, true));
         app.MapPost("/drain", async (PlaywrightComponentRuntime runtime, HttpContext context) =>
         {
             using var lease = await runtime.AcquireExclusiveAsync(context.RequestAborted);
             return Results.Ok();
         });
-        app.MapPost("/render", async (RemoteRenderRequest message, PlaywrightComponentRuntime runtime, HttpContext context) =>
+        app.MapPost("/cancel/{id:guid}", async (Guid id, RemoteRenderJobs jobs, HttpContext context) =>
         {
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted);
+            await jobs.CancelAsync(id).WaitAsync(context.RequestAborted);
+            return Results.Ok();
+        });
+        app.MapPost("/render", async (RemoteRenderRequest message, PlaywrightComponentRuntime runtime, RemoteRenderJobs jobs, HttpContext context) =>
+        {
+            var job = jobs.Start(message.JobId, context.RequestAborted);
+            if (job is null) return Results.Conflict();
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(job.Token);
             timeout.CancelAfter(TimeSpan.FromSeconds(150));
             try
             {
@@ -62,6 +70,7 @@ internal static class RenderingComponentHost
                     app.Logger.LogWarning("Isolated rendering request failed ({ErrorType})", exception.GetType().Name);
                 return Results.StatusCode(500);
             }
+            finally { job.Complete(); }
         });
         await app.StartAsync();
         File.SetUnixFileMode(SocketPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.GroupWrite);

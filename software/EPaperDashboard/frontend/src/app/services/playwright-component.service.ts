@@ -21,6 +21,12 @@ export interface PlaywrightComponentStatus {
   error?: string;
 }
 
+export type UserRenderingComponentStatus = Pick<PlaywrightComponentStatus, 'state' | 'supported' | 'ready'>;
+export interface UserRenderingStatus {
+  enabled: boolean;
+  component: UserRenderingComponentStatus;
+}
+
 @Injectable({ providedIn: 'root' })
 export class PlaywrightComponentService {
   private readonly http = inject(HttpClient);
@@ -28,6 +34,10 @@ export class PlaywrightComponentService {
 
   getStatus(): Observable<PlaywrightComponentStatus> {
     return this.http.get<PlaywrightComponentStatus>(this.endpoint);
+  }
+
+  getUserStatus(): Observable<UserRenderingStatus> {
+    return this.http.get<UserRenderingStatus>('/api/rendering');
   }
 
   install(): Observable<PlaywrightComponentStatus> {

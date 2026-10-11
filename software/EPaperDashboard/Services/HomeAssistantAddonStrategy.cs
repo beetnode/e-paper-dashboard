@@ -186,7 +186,8 @@ public class HomeAssistantAddonStrategy : IDeploymentStrategy
             var path = context.Request.Path.Value?.ToLowerInvariant() ?? "";
             var isUserManagementEndpoint = path.StartsWith("/api/auth/") || path.StartsWith("/api/users/");
             
-            if (isUserManagementEndpoint && path != "/api/auth/current")
+            var isSetupStatus = path == "/api/auth/setup" && HttpMethods.IsGet(context.Request.Method);
+            if (isUserManagementEndpoint && path != "/api/auth/current" && !isSetupStatus)
             {
                 context.Response.StatusCode = 403;
                 await context.Response.WriteAsJsonAsync(new { message = "User management is disabled in Home Assistant add-on mode" });

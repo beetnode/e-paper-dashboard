@@ -20,7 +20,7 @@ The server component of the izBoard system. An ASP.NET Core web application with
 ### Docker Compose
 
 For a standalone deployment, copy `.env.example` to `.env` in the `software` directory and fill in
-`CLIENT_URL`, `STATE_SIGNING_KEY`, and `SUPERUSER_PASSWORD` before starting. Generate a unique signing
+`CLIENT_URL` and `STATE_SIGNING_KEY` before starting. Generate a unique signing
 key with `openssl rand -hex 32`. Set `CLIENT_URL` to an address reachable by both the display and
 your Home Assistant OAuth browser; `localhost` is suitable only for local testing. The `.env` file
 and any personal `docker-compose.yml` are ignored by Git. The tracked `docker-compose.base.yml`
@@ -38,10 +38,20 @@ services:
     environment:
       - CLIENT_URL=http://dashboard.local:<port>
       - STATE_SIGNING_KEY=<random-secret>
-      - SUPERUSER_USERNAME=<admin-username>
-      - SUPERUSER_PASSWORD=<admin-password>
       - TZ=<time-zone>
 ```
+
+### First-start accounts
+
+Open the web UI and create the **service administrator** through the one-time setup page.
+Complete setup before exposing a fresh installation to other people: the first successful setup request claims administration.
+The administrator manages accounts and shared server components. Ordinary users register separately and never receive administrator permissions.
+Existing accounts, administrator permissions, dashboards, and devices are preserved. Existing installations do not reopen setup,
+even if their accounts are later deleted. The old superuser environment variables are no longer read or required.
+Home Assistant add-on deployments continue using ingress authentication and disable local account setup and registration.
+The add-on uses one shared identity: its rendering setting and queue apply to everyone accessing that add-on.
+
+PostgreSQL upgrades require the maintenance migration described below; it records durable setup state and rendering preferences.
 
 ### Home Assistant Add-on
 
@@ -53,8 +63,6 @@ Install via the [izBoard Home Assistant Add-on repository](https://github.com/iz
 |---|---|---|
 | `CLIENT_URL` | Yes | Absolute HTTP or HTTPS URL reachable from the display network. In standalone/host mode it is also the Home Assistant OAuth client URL; in add-on mode it is the direct device endpoint. |
 | `STATE_SIGNING_KEY` | Yes (standalone) | Random secret for signing auth state |
-| `SUPERUSER_USERNAME` | Yes (standalone) | Initial superuser account username |
-| `SUPERUSER_PASSWORD` | Yes (standalone) | Initial superuser account password |
 | `TZ` | Recommended | Timezone (e.g. `Europe/London`) |
 | `APP_MODE` | No | Deployment mode: `standalone` (default) or `addon` |
 | `DATABASE_PROVIDER` | No | `litedb` (default) or `postgresql`. Independent of `APP_MODE`. |
@@ -143,7 +151,8 @@ users' Home Assistant servers: operators should restrict outbound access to appr
 and unrelated internal services. Container/browser isolation does not by itself provide an SSRF/network-access policy.
 
 The default image does not include the browser-rendering runtime or browser binaries. Custom layouts work without them.
-To render an existing Home Assistant dashboard, sign in as a superuser, open **System**, and select **Install component**.
+To render an existing Home Assistant dashboard, sign in with your own account, open **Rendering**, and select **Enable for my account**.
+In add-on mode, open the same page through Home Assistant ingress; the control applies to the whole add-on.
 izBoard downloads the version-matched component for the current CPU architecture from the project's GitHub release, verifies its
 SHA-256 checksum, performs a browser readiness test, and activates it immediately. The component is stored in the persistent `/data` volume, so it survives image
 updates when `/data` is mounted as documented above. If izBoard is updated while the component is installed, izBoard automatically
@@ -169,8 +178,8 @@ docker compose -f docker-compose.base.yml -f docker-compose.rendering.yml up --b
 ```
 
 Set `CLIENT_URL=http://localhost:8128` in your local `.env` for this test. Open `http://localhost:8128`,
-sign in with the credentials you put in `.env`, then open **System** and select
-**Install component** followed by **Test component**. Set `IZBOARD_VERSION` to override the default test version; the application
+complete administrator setup, then register a regular account. Open **Rendering** and select
+**Enable for my account**, followed by **Test rendering**. Set `IZBOARD_VERSION` to override the default test version; the application
 and component builds always receive the same value.
 
 Before publishing, keep the pinned browser-runtime dependency current and manually verify installation, **Test component**,
@@ -180,9 +189,27 @@ installed component updates automatically. Repeat with the artifact server stopp
 Assistant rendering must recover after the matching artifacts become reachable. Test simultaneous requests, cancelled requests,
 and removal during rendering; after removal inspect `/data/components` in the app container to confirm the files are gone.
 
-Rendering is limited to two simultaneous workers and 100 queued requests. Queue waiting and worker execution each time out after
-150 seconds. Viewports are limited to 4096 pixels per dimension and 16 million pixels, HTML to one million characters, images to
+Rendering uses one active browser job per user, FIFO within each user's queue, and round-robin dispatch between ready users.
+The defaults are two active workers per replica, 100 pending jobs per replica, and five pending jobs per user.
+Configure these using `RENDERING_MAX_CONCURRENT_RENDERS`, `RENDERING_MAX_QUEUED_RENDERS`, and
+`RENDERING_MAX_QUEUED_RENDERS_PER_USER`. A zero queue limit permits immediately runnable jobs only.
+An accepted job has a five-minute total deadline; runtime queue waiting and worker execution each have a 150-second deadline. Viewports are limited to 4096 pixels per dimension and 16 million pixels, HTML to one million characters, images to
 64 MB, and worker responses to 64,000 characters. Workers receive only their request's credentials, not the app's environment secrets.
+
+User rendering preferences are persisted in the database. New accounts start disabled; existing accounts retain access until they
+explicitly disable it. Disabling cancels that account's queued and active work without removing shared files or draining other users' jobs.
+Other replicas observe preference changes and account deletion through a one-second access check. A newly used replica prepares
+its own matching runtime on the first render; the caller can retry once preparation completes. Replicas must have separate component
+directories and private renderer sockets. User preferences are shared through PostgreSQL; queue limits are per replica, not cluster-wide.
+
+The service administrator retains global component installation/removal and diagnostic controls under **System**. Removing a shared
+component affects all users on that replica; an enabled user's next render can prepare it again. Use deployment configuration to take
+a renderer offline for maintenance. Users only enable/disable their own capability and cannot remove shared files.
+
+Fresh processes, browser contexts, temporary directories, stripped environments, and ownership checks provide application-level
+separation. Worker processes still share the sidecar's OS identity and aggregate CPU/memory limits. This is not a per-job container,
+hard per-user resource boundary, or enforced per-job network-egress policy. Hostile-tenant OS isolation requires additional deployment
+sandboxing. See [the implementation plan](../docs/account-and-rendering-plan.md) for the boundary and verification scope.
 
 Only the single-user Home Assistant add-on retains an in-app-container compatibility worker with browser sandboxing disabled.
 Standalone and host deployments require the isolated sidecar and browser sandboxing; they never fall back to compatibility mode.

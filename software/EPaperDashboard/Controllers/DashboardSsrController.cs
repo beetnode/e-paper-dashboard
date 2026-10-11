@@ -302,7 +302,7 @@ public class DashboardSsrController(
 
         var (contentType, encoder) = GetEncoder(format);
         var result = await renderingService
-            .RenderDashboardAsync(dashboardInfo.Value.DashboardUri, imageSize, dashboardInfo.Value.Tokens, HttpContext.RequestAborted);
+            .RenderDashboardAsync(CurrentUserId, dashboard.Id, dashboardInfo.Value.DashboardUri, imageSize, dashboardInfo.Value.Tokens, HttpContext.RequestAborted);
 
         return await result.Match(
             image => ConvertToResult(image, encoder, contentType),

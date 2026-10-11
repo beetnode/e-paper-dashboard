@@ -72,7 +72,7 @@ export class LoginComponent implements OnInit {
         this.authService.isAuthReady() &&
         this.authService.isAuthenticated()) {
         this.hasRedirected = true;
-        this.router.navigate([this.returnUrl]);
+        this.router.navigate([this.returnUrl === '/dashboards' && this.authService.currentUser()?.isSuperUser ? '/users/manage' : this.returnUrl]);
       }
     });
   }
@@ -93,7 +93,7 @@ export class LoginComponent implements OnInit {
 
     this.authService.login({ username, password: this.password }).subscribe({
       next: () => {
-        this.router.navigate([this.returnUrl]);
+        this.router.navigate([this.returnUrl === '/dashboards' && this.authService.currentUser()?.isSuperUser ? '/users/manage' : this.returnUrl]);
       },
       error: (error) => {
         this.errorMessage.set(error.error?.message || 'Invalid username or password.');

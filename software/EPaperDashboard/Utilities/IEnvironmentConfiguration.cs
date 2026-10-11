@@ -6,8 +6,6 @@ public interface IEnvironmentConfiguration
     bool IsAddonMode { get; }
     string? HomeAssistantHost { get; }
     Uri? ClientUri { get; }
-    string? SuperUserUsername { get; }
-    string? SuperUserPassword { get; }
     string? StateSigningKey { get; }
     TimeSpan DashboardScheduleCheckInterval { get; }
     TimeSpan DashboardMissedScheduleTolerance { get; }

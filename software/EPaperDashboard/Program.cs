@@ -98,6 +98,7 @@ builder.Services.AddControllers()
 builder.Services.AddRateLimiter(options =>
 {
 	options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+	options.AddPolicy("AccountCreation", context => PairingRateLimit(context, 10));
 	options.AddPolicy("PairingAnnounce", context => PairingRateLimit(context, 10));
 	options.AddPolicy("PairingStatus", context => PairingRateLimit(context, 240));
 	options.AddPolicy("PairingClaim", context => PairingRateLimit(context, 10));
@@ -156,6 +157,8 @@ builder.Services
 	.AddTransient<IPageToImageRenderingService, PageToImageRenderingService>()
 	.AddSingleton<PlaywrightComponentManager>()
 	.AddSingleton<PlaywrightComponentRuntime>()
+	.AddSingleton<UserRenderScheduler>()
+	.AddSingleton<RenderingAccessService>()
 	.AddHostedService(sp => sp.GetRequiredService<PlaywrightComponentManager>())
 	.AddSingleton<IImageFactory, ImageFactory>()
 	.AddSingleton<UserService>()

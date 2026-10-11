@@ -22,6 +22,39 @@ internal sealed class PostgresUserRepository(PostgresDbContext context) : IUserR
     public bool ExistsSuperUser() => context.Exists(
         "SELECT EXISTS (SELECT 1 FROM izboard_users WHERE is_super_user)");
 
+    public bool IsSetupComplete() => context.Exists(
+        "SELECT EXISTS (SELECT 1 FROM izboard_service_state WHERE id = 'setup') OR EXISTS (SELECT 1 FROM izboard_users)");
+
+    public bool TryCreateAdministrator(User user) => context.ExecuteInTransaction(() =>
+    {
+        // This lock is shared by replicas and also excludes concurrent inserts/deletes.
+        context.Execute("LOCK TABLE izboard_users IN EXCLUSIVE MODE");
+        if (IsSetupComplete()) return false;
+        user.IsSuperUser = true;
+        Insert(user);
+        context.Execute("INSERT INTO izboard_service_state (id) VALUES ('setup')");
+        return true;
+    });
+
+    public bool? GetRenderingEnabled(UserId id) => context.FindOne<RenderingPreference>(
+        "SELECT jsonb_build_object('Enabled', enabled) FROM izboard_service_state WHERE id = @id",
+        PostgresDbContext.Parameter("id", "rendering:" + id.Value))?.Enabled;
+
+    public void SetRenderingEnabled(UserId id, bool enabled) => context.Execute(
+        "INSERT INTO izboard_service_state (id, enabled) VALUES (@id, @enabled) ON CONFLICT (id) DO UPDATE SET enabled = EXCLUDED.enabled",
+        PostgresDbContext.Parameter("id", "rendering:" + id.Value), PostgresDbContext.Parameter("enabled", enabled));
+
+    private sealed record RenderingPreference(bool Enabled);
+
+    public bool TryInsert(User user)
+    {
+        try { Insert(user); return true; }
+        catch (Npgsql.PostgresException exception) when (exception.SqlState == Npgsql.PostgresErrorCodes.UniqueViolation)
+        {
+            return false;
+        }
+    }
+
     public void Insert(User user)
     {
         if (user.Id == UserId.Empty)

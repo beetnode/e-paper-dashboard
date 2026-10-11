@@ -14,6 +14,21 @@ public sealed class UserService(IUserRepository userRepository, IDashboardReposi
     public Maybe<User> GetUserById(UserId id) =>
         userRepository.FindById(id);
 
+    public bool IsSetupComplete() => userRepository.IsSetupComplete();
+
+    public bool TryCreateAdministrator(string username, string password) =>
+        userRepository.TryCreateAdministrator(new User
+        {
+            Username = username.Trim(), PasswordHash = ComputeSha256Hash(password),
+            IsSuperUser = true, RenderingEnabled = false
+        });
+
+    public static string? ValidateCredentials(string? username, string? password) =>
+        string.IsNullOrWhiteSpace(username) || username.Trim().Length is < 3 or > 100
+            ? "Username must contain between 3 and 100 characters."
+            : string.IsNullOrWhiteSpace(password) || password.Length is < 6 or > 1024
+                ? "Password must contain between 6 and 1024 characters." : null;
+
     public bool HasSuperUser() =>
         userRepository.ExistsSuperUser();
 
@@ -52,11 +67,11 @@ public sealed class UserService(IUserRepository userRepository, IDashboardReposi
         {
             Username = username,
             PasswordHash = ComputeSha256Hash(password),
-            IsSuperUser = isSuperUser
+            IsSuperUser = isSuperUser,
+            RenderingEnabled = false
         };
 
-        userRepository.Insert(user);
-        return true;
+        return userRepository.TryInsert(user);
     }
 
     public bool TryChangeNickname(UserId userId, string? newNickname) =>
