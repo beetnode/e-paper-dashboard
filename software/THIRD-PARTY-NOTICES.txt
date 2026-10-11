@@ -1,8 +1,8 @@
 THIRD-PARTY SOFTWARE NOTICES AND INFORMATION
 
 This project incorporates components from the projects listed below. The
-original copyright notices and the licenses under which izdev-digital received
-such components are set forth below. izdev-digital reserves all rights not
+original copyright notices and the licenses under which beetnode received
+such components are set forth below. beetnode reserves all rights not
 expressly granted herein, whether by implication, estoppel or otherwise.
 
 ================================================================================
