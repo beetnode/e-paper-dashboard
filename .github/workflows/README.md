@@ -30,6 +30,12 @@ The release workflow automatically:
 - Creates a GitHub release with all files attached
 - Pushes `izdevdigital/e-paper-dashboard` and `izdevdigital/izboard-addon` images to Docker Hub
 
+## Build Numbers
+
+Builds are versioned `<Version>.<build>`, where `<build>` is the commit count of the built commit (`git rev-list --count HEAD`). It only grows along master and is the same for every workflow, so a release tagged on a master commit gets the same build number as that commit's dev build and reuses its published rendering component. The workflows check out full history (`fetch-depth: 0`) to compute it.
+
+Pull request builds count the temporary merge commit GitHub creates for the PR, so their build number can repeat a master build's number or be skipped by master later. They never publish images, component releases, or the dev release, so the numbers do not collide with published builds; do not distribute PR build artifacts as versioned builds.
+
 ## Setup
 
 **Required - Docker Hub:** Add repository secrets to push Docker images:

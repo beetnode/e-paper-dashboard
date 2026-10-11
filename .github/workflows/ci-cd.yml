@@ -109,6 +109,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # Full history so the build number can be derived from the commit count.
+          fetch-depth: 0
 
       - name: Install GitHub CLI
         run: |
@@ -127,7 +130,8 @@ jobs:
         run: |
           # Get software version
           BASE_VERSION=$(grep '<Version>' software/EPaperDashboard/EPaperDashboard.csproj | sed -E 's/.*<Version>([^<]+)<\/Version>.*/\1/' | tr -d '[:space:]')
-          BUILD_NUMBER=${GITHUB_RUN_NUMBER}
+          # Commit count matches the build number used by docker-build.yml and firmware-build.yml
+          BUILD_NUMBER=$(git rev-list --count HEAD)
           VERSION="${BASE_VERSION}.${BUILD_NUMBER}"
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "version=$VERSION" >> $GITHUB_OUTPUT

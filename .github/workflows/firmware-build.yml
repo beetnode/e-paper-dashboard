@@ -16,6 +16,9 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        # Full history so the build number can be derived from the commit count.
+        fetch-depth: 0
       
     - name: Cache PlatformIO
       uses: actions/cache@v4
@@ -46,7 +49,8 @@ jobs:
       run: |
         # Extract FIRMWARE_VERSION from version.h
         FW_VERSION=$(grep 'FIRMWARE_VERSION' firmware/src/version.h | sed 's/.*"\([0-9.]*\)".*/\1/')
-        BUILD_NUMBER=${GITHUB_RUN_NUMBER}
+        # Commit count matches across dev and release builds of the same commit
+        BUILD_NUMBER=$(git rev-list --count HEAD)
         VERSION="$FW_VERSION.$BUILD_NUMBER"
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Firmware version: $VERSION"
