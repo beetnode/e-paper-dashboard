@@ -545,33 +545,33 @@
       <div class="designer-field-grid">
         <label class="designer-field">
           <span class="form-label fw-semibold">Columns</span>
-          <input type="number" class="form-control" [ngModel]="layout().gridCols"
-            (ngModelChange)="updateLayoutGridCols($event)" min="1" />
+          <input type="number" class="form-control" [value]="layout().gridCols"
+            (change)="updateLayoutGridCols($event)" min="1" max="100" />
         </label>
         <label class="designer-field">
           <span class="form-label fw-semibold">Rows</span>
-          <input type="number" class="form-control" [ngModel]="layout().gridRows"
-            (ngModelChange)="updateLayoutGridRows($event)" min="1" />
+          <input type="number" class="form-control" [value]="layout().gridRows"
+            (change)="updateLayoutGridRows($event)" min="1" max="100" />
         </label>
         <label class="designer-field">
           <span class="form-label fw-semibold">Canvas padding</span>
-          <input type="number" class="form-control" [ngModel]="layout().canvasPadding"
-            (ngModelChange)="updateCanvasPadding($event)" min="0" max="128" />
+          <input type="number" class="form-control" [value]="layout().canvasPadding"
+            (change)="updateCanvasPadding($event)" min="0" max="128" />
         </label>
         <label class="designer-field">
           <span class="form-label fw-semibold">Widget gap</span>
-          <input type="number" class="form-control" [ngModel]="layout().widgetGap"
-            (ngModelChange)="updateWidgetGap($event)" min="0" max="64" />
+          <input type="number" class="form-control" [value]="layout().widgetGap"
+            (change)="updateWidgetGap($event)" min="0" max="64" />
         </label>
         <label class="designer-field">
           <span class="form-label fw-semibold">Border (px)</span>
-          <input type="number" class="form-control" [ngModel]="layout().widgetBorder"
-            (ngModelChange)="updateWidgetBorder($event)" min="0" max="20" />
+          <input type="number" class="form-control" [value]="layout().widgetBorder"
+            (change)="updateWidgetBorder($event)" min="0" max="20" />
         </label>
         <label class="designer-field">
           <span class="form-label fw-semibold">Widget padding</span>
-          <input type="number" class="form-control" [ngModel]="layout().widgetPadding"
-            (ngModelChange)="updateWidgetPadding($event)" min="0" max="32" />
+          <input type="number" class="form-control" [value]="layout().widgetPadding"
+            (change)="updateWidgetPadding($event)" min="0" max="32" />
         </label>
       </div>
     </div>
@@ -582,8 +582,8 @@
       <div class="designer-field-grid">
         <label class="designer-field">
           <span class="form-label fw-semibold">Title size (px)</span>
-          <input type="number" class="form-control" [ngModel]="layout().titleFontSize"
-            (ngModelChange)="updateTitleFontSize($event)" min="8" max="72" placeholder="16" />
+          <input type="number" class="form-control" [value]="layout().titleFontSize"
+            (change)="updateTitleFontSize($event)" min="8" max="72" placeholder="16" />
         </label>
         <label class="designer-field">
           <span class="form-label fw-semibold">Title weight</span>
@@ -595,8 +595,8 @@
         </label>
         <label class="designer-field">
           <span class="form-label fw-semibold">Text size (px)</span>
-          <input type="number" class="form-control" [ngModel]="layout().textFontSize"
-            (ngModelChange)="updateTextFontSize($event)" min="6" max="48" placeholder="14" />
+          <input type="number" class="form-control" [value]="layout().textFontSize"
+            (change)="updateTextFontSize($event)" min="6" max="48" placeholder="14" />
         </label>
         <label class="designer-field">
           <span class="form-label fw-semibold">Text weight</span>
@@ -729,10 +729,32 @@
     [colorScheme]="layout().colorScheme"
     (widgetChanged)="onWidgetConfigChanged($event)"
     [attr.key]="selectedWidget()!.id"></app-widget-config>
-  @if (selectedWidgetSupportsElementEditing()) {
   <details class="inspector-section" [open]="isSectionOpen('widget-layout')" (toggle)="onSectionToggle('widget-layout', $event)">
     <summary class="inspector-section-summary">Layout</summary>
     <div class="inspector-section-body">
+      <div class="designer-field-grid mb-3" role="group" aria-label="Position and size in grid cells">
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Column</span>
+          <input type="number" class="form-control" min="1" [max]="layout().gridCols" [value]="selectedWidget()!.position.x + 1"
+            (change)="updateSelectedWidgetPosition('x', $event)" />
+        </label>
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Row</span>
+          <input type="number" class="form-control" min="1" [max]="layout().gridRows" [value]="selectedWidget()!.position.y + 1"
+            (change)="updateSelectedWidgetPosition('y', $event)" />
+        </label>
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Width</span>
+          <input type="number" class="form-control" min="1" [max]="layout().gridCols" [value]="selectedWidget()!.position.w"
+            (change)="updateSelectedWidgetPosition('w', $event)" />
+        </label>
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Height</span>
+          <input type="number" class="form-control" min="1" [max]="layout().gridRows" [value]="selectedWidget()!.position.h"
+            (change)="updateSelectedWidgetPosition('h', $event)" />
+        </label>
+      </div>
+      @if (selectedWidgetSupportsElementEditing()) {
       <button type="button" class="btn w-100 mb-2"
         [ngClass]="elementEditingWidgetId() === selectedWidget()!.id ? 'btn-success' : 'btn-outline-primary'"
         [disabled]="renderedCanvasLoading() || !selectedWidgetGeometry()"
@@ -760,9 +782,9 @@
         </label>
       </div>
       <small class="form-text text-muted">Drag elements inside the widget on the canvas while layout editing is on.</small>
+      }
     </div>
   </details>
-  }
   <details class="inspector-section" [open]="isSectionOpen('widget-colors')" (toggle)="onSectionToggle('widget-colors', $event)">
     <summary class="inspector-section-summary">
       Colors

@@ -41,3 +41,41 @@ export function moveWidgetInPaintOrder(
   [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
   return reordered;
 }
+
+/** Supported grid size; mirrors TransientLayoutValidator on the server. */
+export const GRID_LIMITS = { min: 1, max: 100 } as const;
+
+/** Whole number within [min, max]; empty or invalid input falls back. */
+export function clampWhole(value: unknown, min: number, max: number, fallback: number): number {
+  const number = typeof value === 'number' ? value : Number(value);
+  if (value === '' || value === null || value === undefined || !Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(number)));
+}
+
+/** Clamps a position so the widget keeps at least 1×1 and stays inside the grid. */
+export function fitPositionToGrid(position: WidgetPosition, gridCols: number, gridRows: number): WidgetPosition {
+  const w = Math.min(Math.max(1, position.w), gridCols);
+  const h = Math.min(Math.max(1, position.h), gridRows);
+  return {
+    w,
+    h,
+    x: Math.min(Math.max(0, position.x), gridCols - w),
+    y: Math.min(Math.max(0, position.y), gridRows - h),
+  };
+}
+
+/** Moves or shrinks widgets that no longer fit after a grid change; reports how many changed. */
+export function fitWidgetsToGrid(
+  widgets: readonly WidgetConfig[], gridCols: number, gridRows: number,
+): { widgets: WidgetConfig[]; changed: number } {
+  let changed = 0;
+  const fitted = widgets.map(widget => {
+    const position = fitPositionToGrid(widget.position, gridCols, gridRows);
+    const same = position.x === widget.position.x && position.y === widget.position.y
+      && position.w === widget.position.w && position.h === widget.position.h;
+    if (same) return widget;
+    changed++;
+    return { ...widget, position };
+  });
+  return { widgets: fitted, changed };
+}

@@ -49,7 +49,14 @@ import {
   getWidgetRenderType,
 } from '../../models/widget-catalog';
 import { rememberRecentWidget } from '../../models/widget-picker';
-import { findFreeSlot, moveWidgetInPaintOrder } from '../../models/designer-layers';
+import {
+  clampWhole,
+  findFreeSlot,
+  fitPositionToGrid,
+  fitWidgetsToGrid,
+  GRID_LIMITS,
+  moveWidgetInPaintOrder,
+} from '../../models/designer-layers';
 import {
   CanvasZoom,
   parseCanvasZoom,
@@ -1319,19 +1326,23 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   }
 
   setOrientation(newOrientation: DashboardOrientation): void {
-    if (newOrientation === this.orientation()) return;
+    const previousOrientation = this.orientation();
+    if (newOrientation === previousOrientation) return;
     this.orientation.set(newOrientation);
 
     const size = this.sizePresets[this.selectedSizeIndex] ?? DEFAULT_DASHBOARD_SIZE;
     const isPortrait = newOrientation === 'Portrait';
-
-    this.layout.update(l => ({
-      ...l,
+    const previous = this.layout();
+    this.layout.set({
+      ...previous,
       width: isPortrait ? size.height : size.width,
       height: isPortrait ? size.width : size.height,
-      gridCols: l.gridRows,
-      gridRows: l.gridCols,
-    }));
+    });
+    // Rotating swaps the grid; widgets are fitted into it like any other grid change.
+    this.applyGridSize(previous.gridRows, previous.gridCols, () => {
+      this.orientation.set(previousOrientation);
+      this.layout.set(previous);
+    });
   }
 
   onSizeChange(): void {
@@ -1344,38 +1355,101 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     }));
   }
 
-  updateLayoutGridCols(gridCols: number): void {
-    this.layout.update(layout => ({ ...layout, gridCols }));
+  /**
+   * Number inputs commit on change (blur, Enter, spinner) rather than per keystroke, so typing
+   * "16" never applies an intermediate 1. The clamped value is written back to the field.
+   */
+  private readNumberInput(event: Event, min: number, max: number, fallback: number): number {
+    const input = event.target as HTMLInputElement;
+    const value = clampWhole(input.value, min, max, fallback);
+    input.value = String(value);
+    return value;
   }
 
-  updateLayoutGridRows(gridRows: number): void {
-    this.layout.update(layout => ({ ...layout, gridRows }));
+  updateLayoutGridCols(event: Event): void {
+    const layout = this.layout();
+    this.applyGridSize(this.readNumberInput(event, GRID_LIMITS.min, GRID_LIMITS.max, layout.gridCols), layout.gridRows);
   }
 
-  updateCanvasPadding(padding: number): void {
-    this.layout.update(layout => ({ ...layout, canvasPadding: padding }));
+  updateLayoutGridRows(event: Event): void {
+    const layout = this.layout();
+    this.applyGridSize(layout.gridCols, this.readNumberInput(event, GRID_LIMITS.min, GRID_LIMITS.max, layout.gridRows));
   }
 
-  updateWidgetGap(gap: number): void {
-    this.layout.update(layout => ({ ...layout, widgetGap: gap }));
+  /** Changes the grid and fits widgets back inside it, offering undo when any had to move. */
+  private applyGridSize(gridCols: number, gridRows: number, undo?: () => void): void {
+    const previous = this.layout();
+    if (gridCols === previous.gridCols && gridRows === previous.gridRows) return;
+    const fitted = fitWidgetsToGrid(previous.widgets, gridCols, gridRows);
+    this.layout.set({ ...previous, gridCols, gridRows, widgets: fitted.widgets });
+    this.refreshSelectedWidget();
+    if (fitted.changed === 0) return;
+    this.toastService.showWithAction(
+      fitted.changed === 1 ? '1 widget was moved or resized to fit the grid' : `${fitted.changed} widgets were moved or resized to fit the grid`,
+      'Undo',
+      () => {
+        if (undo) undo();
+        else this.layout.set(previous);
+        this.refreshSelectedWidget();
+      },
+      'info',
+      6000,
+    );
   }
 
-  updateWidgetBorder(border: number): void {
-    this.layout.update(layout => ({ ...layout, widgetBorder: border }));
+  /** Re-reads the selected widget from the layout after a bulk change. */
+  private refreshSelectedWidget(): void {
+    const selected = this.selectedWidget();
+    if (!selected) return;
+    const current = this.layout().widgets.find(widget => widget.id === selected.id) ?? null;
+    if (current !== selected) this.selectedWidget.set(current);
   }
 
-  updateWidgetPadding(padding: number): void {
-    this.layout.update(layout => ({ ...layout, widgetPadding: padding }));
+  /** Position and size fields in the inspector; columns and rows are shown 1-based. */
+  updateSelectedWidgetPosition(field: 'x' | 'y' | 'w' | 'h', event: Event): void {
+    const widget = this.selectedWidget();
+    if (!widget) return;
+    const layout = this.layout();
+    const isColumnAxis = field === 'x' || field === 'w';
+    const limit = isColumnAxis ? layout.gridCols : layout.gridRows;
+    const oneBased = field === 'x' || field === 'y';
+    const current = widget.position[field] + (oneBased ? 1 : 0);
+    const value = this.readNumberInput(event, 1, limit, current) - (oneBased ? 1 : 0);
+    const position = fitPositionToGrid({ ...widget.position, [field]: value }, layout.gridCols, layout.gridRows);
+    (event.target as HTMLInputElement).value = String(position[field] + (oneBased ? 1 : 0));
+    const updated = { ...widget, position };
+    this.layout.update(value => ({ ...value, widgets: value.widgets.map(item => item.id === widget.id ? updated : item) }));
+    this.selectedWidget.set(updated);
   }
 
-  updateTitleFontSize(fontSize: number | string): void {
-    const size = typeof fontSize === 'string' ? parseInt(fontSize, 10) : fontSize;
-    this.layout.update(layout => ({ ...layout, titleFontSize: size }));
+  updateCanvasPadding(event: Event): void {
+    const canvasPadding = this.readNumberInput(event, 0, 128, this.layout().canvasPadding ?? 0);
+    this.layout.update(layout => ({ ...layout, canvasPadding }));
   }
 
-  updateTextFontSize(fontSize: number | string): void {
-    const size = typeof fontSize === 'string' ? parseInt(fontSize, 10) : fontSize;
-    this.layout.update(layout => ({ ...layout, textFontSize: size }));
+  updateWidgetGap(event: Event): void {
+    const widgetGap = this.readNumberInput(event, 0, 64, this.layout().widgetGap ?? 0);
+    this.layout.update(layout => ({ ...layout, widgetGap }));
+  }
+
+  updateWidgetBorder(event: Event): void {
+    const widgetBorder = this.readNumberInput(event, 0, 20, this.layout().widgetBorder ?? 0);
+    this.layout.update(layout => ({ ...layout, widgetBorder }));
+  }
+
+  updateWidgetPadding(event: Event): void {
+    const widgetPadding = this.readNumberInput(event, 0, 32, this.layout().widgetPadding ?? 0);
+    this.layout.update(layout => ({ ...layout, widgetPadding }));
+  }
+
+  updateTitleFontSize(event: Event): void {
+    const titleFontSize = this.readNumberInput(event, 8, 72, this.layout().titleFontSize ?? 16);
+    this.layout.update(layout => ({ ...layout, titleFontSize }));
+  }
+
+  updateTextFontSize(event: Event): void {
+    const textFontSize = this.readNumberInput(event, 6, 48, this.layout().textFontSize ?? 14);
+    this.layout.update(layout => ({ ...layout, textFontSize }));
   }
 
   updateTitleFontWeight(fontWeight: number | string): void {
