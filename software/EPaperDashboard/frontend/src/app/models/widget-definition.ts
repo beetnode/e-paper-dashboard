@@ -15,6 +15,8 @@ export interface WidgetDefinition {
   previewComponent?: Type<unknown>;
   configComponent?: Type<unknown>;
   label: string;
+  /** One-line summary shown in the widget picker. */
+  description?: string;
   previewLabel?: string;
   icon: string;
   category: WidgetCategory;

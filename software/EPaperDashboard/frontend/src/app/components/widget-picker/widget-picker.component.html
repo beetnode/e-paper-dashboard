@@ -1,0 +1,42 @@
+<div class="picker-search">
+  <i class="fa fa-magnifying-glass" aria-hidden="true"></i>
+  <input #search type="search" class="form-control form-control-sm" placeholder="Search widgets"
+    aria-label="Search widgets" [value]="query()" (input)="query.set($any($event.target).value)"
+    (keydown)="onSearchKeydown($event)" />
+</div>
+
+<div class="picker-body">
+  @if (recent().length > 0) {
+    <div class="picker-group-label">Recently used</div>
+    <div class="picker-recent">
+      @for (widget of recent(); track widget.type) {
+        <button type="button" class="picker-chip" (pointerdown)="onItemPointerDown($event, widget)" (click)="onItemClick(widget)"
+          [title]="widget.description ?? widget.label">
+          <i class="fa {{ widget.icon }}" aria-hidden="true"></i>{{ widget.label }}
+        </button>
+      }
+    </div>
+  }
+
+  @for (group of groups(); track group.type) {
+    <div class="picker-group-label">{{ group.label }}</div>
+    @for (widget of group.widgets; track widget.type) {
+      <button type="button" class="picker-item" (pointerdown)="onItemPointerDown($event, widget)" (click)="onItemClick(widget)"
+        [attr.aria-label]="'Add ' + widget.label + ' widget'">
+        <span class="picker-item-icon"><i class="fa {{ widget.icon }}" aria-hidden="true"></i></span>
+        <span class="picker-item-text">
+          <span class="picker-item-label">{{ widget.label }}</span>
+          @if (widget.description) {
+            <span class="picker-item-description">{{ widget.description }}</span>
+          }
+        </span>
+      </button>
+    }
+  } @empty {
+    <p class="picker-empty">No widgets match “{{ query() }}”.</p>
+  }
+</div>
+
+@if (allowDrag()) {
+  <div class="picker-hint">Click to place · drag onto the canvas to position</div>
+}
