@@ -503,6 +503,8 @@ export interface AiConfig {
   directModel?: string;
   homeAssistantAgentId?: string;
 }
+  /** Named Home Assistant connection for conversation agents; empty uses the add-on or legacy settings. */
+  homeAssistantConnectionId?: string;
 
 export interface AiGenerationResult {
   widgets: WidgetConfig[];

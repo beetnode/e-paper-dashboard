@@ -27,8 +27,9 @@ export class AiService {
     return this.http.put<AiConfig>(`/api/ai/dashboards/${dashboardId}/config`, config);
   }
 
-  getConversationAgents(dashboardId: string): Observable<ConversationAgent[]> {
-    return this.http.get<ConversationAgent[]>(`/api/ai/dashboards/${dashboardId}/conversation-agents`);
+  getConversationAgents(dashboardId: string, connectionId?: string): Observable<ConversationAgent[]> {
+    const params: Record<string, string> = connectionId ? { connectionId } : {};
+    return this.http.get<ConversationAgent[]>(`/api/ai/dashboards/${dashboardId}/conversation-agents`, { params });
   }
 
   generateDashboard(dashboardId: string, prompt?: string): Observable<AiGenerationResult> {

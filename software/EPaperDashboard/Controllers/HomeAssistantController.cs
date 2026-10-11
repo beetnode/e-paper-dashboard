@@ -26,7 +26,7 @@ public class HomeAssistantController(
     [DashboardOwnerFromBody]
     public async Task<IActionResult> FetchDashboards([FromBody] FetchDashboardsRequest request)
     {
-        var result = await _homeAssistantService.FetchDashboards(request.DashboardId);
+        var result = await _homeAssistantService.FetchDashboards(new HomeAssistantScope.DashboardSettings(request.DashboardId));
 
         return result.IsSuccess
             ? Ok(new { dashboards = result.Value })
@@ -40,8 +40,7 @@ public class HomeAssistantController(
         if (connection is null)
             return NotFound(new { error = "Home Assistant connection not found." });
 
-        var (host, token) = homeAssistantTargets.ConnectionServer(connection);
-        var result = await _homeAssistantService.FetchConnectionDashboards(host, token);
+        var result = await _homeAssistantService.FetchDashboards(new HomeAssistantScope.Connection(connection));
 
         return result.IsSuccess
             ? Ok(new { data = result.Value })
@@ -52,7 +51,7 @@ public class HomeAssistantController(
     [DashboardOwnerFromBody]
     public async Task<IActionResult> FetchEntities([FromBody] FetchEntitiesRequest request)
     {
-        var result = await _homeAssistantService.FetchEntities(request.DashboardId);
+        var result = await _homeAssistantService.FetchEntities(new HomeAssistantScope.DashboardSettings(request.DashboardId));
 
         return result.IsSuccess
             ? Ok(new { entities = result.Value })

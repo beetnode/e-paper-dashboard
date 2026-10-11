@@ -23,9 +23,7 @@ public class HomeAssistantConnectionService(
 
     public string WebSocketPath => _deploymentStrategy.WebSocketPath;
 
-    // Internal scope used by the HA plugin; ownership is checked against the persisted dashboard.
-    public static string ConnectionScope(string dashboardId, string connectionId) => $"connection:{connectionId}:{dashboardId}";
-    public string GetWebSocketPath(string scope) => scope.StartsWith("connection:", StringComparison.Ordinal) ? "/api/websocket" : WebSocketPath;
+    private const string ConnectionWebSocketPath = "/api/websocket";
 
     public (string host, string token) GetHostAndToken(Dashboard dashboard)
     {
@@ -63,52 +61,62 @@ public class HomeAssistantConnectionService(
     }
 
     /// <summary>
-    /// Returns a connected and authenticated WebSocket to Home Assistant for the given dashboard.
-    /// Caller is responsible for disposing the returned WebSocket.
+    /// Returns a connected and authenticated WebSocket. Caller is responsible for disposing it.
     /// </summary>
-    public async Task<ClientWebSocket> ConnectAsync(string dashboardId, CancellationToken cancellationToken = default)
+    public async Task<ClientWebSocket> ConnectAsync(HomeAssistantScope scope, CancellationToken cancellationToken = default)
     {
-        var dashboardResult = ValidateAndGetDashboard(dashboardId);
-        if (dashboardResult.IsFailure)
+        var endpoint = GetConnectionInfo(scope);
+        if (endpoint.IsFailure)
         {
-            throw new InvalidOperationException(dashboardResult.Error);
+            throw new InvalidOperationException(endpoint.Error);
         }
 
-        var dashboard = dashboardResult.Value;
-        var (hostUrl, token) = GetHostAndToken(dashboard);
-        hostUrl = hostUrl.TrimEnd('/');
-
-        return await WebSocketHelpers.ConnectAndAuthenticateAsync(hostUrl, token, WebSocketPath, cancellationToken);
+        return await WebSocketHelpers.ConnectAndAuthenticateAsync(endpoint.Value.HostUrl, endpoint.Value.Token, endpoint.Value.WebSocketPath, cancellationToken);
     }
 
+    /// <summary>Finds a named Home Assistant connection only if it belongs to <paramref name="owner"/>.</summary>
+    public ProviderConnection? FindConnection(string connectionId, UserId owner) =>
+        connections?.Find(connectionId, owner) is { PluginId: "home-assistant" } connection ? connection : null;
+
     /// <summary>
-    /// Returns host URL and bearer token for the given dashboard, after validation.
+    /// Scope for a dashboard feature that may name a connection: the connection must belong to the dashboard owner.
+    /// Without one, the dashboard's retired settings or the add-on's automatic connection are used.
     /// </summary>
-    public Result<(string hostUrl, string token), string> GetConnectionInfo(string dashboardId)
+    public Result<HomeAssistantScope, string> ResolveScope(string dashboardId, string? connectionId)
     {
-        if (dashboardId.StartsWith("connection:", StringComparison.Ordinal))
+        if (string.IsNullOrEmpty(connectionId)) return new HomeAssistantScope.DashboardSettings(dashboardId);
+        if (!DashboardId.TryParse(dashboardId, out var id)) return "Invalid dashboard ID format";
+        var dashboard = _dashboardService.GetDashboardById(id);
+        if (dashboard.HasNoValue) return "Dashboard not found";
+        var connection = FindConnection(connectionId, dashboard.Value.UserId);
+        return connection is null
+            ? "The selected Home Assistant connection is unavailable."
+            : new HomeAssistantScope.Connection(connection);
+    }
+
+    /// <summary>Resolves the server for a scope, after validating the dashboard settings when they are used.</summary>
+    public Result<HomeAssistantEndpoint, string> GetConnectionInfo(HomeAssistantScope scope)
+    {
+        if (scope is HomeAssistantScope.Connection { Value: var connection })
         {
-            var parts = dashboardId.Split(':');
-            if (parts.Length != 3 || !DashboardId.TryParse(parts[2], out var id)) return "Invalid connection scope";
-            var scopedDashboard = _dashboardService.GetDashboardById(id);
-            if (scopedDashboard.HasNoValue) return "Dashboard not found";
-            var connection = connections?.Find(parts[1], scopedDashboard.Value.UserId);
-            if (connection is null || connection.PluginId != "home-assistant") return "Connection not found";
-            var credentials = connections!.Credentials(connection);
+            if (connection.PluginId != "home-assistant" || connections is null) return "Connection not found";
+            var credentials = connections.Credentials(connection);
             if (!credentials.TryGetValue("token", out var connectionToken) || string.IsNullOrWhiteSpace(connectionToken))
                 return "Sign in to this Home Assistant connection from Connections first.";
-            return (credentials["host"].TrimEnd('/'), connectionToken);
+            if (!credentials.TryGetValue("host", out var host) || string.IsNullOrWhiteSpace(host))
+                return "This Home Assistant connection has no server URL.";
+            return new HomeAssistantEndpoint(host.TrimEnd('/'), connectionToken, ConnectionWebSocketPath);
         }
 
+        var dashboardId = ((HomeAssistantScope.DashboardSettings)scope).DashboardId;
         var dashboardResult = ValidateAndGetDashboard(dashboardId);
         if (dashboardResult.IsFailure)
         {
             return dashboardResult.Error;
         }
 
-        var dashboard = dashboardResult.Value;
-        var (hostUrl, token) = GetHostAndToken(dashboard);
-        return (hostUrl.TrimEnd('/'), token);
+        var (hostUrl, token) = GetHostAndToken(dashboardResult.Value);
+        return new HomeAssistantEndpoint(hostUrl.TrimEnd('/'), token, WebSocketPath);
     }
 
     public int NextMessageId() => Interlocked.Increment(ref _messageId);

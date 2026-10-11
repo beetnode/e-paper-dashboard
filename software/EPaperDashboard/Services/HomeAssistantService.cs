@@ -19,25 +19,16 @@ public class HomeAssistantService(
     private readonly ILogger<HomeAssistantService> _logger = logger;
     private readonly HomeAssistantConnectionService _connection = connection;
 
-    public async Task<Result<List<HassUrlInfo>, string>> FetchDashboards(string dashboardId)
+    public async Task<Result<List<HassUrlInfo>, string>> FetchDashboards(HomeAssistantScope scope)
     {
-        var connectionInfo = _connection.GetConnectionInfo(dashboardId);
+        var connectionInfo = _connection.GetConnectionInfo(scope);
         if (connectionInfo.IsFailure)
             return connectionInfo.Error;
 
         var (hostUrl, token) = connectionInfo.Value;
-        return await FetchDashboards(hostUrl, token, _connection.WebSocketPath);
-    }
-
-    /// <summary>Lists dashboards of a named Home Assistant connection (direct server, standard WebSocket path).</summary>
-    public Task<Result<List<HassUrlInfo>, string>> FetchConnectionDashboards(string hostUrl, string token) =>
-        FetchDashboards(hostUrl.TrimEnd('/'), token, "/api/websocket");
-
-    private async Task<Result<List<HassUrlInfo>, string>> FetchDashboards(string hostUrl, string token, string webSocketPath)
-    {
         try
         {
-            using var ws = await WebSocketHelpers.ConnectAndAuthenticateAsync(hostUrl, token, webSocketPath);
+            using var ws = await WebSocketHelpers.ConnectAndAuthenticateAsync(hostUrl, token, connectionInfo.Value.WebSocketPath);
             var results = await FetchAllDashboardViews(ws, hostUrl);
 
             await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Done", CancellationToken.None);
@@ -54,9 +45,9 @@ public class HomeAssistantService(
         }
     }
 
-    public async Task<Result<List<HassEntity>, string>> FetchEntities(string dashboardId, CancellationToken cancellationToken = default)
+    public async Task<Result<List<HassEntity>, string>> FetchEntities(HomeAssistantScope scope, CancellationToken cancellationToken = default)
     {
-        var connectionInfo = _connection.GetConnectionInfo(dashboardId);
+        var connectionInfo = _connection.GetConnectionInfo(scope);
         if (connectionInfo.IsFailure)
             return connectionInfo.Error;
 
@@ -64,7 +55,7 @@ public class HomeAssistantService(
 
         try
         {
-            using var ws = await WebSocketHelpers.ConnectAndAuthenticateAsync(hostUrl, token, _connection.GetWebSocketPath(dashboardId), cancellationToken);
+            using var ws = await WebSocketHelpers.ConnectAndAuthenticateAsync(hostUrl, token, connectionInfo.Value.WebSocketPath, cancellationToken);
             
             await HomeAssistantConnectionService.SendMessageAsync(ws, new
             {
@@ -162,9 +153,13 @@ public class HomeAssistantService(
     public async Task<Result<bool, string>> SendNotification(Dashboard dashboard, string message, string title = "EPaper Dashboard")
     {
         // Dashboards rendering a named connection notify that Home Assistant instance.
-        var scope = string.IsNullOrEmpty(dashboard.HomeAssistantConnectionId)
-            ? dashboard.Id.ToString()
-            : HomeAssistantConnectionService.ConnectionScope(dashboard.Id.ToString(), dashboard.HomeAssistantConnectionId);
+        HomeAssistantScope scope = new HomeAssistantScope.DashboardSettings(dashboard.Id.ToString());
+        if (!string.IsNullOrEmpty(dashboard.HomeAssistantConnectionId))
+        {
+            var connection = _connection.FindConnection(dashboard.HomeAssistantConnectionId, dashboard.UserId);
+            if (connection is null) return "The dashboard's Home Assistant connection is unavailable.";
+            scope = new HomeAssistantScope.Connection(connection);
+        }
         var connectionInfo = _connection.GetConnectionInfo(scope);
         if (connectionInfo.IsFailure)
         {
@@ -175,7 +170,7 @@ public class HomeAssistantService(
 
         try
         {
-            using var ws = await WebSocketHelpers.ConnectAndAuthenticateAsync(hostUrl, token, _connection.GetWebSocketPath(scope));
+            using var ws = await WebSocketHelpers.ConnectAndAuthenticateAsync(hostUrl, token, connectionInfo.Value.WebSocketPath);
             
             var messageId = _connection.NextMessageId();
             await HomeAssistantConnectionService.SendMessageAsync(ws, new

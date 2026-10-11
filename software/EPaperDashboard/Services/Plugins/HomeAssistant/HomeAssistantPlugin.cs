@@ -58,8 +58,10 @@ public sealed class HomeAssistantPlugin(
             ? "Enter an absolute HTTP or HTTPS Home Assistant server URL."
             : null;
 
-    private static string Scope(ProviderContext context) => context.Connection is null ? context.DashboardId
-        : HomeAssistantConnectionService.ConnectionScope(context.DashboardId, context.Connection.Id);
+    // The router has already checked that a named connection belongs to the dashboard owner.
+    private static HomeAssistantScope Scope(ProviderContext context) => context.Connection is null
+        ? new HomeAssistantScope.DashboardSettings(context.DashboardId)
+        : new HomeAssistantScope.Connection(context.Connection);
 
     public async Task<Result<List<DataSource>, string>> DiscoverAsync(ProviderContext context, CancellationToken cancellationToken)
     {

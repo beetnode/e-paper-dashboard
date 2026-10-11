@@ -17,7 +17,7 @@ public class DashboardHomeAssistantDesignerController(
     [HttpGet("entity-metadata")]
     public async Task<IActionResult> GetEntityMetadata(string dashboardId)
     {
-        var result = await _homeAssistantService.FetchEntities(dashboardId);
+        var result = await _homeAssistantService.FetchEntities(new HomeAssistantScope.DashboardSettings(dashboardId));
         return result.IsSuccess
             ? Ok(new { data = result.Value })
             : BadRequest(new { error = result.Error });

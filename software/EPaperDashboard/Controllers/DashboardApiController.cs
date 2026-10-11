@@ -187,7 +187,15 @@ public class DashboardApiController(DashboardService dashboardService, UserServi
             updatedDashboard.ScreenHeight = preset.Height;
         }
 
-        if (request.AiConfig != null) updatedDashboard.AiConfig = request.AiConfig;
+        if (request.AiConfig != null)
+        {
+            if (!string.IsNullOrEmpty(request.AiConfig.HomeAssistantConnectionId)
+                && homeAssistantTargets.FindConnection(request.AiConfig.HomeAssistantConnectionId, CurrentUserId) == null)
+            {
+                return BadRequest(new { message = "Home Assistant connection not found." });
+            }
+            updatedDashboard.AiConfig = request.AiConfig;
+        }
         if (request.IsAiEnabled.HasValue) updatedDashboard.IsAiEnabled = request.IsAiEnabled.Value;
         if (request.AiPrompt != null) updatedDashboard.AiPrompt = request.AiPrompt;
         if (request.AiLeadTimeMinutes.HasValue) updatedDashboard.AiLeadTimeMinutes = request.AiLeadTimeMinutes.Value;

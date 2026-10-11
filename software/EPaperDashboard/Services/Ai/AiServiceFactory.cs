@@ -49,18 +49,17 @@ public sealed class AiServiceFactory(
             return "A dashboard with Home Assistant connection is required for HA AI mode";
         }
 
-        var connectionInfo = homeAssistantConnectionService.GetConnectionInfo(dashboardId);
+        var connectionInfo = homeAssistantConnectionService.ResolveScope(dashboardId, aiConfig.HomeAssistantConnectionId)
+            .Bind(homeAssistantConnectionService.GetConnectionInfo);
         if (connectionInfo.IsFailure)
         {
             return connectionInfo.Error;
         }
 
-        var (hostUrl, token) = connectionInfo.Value;
-
         return new HomeAssistantAiService(
-            hostUrl,
-            token,
-            homeAssistantConnectionService.WebSocketPath,
+            connectionInfo.Value.HostUrl,
+            connectionInfo.Value.Token,
+            connectionInfo.Value.WebSocketPath,
             aiConfig.HomeAssistantAgentId,
             loggerFactory.CreateLogger<HomeAssistantAiService>());
     }

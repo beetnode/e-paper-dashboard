@@ -10,15 +10,15 @@ namespace EPaperDashboard.Services.Providers.HomeAssistant;
 public class HomeAssistantEntityHistoryProvider(
     HomeAssistantConnectionService connection,
     IHttpClientFactory httpClientFactory,
-    ILogger<HomeAssistantEntityHistoryProvider> logger) : IEntityHistoryProvider
+    ILogger<HomeAssistantEntityHistoryProvider> logger)
 {
     private readonly HomeAssistantConnectionService _connection = connection;
     private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
     private readonly ILogger<HomeAssistantEntityHistoryProvider> _logger = logger;
 
-    public async Task<Result<Dictionary<string, List<HistoryState>>, string>> FetchEntityHistoryAsync(string dashboardId, IEnumerable<string> entityIds, int hours = 24, CancellationToken cancellationToken = default)
+    public async Task<Result<Dictionary<string, List<HistoryState>>, string>> FetchEntityHistoryAsync(HomeAssistantScope scope, IEnumerable<string> entityIds, int hours = 24, CancellationToken cancellationToken = default)
     {
-        var connectionInfo = _connection.GetConnectionInfo(dashboardId);
+        var connectionInfo = _connection.GetConnectionInfo(scope);
         if (connectionInfo.IsFailure)
             return connectionInfo.Error;
 

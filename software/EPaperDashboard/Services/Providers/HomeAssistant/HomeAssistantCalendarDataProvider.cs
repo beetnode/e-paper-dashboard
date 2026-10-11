@@ -10,14 +10,14 @@ namespace EPaperDashboard.Services.Providers.HomeAssistant;
 /// </summary>
 public class HomeAssistantCalendarDataProvider(
     HomeAssistantConnectionService connection,
-    ILogger<HomeAssistantCalendarDataProvider> logger) : ICalendarDataProvider
+    ILogger<HomeAssistantCalendarDataProvider> logger)
 {
     private readonly HomeAssistantConnectionService _connection = connection;
     private readonly ILogger<HomeAssistantCalendarDataProvider> _logger = logger;
 
-    public async Task<Result<List<CalendarEvent>, string>> FetchCalendarEventsAsync(string dashboardId, string calendarEntityId, int durationHours = 168, CancellationToken cancellationToken = default)
+    public async Task<Result<List<CalendarEvent>, string>> FetchCalendarEventsAsync(HomeAssistantScope scope, string calendarEntityId, int durationHours = 168, CancellationToken cancellationToken = default)
     {
-        var connectionInfo = _connection.GetConnectionInfo(dashboardId);
+        var connectionInfo = _connection.GetConnectionInfo(scope);
         if (connectionInfo.IsFailure)
             return connectionInfo.Error;
 
@@ -28,7 +28,7 @@ public class HomeAssistantCalendarDataProvider(
 
         try
         {
-            using var ws = await WebSocketHelpers.ConnectAndAuthenticateAsync(hostUrl, token, _connection.GetWebSocketPath(dashboardId), cancellationToken);
+            using var ws = await WebSocketHelpers.ConnectAndAuthenticateAsync(hostUrl, token, connectionInfo.Value.WebSocketPath, cancellationToken);
 
             var messageId = _connection.NextMessageId();
             var now = DateTime.UtcNow;
@@ -199,65 +199,7 @@ public class HomeAssistantCalendarDataProvider(
         }
     }
 
-    public async Task<Result<Dictionary<string, List<CalendarEvent>>, string>> FetchAllCalendarEventsAsync(string dashboardId, int durationHours = 168, CancellationToken cancellationToken = default)
-    {
-        var entityIds = await DiscoverEntitiesAsync(dashboardId, "calendar", cancellationToken);
-        if (entityIds.IsFailure)
-            return entityIds.Error;
 
-        var result = new Dictionary<string, List<CalendarEvent>>();
-        foreach (var entityId in entityIds.Value)
-        {
-            var eventsResult = await FetchCalendarEventsAsync(dashboardId, entityId, durationHours, cancellationToken);
-            if (eventsResult.IsSuccess && eventsResult.Value.Count > 0)
-                result[entityId] = eventsResult.Value;
-        }
-
-        _logger.LogDebug("Fetched calendar events from {Count} entities for dashboard {DashboardId}", result.Count, dashboardId);
-        return result;
-    }
-
-    private async Task<Result<List<string>, string>> DiscoverEntitiesAsync(string dashboardId, string domain, CancellationToken cancellationToken)
-    {
-        var connectionInfo = _connection.GetConnectionInfo(dashboardId);
-        if (connectionInfo.IsFailure)
-            return connectionInfo.Error;
-
-        var (hostUrl, token) = connectionInfo.Value;
-
-        try
-        {
-            using var ws = await WebSocketHelpers.ConnectAndAuthenticateAsync(hostUrl, token, _connection.GetWebSocketPath(dashboardId), cancellationToken);
-
-            await HomeAssistantConnectionService.SendMessageAsync(ws, new { id = 1, type = "get_states" }, cancellationToken);
-            var response = await HomeAssistantConnectionService.ReceiveMessageAsync(ws, cancellationToken);
-            var json = JsonSerializer.Deserialize<JsonElement>(response);
-
-            var entityIds = new List<string>();
-            if (json.TryGetProperty("success", out var success) && success.GetBoolean() &&
-                json.TryGetProperty("result", out var result) && result.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var entity in result.EnumerateArray())
-                {
-                    var entityId = entity.TryGetProperty("entity_id", out var eid) ? eid.GetString() : null;
-                    if (entityId != null && entityId.StartsWith(domain + ".", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var state = entity.TryGetProperty("state", out var s) ? s.GetString() : null;
-                        if (state is not "unavailable")
-                            entityIds.Add(entityId);
-                    }
-                }
-            }
-
-            try { await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Done", CancellationToken.None); } catch { /* using disposes socket */ }
-            return entityIds;
-        }
-        catch (OperationCanceledException) { throw; }
-        catch (Exception ex)
-        {
-            return $"Failed to discover {domain} entities: {ex.Message}";
-        }
-    }
 
     private static string? ExtractDateTimeString(JsonElement element)
     {
