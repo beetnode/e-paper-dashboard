@@ -89,6 +89,48 @@ html[data-bs-theme="dark"] & {
   border-top: 1px solid var(--bs-border-color);
 }
 
+/* Palette swatches, used by dashboard, widget and graph series colors. */
+.swatch-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+
+.swatch {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--app-radius-sm);
+  cursor: pointer;
+
+  &.selected {
+    outline: 2px solid var(--bs-primary);
+    outline-offset: 1px;
+  }
+}
+
+.swatch-default {
+  background: var(--bs-body-bg);
+  color: var(--bs-secondary-color);
+  font-size: var(--designer-text-xs);
+}
+
+@media (pointer: coarse) {
+  .swatch {
+    position: relative;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: -0.375rem;
+    }
+  }
+}
+
 /* "Custom" marker for overridden colors, a compact app status chip. */
 .override-chip {
   min-height: 0;

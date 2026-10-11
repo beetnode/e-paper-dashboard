@@ -465,16 +465,6 @@
 
 /* Touch screens: finger-sized hit areas without changing the compact visuals. */
 @media (pointer: coarse) {
-  .swatch {
-    position: relative;
-
-    &::before {
-      content: '';
-      position: absolute;
-      inset: -0.375rem;
-    }
-  }
-
   .inspector-back {
     min-height: var(--designer-hit-size);
   }
@@ -558,36 +548,6 @@
   border-radius: 50%;
   background: var(--bs-warning);
 }
-
-.swatch-group {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.25rem;
-}
-
-.swatch {
-  display: inline-grid;
-  place-items: center;
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
-  border: 1px solid var(--bs-border-color);
-  border-radius: var(--app-radius-sm);
-  cursor: pointer;
-
-  &.selected {
-    outline: 2px solid var(--bs-primary);
-    outline-offset: 1px;
-  }
-}
-
-.swatch-default {
-  background: var(--bs-body-bg);
-  color: var(--bs-secondary-color);
-  font-size: var(--designer-text-xs);
-}
-
 
 /* Single scroll container; auto margins centre the canvas without clipping it when zoomed in. */
 .canvas-wrapper {

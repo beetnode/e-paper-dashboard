@@ -26,8 +26,10 @@
       (change)="toggleTitleVisibility()" />
     <label class="form-check-label" for="showTitle-{{widget.id}}">Show title</label>
   </div>
+  @if (widget.showTitle !== false) {
   <input type="text" class="form-control" [id]="'headerTitle-' + widget.id" [(ngModel)]="headerConfig.title" placeholder="Enter title"
     (ngModelChange)="onPropertyChanged()" />
+  }
 </div>
   </div>
 </details>
@@ -86,9 +88,12 @@
     </select>
   </div>
   <div class="col">
-    <label class="form-label fw-semibold mb-1">Size (px)</label>
-    <input type="number" class="form-control" [(ngModel)]="headerConfig.iconSize" min="16" max="128" placeholder="32"
-      (ngModelChange)="onPropertyChanged()" />
+    <label class="form-label fw-semibold mb-1">Icon size</label>
+    <div class="input-group">
+      <input type="number" class="form-control" [(ngModel)]="headerConfig.iconSize" min="16" max="128" placeholder="32"
+        (ngModelChange)="onPropertyChanged()" />
+      <span class="input-group-text">px</span>
+    </div>
   </div>
 </div>
 <div class="form-check form-switch">
@@ -97,7 +102,7 @@
     (ngModelChange)="onPropertyChanged()" />
   <label class="form-check-label" for="headerDithering-{{widget.id}}">Dither icon</label>
 </div>
-<small class="form-text text-muted">Apply dithering to map icon shades to the color palette.</small>
+<small class="form-text text-muted">Approximates shades with the display's colors.</small>
   </div>
 </details>
 }
@@ -173,11 +178,14 @@
       (ngModelChange)="onPropertyChanged()" />
   </div>
   <div class="col">
-    <label class="form-label fw-semibold mb-1">Event gap (px)</label>
-    <input type="number" class="form-control"
-      id="calEventGap-{{widget.id}}" min="0" step="1"
-      [(ngModel)]="calendarConfig.eventGap"
-      (ngModelChange)="onPropertyChanged()" placeholder="0" />
+    <label class="form-label fw-semibold mb-1" for="calEventGap-{{widget.id}}">Event gap</label>
+    <div class="input-group">
+      <input type="number" class="form-control"
+        id="calEventGap-{{widget.id}}" min="0" step="1"
+        [(ngModel)]="calendarConfig.eventGap"
+        (ngModelChange)="onPropertyChanged()" placeholder="0" />
+      <span class="input-group-text">px</span>
+    </div>
   </div>
 </div>
   </div>
@@ -252,9 +260,7 @@
     <option value="hourly">Hourly</option>
     <option value="weekly">Weekly</option>
   </select>
-  <small class="form-text text-muted">
-    Daily: High/Low temperatures | Hourly: Temperature for each hour | Weekly: Summary for each day
-  </small>
+  <small class="form-text text-muted">{{ forecastModeHelp() }}</small>
 </div>
 <app-source-status [statuses]="sourceStatuses" [missing]="sourceMissing" [refreshing]="sourcesRefreshing"
   (refresh)="refreshSources.emit()" />
@@ -290,12 +296,14 @@
     <label class="form-label fw-semibold mb-1">Max items</label>
     <input type="number" class="form-control" [(ngModel)]="weatherForecastConfig.maxItems" min="1" max="14" placeholder="Auto"
       (ngModelChange)="onPropertyChanged()" />
-    <small class="form-text text-muted">Leave empty for auto</small>
   </div>
   <div class="col">
-    <label class="form-label fw-semibold mb-1">Row gap (px)</label>
-    <input type="number" class="form-control" [(ngModel)]="weatherForecastConfig.rowGap" min="0" placeholder="0"
-      (ngModelChange)="onPropertyChanged()" />
+    <label class="form-label fw-semibold mb-1">Row gap</label>
+    <div class="input-group">
+      <input type="number" class="form-control" [(ngModel)]="weatherForecastConfig.rowGap" min="0" placeholder="0"
+        (ngModelChange)="onPropertyChanged()" />
+      <span class="input-group-text">px</span>
+    </div>
   </div>
 </div>
   </div>
@@ -336,20 +344,25 @@
             </div>
             
             <!-- Label and Color -->
-            <div class="col-8">
+            <div class="col-12">
               <label class="form-label fw-semibold mb-1">Label</label>
               <input type="text" class="form-control" [(ngModel)]="series.label" (ngModelChange)="onPropertyChanged()" [placeholder]="series.entityId || 'Optional label'" />
-              <small class="form-text text-muted d-block mt-1">Leave empty to use the source name</small>
+              <small class="form-text text-muted d-block mt-1">Empty uses the source name.</small>
             </div>
             
-            <div class="col-4">
-              <label class="form-label fw-semibold mb-1">Color</label>
-              <select class="form-select" [(ngModel)]="series.color" (ngModelChange)="onPropertyChanged()">
-                <option [value]="null">Auto</option>
+            <div class="col-12">
+              <span class="form-label fw-semibold mb-1 d-block">Color</span>
+              <div class="swatch-group justify-content-start" role="radiogroup" [attr.aria-label]="'Color for series ' + (idx + 1)">
+                <button type="button" class="swatch swatch-default" role="radio" [class.selected]="!series.color"
+                  [attr.aria-checked]="!series.color" aria-label="Automatic color" title="Auto"
+                  (click)="series.color = undefined; onPropertyChanged()"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></button>
                 @for (color of colorScheme?.palette; track color) {
-                  <option [value]="color">{{ getColorName(color) }}</option>
+                  <button type="button" class="swatch" role="radio" [style.background-color]="color"
+                    [class.selected]="series.color === color" [attr.aria-checked]="series.color === color"
+                    [attr.aria-label]="getColorName(color)" [title]="getColorName(color)"
+                    (click)="series.color = color; onPropertyChanged()"></button>
                 }
-              </select>
+              </div>
             </div>
           </div>
         </div>
@@ -388,16 +401,20 @@
 </div>
 @if (graphConfig.plotType === 'line') {
 <div>
-  <label class="form-label fw-semibold mb-1">Line width (px)</label>
-  <input type="number" class="form-control" [(ngModel)]="graphConfig.lineWidth" (ngModelChange)="onPropertyChanged()" min="1" max="10" placeholder="2" />
-  <small class="form-text text-muted">Default: 2px</small>
+  <label class="form-label fw-semibold mb-1">Line width</label>
+  <div class="input-group">
+    <input type="number" class="form-control" [(ngModel)]="graphConfig.lineWidth" (ngModelChange)="onPropertyChanged()" min="1" max="10" placeholder="2" />
+    <span class="input-group-text">px</span>
+  </div>
 </div>
 }
 @if (graphConfig.plotType === 'bar') {
 <div>
   <label class="form-label fw-semibold mb-1">Bar width</label>
-  <input type="number" class="form-control" [(ngModel)]="graphConfig.barWidth" (ngModelChange)="onPropertyChanged()" min="1" max="20" placeholder="Auto" />
-  <small class="form-text text-muted">Leave empty for automatic width</small>
+  <div class="input-group">
+    <input type="number" class="form-control" [(ngModel)]="graphConfig.barWidth" (ngModelChange)="onPropertyChanged()" min="1" max="20" placeholder="Auto" />
+    <span class="input-group-text">px</span>
+  </div>
 </div>
 }
   </div>
@@ -434,7 +451,7 @@
   <label class="form-label fw-semibold mb-1">Max items</label>
   <input type="number" class="form-control" [(ngModel)]="todoConfig.maxItems" min="1" max="50"
     (ngModelChange)="onPropertyChanged()" placeholder="Auto" />
-  <small class="form-text text-muted">Leave empty to show as many as fit in the widget</small>
+  <small class="form-text text-muted">Empty shows as many as fit.</small>
 </div>
 <label class="form-label fw-semibold mt-2">Item icons</label>
 <div class="list-group list-group-flush border rounded">
@@ -490,9 +507,12 @@
   <summary class="inspector-section-summary">Display</summary>
   <div class="inspector-section-body">
 <div class="mb-2">
-  <label class="form-label fw-semibold mb-1">Size (px)</label>
-  <input type="number" class="form-control" [(ngModel)]="appIconConfig.size" min="16" max="256"
-    (ngModelChange)="onPropertyChanged()" />
+  <label class="form-label fw-semibold mb-1">Icon size</label>
+  <div class="input-group">
+    <input type="number" class="form-control" [(ngModel)]="appIconConfig.size" min="16" max="256"
+      (ngModelChange)="onPropertyChanged()" />
+    <span class="input-group-text">px</span>
+  </div>
 </div>
 <div class="form-check form-switch">
   <input class="form-check-input" type="checkbox" id="appIconDithering-{{widget.id}}"
@@ -500,7 +520,7 @@
     (ngModelChange)="onPropertyChanged()" />
   <label class="form-check-label" for="appIconDithering-{{widget.id}}">Dither icon</label>
 </div>
-<small class="form-text text-muted">Apply dithering to map icon shades to the color palette.</small>
+<small class="form-text text-muted">Approximates shades with the display's colors.</small>
   </div>
 </details>
 }
@@ -558,7 +578,12 @@
   <summary class="inspector-section-summary">Display</summary>
   <div class="inspector-section-body">
 <div class="mb-2">
-  <label class="form-label fw-semibold mb-1">Zoom ({{ (widget.config.zoom || 1) | number:'1.1-1' }}x)</label>
+  <div class="d-flex justify-content-between align-items-center">
+    <label class="form-label fw-semibold mb-1">Zoom ({{ (widget.config.zoom || 1) | number:'1.1-1' }}×)</label>
+    @if ((widget.config.zoom && widget.config.zoom !== 1) || widget.config.offsetX || widget.config.offsetY) {
+      <button type="button" class="btn btn-sm btn-link px-0" (click)="resetImageFraming()">Reset framing</button>
+    }
+  </div>
   <input type="range" class="form-range" min="1" max="5" step="0.1"
     [ngModel]="widget.config.zoom || 1"
     (ngModelChange)="widget.config.zoom = $event; onPropertyChanged()" />
@@ -590,7 +615,7 @@
     (ngModelChange)="onPropertyChanged()" />
   <label class="form-check-label" for="imageDithering-{{widget.id}}">Dither image</label>
 </div>
-<small class="form-text text-muted">Apply dithering to map image colors to the color palette.</small>
+<small class="form-text text-muted">Approximates colors with the display's palette.</small>
   </div>
 </details>
 }

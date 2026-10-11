@@ -534,6 +534,22 @@ export class WidgetConfigComponent implements OnChanges {
     input.value = '';
   }
 
+  resetImageFraming(): void {
+    const config = this.widget.config as { zoom?: number; offsetX?: number; offsetY?: number };
+    config.zoom = 1;
+    config.offsetX = 0;
+    config.offsetY = 0;
+    this.onPropertyChanged();
+  }
+
+  forecastModeHelp(): string {
+    switch (this.weatherForecastConfig?.forecastMode) {
+      case 'hourly': return 'Temperature for each upcoming hour.';
+      case 'weekly': return 'A summary for each day of the week.';
+      default: return 'High and low temperatures for each day.';
+    }
+  }
+
   clearUploadedImage(): void {
     const config = this.widget.config as any;
     const imageUrl: string = config.imageUrl || '';

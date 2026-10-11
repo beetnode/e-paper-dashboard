@@ -14,9 +14,11 @@ import { WidgetConfig } from '../../models/types';
           [checked]="widget.showTitle !== false" (change)="setVisible($event)" />
         <label class="form-check-label" [for]="'showTitle-' + widget.id">Show title</label>
       </div>
-      <input type="text" class="form-control" [id]="'widgetTitle-' + widget.id" [ngModel]="widget.titleOverride ?? ''"
-        (ngModelChange)="setTitle($event)" placeholder="Override widget title" />
-      <small class="form-text text-muted">Leave empty to use the default title</small>
+      @if (widget.showTitle !== false) {
+        <input type="text" class="form-control" [id]="'widgetTitle-' + widget.id" [ngModel]="widget.titleOverride ?? ''"
+          (ngModelChange)="setTitle($event)" placeholder="Default title" />
+        <small class="form-text text-muted">Empty uses the default title.</small>
+      }
     </div>
   `,
 })

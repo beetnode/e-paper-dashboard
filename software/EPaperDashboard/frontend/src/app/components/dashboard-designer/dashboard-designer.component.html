@@ -493,99 +493,122 @@
 </ng-template>
 
 <ng-template #dashboardSettingsContent>
-  <details class="inspector-section" [open]="isSectionOpen('dashboard-layout')" (toggle)="onSectionToggle('dashboard-layout', $event)">
-    <summary class="inspector-section-summary">Layout</summary>
+  <details class="inspector-section" [open]="isSectionOpen('dashboard-screen')" (toggle)="onSectionToggle('dashboard-screen', $event)">
+    <summary class="inspector-section-summary">Screen</summary>
     <div class="inspector-section-body">
-      <div class="mb-2">
-        <label class="form-label fw-semibold">Orientation</label>
-        <div class="btn-group d-flex" role="group">
-          <button type="button" class="btn flex-grow-1"
+      <div class="mb-3">
+        <span class="form-label fw-semibold d-block" id="orientationLabel">Orientation</span>
+        <div class="btn-group d-flex" role="group" aria-labelledby="orientationLabel">
+          <button type="button" class="btn flex-grow-1" [attr.aria-pressed]="orientation() === 'Landscape'"
             [class.btn-secondary]="orientation() === 'Landscape'"
             [class.btn-outline-secondary]="orientation() !== 'Landscape'"
             (click)="setOrientation('Landscape')">
-            <i class="fa-solid fa-display"></i> Landscape
+            <i class="fa-solid fa-display" aria-hidden="true"></i> Landscape
           </button>
-          <button type="button" class="btn flex-grow-1"
+          <button type="button" class="btn flex-grow-1" [attr.aria-pressed]="orientation() === 'Portrait'"
             [class.btn-secondary]="orientation() === 'Portrait'"
             [class.btn-outline-secondary]="orientation() !== 'Portrait'"
             (click)="setOrientation('Portrait')">
-            <i class="fa-solid fa-mobile-screen"></i> Portrait
+            <i class="fa-solid fa-mobile-screen" aria-hidden="true"></i> Portrait
           </button>
         </div>
       </div>
-      <div class="mb-2">
-        <label class="form-label fw-semibold">Screen Size</label>
-        <select class="form-select" [(ngModel)]="selectedSizeIndex" (ngModelChange)="onSizeChange()">
+      <div>
+        <label class="form-label fw-semibold" for="dashboardScreenSize">Screen size</label>
+        <select id="dashboardScreenSize" class="form-select" [(ngModel)]="selectedSizeIndex" (ngModelChange)="onSizeChange()">
           @for (size of sizePresets; track size.label; let i = $index) {
             <option [ngValue]="i">{{ size.label }}</option>
           }
         </select>
+        <small class="form-text text-muted">{{ layout().width }} × {{ layout().height }} px</small>
       </div>
+    </div>
+  </details>
+  <details class="inspector-section" [open]="isSectionOpen('dashboard-grid')" (toggle)="onSectionToggle('dashboard-grid', $event)">
+    <summary class="inspector-section-summary">Grid</summary>
+    <div class="inspector-section-body">
       <div class="designer-field-grid">
         <label class="designer-field">
           <span class="form-label fw-semibold">Columns</span>
-          <input type="number" class="form-control" [value]="layout().gridCols"
-            (change)="updateLayoutGridCols($event)" min="1" max="100" />
+          <input type="number" class="form-control" [value]="layout().gridCols" (change)="updateLayoutGridCols($event)" min="1" max="100" />
         </label>
         <label class="designer-field">
           <span class="form-label fw-semibold">Rows</span>
-          <input type="number" class="form-control" [value]="layout().gridRows"
-            (change)="updateLayoutGridRows($event)" min="1" max="100" />
+          <input type="number" class="form-control" [value]="layout().gridRows" (change)="updateLayoutGridRows($event)" min="1" max="100" />
         </label>
         <label class="designer-field">
-          <span class="form-label fw-semibold">Canvas padding</span>
-          <input type="number" class="form-control" [value]="layout().canvasPadding"
-            (change)="updateCanvasPadding($event)" min="0" max="128" />
+          <span class="form-label fw-semibold">Gap</span>
+          <div class="input-group">
+            <input type="number" class="form-control" [value]="layout().widgetGap" (change)="updateWidgetGap($event)" min="0" max="64" />
+            <span class="input-group-text">px</span>
+          </div>
         </label>
         <label class="designer-field">
-          <span class="form-label fw-semibold">Widget gap</span>
-          <input type="number" class="form-control" [value]="layout().widgetGap"
-            (change)="updateWidgetGap($event)" min="0" max="64" />
+          <span class="form-label fw-semibold">Margin</span>
+          <div class="input-group">
+            <input type="number" class="form-control" [value]="layout().canvasPadding" (change)="updateCanvasPadding($event)" min="0" max="128" />
+            <span class="input-group-text">px</span>
+          </div>
+        </label>
+      </div>
+      <small class="form-text text-muted">Margin is the space between the screen edge and the grid.</small>
+    </div>
+  </details>
+  <details class="inspector-section" [open]="isSectionOpen('dashboard-frame')" (toggle)="onSectionToggle('dashboard-frame', $event)">
+    <summary class="inspector-section-summary">Widget frame</summary>
+    <div class="inspector-section-body">
+      <div class="designer-field-grid">
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Border</span>
+          <div class="input-group">
+            <input type="number" class="form-control" [value]="layout().widgetBorder" (change)="updateWidgetBorder($event)" min="0" max="20" />
+            <span class="input-group-text">px</span>
+          </div>
         </label>
         <label class="designer-field">
-          <span class="form-label fw-semibold">Border (px)</span>
-          <input type="number" class="form-control" [value]="layout().widgetBorder"
-            (change)="updateWidgetBorder($event)" min="0" max="20" />
+          <span class="form-label fw-semibold">Padding</span>
+          <div class="input-group">
+            <input type="number" class="form-control" [value]="layout().widgetPadding" (change)="updateWidgetPadding($event)" min="0" max="32" />
+            <span class="input-group-text">px</span>
+          </div>
         </label>
         <label class="designer-field">
-          <span class="form-label fw-semibold">Widget padding</span>
-          <input type="number" class="form-control" [value]="layout().widgetPadding"
-            (change)="updateWidgetPadding($event)" min="0" max="32" />
+          <span class="form-label fw-semibold">Title size</span>
+          <div class="input-group">
+            <input type="number" class="form-control" [value]="layout().titleFontSize" (change)="updateTitleFontSize($event)" min="8" max="72" placeholder="16" />
+            <span class="input-group-text">px</span>
+          </div>
+        </label>
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Title weight</span>
+          <select class="form-select" [ngModel]="layout().titleFontWeight || 700" (ngModelChange)="updateTitleFontWeight($event)">
+            <option [value]="400">Regular</option>
+            <option [value]="700">Bold</option>
+          </select>
         </label>
       </div>
     </div>
   </details>
-  <details class="inspector-section" [open]="isSectionOpen('dashboard-typography')" (toggle)="onSectionToggle('dashboard-typography', $event)">
-    <summary class="inspector-section-summary">Typography</summary>
+  <details class="inspector-section" [open]="isSectionOpen('dashboard-text')" (toggle)="onSectionToggle('dashboard-text', $event)">
+    <summary class="inspector-section-summary">Text</summary>
     <div class="inspector-section-body">
       <div class="designer-field-grid">
         <label class="designer-field">
-          <span class="form-label fw-semibold">Title size (px)</span>
-          <input type="number" class="form-control" [value]="layout().titleFontSize"
-            (change)="updateTitleFontSize($event)" min="8" max="72" placeholder="16" />
+          <span class="form-label fw-semibold">Size</span>
+          <div class="input-group">
+            <input type="number" class="form-control" [value]="layout().textFontSize" (change)="updateTextFontSize($event)" min="6" max="48" placeholder="14" />
+            <span class="input-group-text">px</span>
+          </div>
         </label>
         <label class="designer-field">
-          <span class="form-label fw-semibold">Title weight</span>
-          <select class="form-select" [ngModel]="layout().titleFontWeight || 700"
-            (ngModelChange)="updateTitleFontWeight($event)">
-            <option [value]="400">Regular</option>
-            <option [value]="700">Bold</option>
-          </select>
-        </label>
-        <label class="designer-field">
-          <span class="form-label fw-semibold">Text size (px)</span>
-          <input type="number" class="form-control" [value]="layout().textFontSize"
-            (change)="updateTextFontSize($event)" min="6" max="48" placeholder="14" />
-        </label>
-        <label class="designer-field">
-          <span class="form-label fw-semibold">Text weight</span>
-          <select class="form-select" [ngModel]="layout().textFontWeight || 400"
-            (ngModelChange)="updateTextFontWeight($event)">
+          <span class="form-label fw-semibold">Weight</span>
+          <select class="form-select" [ngModel]="layout().textFontWeight || 400" (ngModelChange)="updateTextFontWeight($event)">
             <option [value]="400">Regular</option>
             <option [value]="700">Bold</option>
           </select>
         </label>
       </div>
+      <small class="form-text text-muted">Default body text for all widgets; a widget can override it in its Display section.</small>
     </div>
   </details>
   @if (aiEnabled()) {
