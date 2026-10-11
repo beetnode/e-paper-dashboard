@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { ProviderConnectionsComponent } from './provider-connections.component';
+import { ToastService } from '../../services/toast.service';
 
 describe('provider connections', () => {
   const homeAssistant = { id: 'home-assistant', name: 'Home Assistant', requiresOAuth: false, supportsSignIn: true, signInCredentialKeys: ['token'], credentials: [
@@ -26,14 +27,20 @@ describe('provider connections', () => {
     http.expectOne('/api/providers/connections').flush({ data: [] });
     return fixture;
   }
+  it('offers to add the first connection when there are none', async () => {
+    const fixture = create(); fixture.detectChanges();
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.textContent).toContain('No connections yet');
+    expect(element.querySelector('form')).toBeNull();
+  });
   it('shows plugin credential fields, setup instructions and its own callback URL', async () => {
-    const fixture = create(); fixture.componentInstance.pluginId = 'google'; fixture.detectChanges();
+    const fixture = create(); fixture.componentInstance.startAdd(); fixture.componentInstance.pluginId = 'google'; fixture.detectChanges();
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
     expect(element.querySelector<HTMLInputElement>('#clientSecret')?.type).toBe('password');
     expect(element.textContent).toContain('Use your own Google Cloud OAuth client.');
     expect(element.querySelector('code')?.textContent).toContain('/api/providers/google/callback');
-    expect(element.textContent).toContain('No connections yet');
   });
   it('labels sign-in with the connection provider name', async () => {
     const fixture = TestBed.createComponent(ProviderConnectionsComponent);
@@ -47,7 +54,8 @@ describe('provider connections', () => {
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Sign in to Google Calendar & Tasks');
   });
   it('creates a named connection using the entered credentials', () => {
-    const fixture = create(); const component = fixture.componentInstance;
+    const success = vi.spyOn(TestBed.inject(ToastService), 'success');
+    const fixture = create(); const component = fixture.componentInstance; component.startAdd();
     component.name = 'Personal'; component.pluginId = 'google';
     component.credentials = { clientId: 'my-client', clientSecret: 'my-secret', redirectUri: 'https://example.test/api/providers/google/callback' };
     component.save();
@@ -57,7 +65,8 @@ describe('provider connections', () => {
     request.flush({});
     http.expectOne('/api/providers/connections').flush({ data: [] });
     expect(component.credentials).toEqual({});
-    expect(component.notice()).toBe('Connection saved.');
+    expect(component.formOpen()).toBe(false);
+    expect(success).toHaveBeenCalledWith('Connection saved.');
   });
   it('edits public settings without putting saved secrets into the form', () => {
     const fixture = create(); const component = fixture.componentInstance;
@@ -71,7 +80,7 @@ describe('provider connections', () => {
     http.expectOne('/api/providers/connections').flush({ data: [] });
   });
   it('makes the Home Assistant token optional because sign-in can create it', async () => {
-    const fixture = create(); fixture.componentInstance.pluginId = 'home-assistant'; fixture.detectChanges();
+    const fixture = create(); fixture.componentInstance.startAdd(); fixture.componentInstance.pluginId = 'home-assistant'; fixture.detectChanges();
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
     expect(element.querySelector<HTMLInputElement>('#token')?.required).toBe(false);
@@ -94,12 +103,14 @@ describe('provider connections', () => {
     open.mockRestore();
   });
   it('tests a connection and shows the result', () => {
+    const toasts = TestBed.inject(ToastService);
+    const success = vi.spyOn(toasts, 'success'); const error = vi.spyOn(toasts, 'error');
     const fixture = create(); const component = fixture.componentInstance;
     component.test({ id: 'one', name: 'Home', pluginId: 'home-assistant', connected: true, credentials: {} });
     http.expectOne('/api/providers/connections/one/test').flush({ message: 'Home works: 12 sources available.' });
-    expect(component.notice()).toBe('Home works: 12 sources available.');
+    expect(success).toHaveBeenCalledWith('Home works: 12 sources available.');
     component.test({ id: 'one', name: 'Home', pluginId: 'home-assistant', connected: true, credentials: {} });
     http.expectOne('/api/providers/connections/one/test').flush({ message: 'Home: unreachable' }, { status: 400, statusText: 'Bad Request' });
-    expect(component.error()).toBe('Home: unreachable');
+    expect(error).toHaveBeenCalledWith('Home: unreachable');
   });
 });

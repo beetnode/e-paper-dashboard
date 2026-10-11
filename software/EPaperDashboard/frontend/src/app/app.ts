@@ -8,6 +8,12 @@ import { VersionService } from './services/version.service';
 import { ToastContainerComponent } from './components/toast-container/toast-container.component';
 import { ConfirmDialogComponent } from './components/confirm-dialog/confirm-dialog.component';
 
+interface SettingsLink {
+  path: string;
+  label: string;
+  icon: string;
+}
+
 @Component({
   selector: 'app-root',
   imports: [CommonModule, RouterOutlet, RouterModule, ToastContainerComponent, ConfirmDialogComponent],
@@ -23,14 +29,32 @@ export class App implements OnInit {
   private readonly theme = signal<string>(this.getInitialTheme());
   readonly isDark = computed(() => this.theme() === 'dark');
 
+  private readonly navigationEnd = this.router.events.pipe(filter(event => event instanceof NavigationEnd));
+
   /** Routes flagged with `data: { workspace: true }` use the full window width and height. */
   protected readonly isWorkspace = toSignal(
-    this.router.events.pipe(
-      filter(event => event instanceof NavigationEnd),
-      map(() => App.isWorkspaceRoute(this.router.routerState.snapshot.root)),
-    ),
+    this.navigationEnd.pipe(map(() => App.isWorkspaceRoute(this.router.routerState.snapshot.root))),
     { initialValue: false },
   );
+
+  private readonly currentUrl = toSignal(this.navigationEnd.pipe(map(event => event.urlAfterRedirects)), { initialValue: '' });
+
+  /** Setup pages visited rarely, grouped under one Settings menu. */
+  protected readonly settingsLinks = computed<SettingsLink[]>(() => {
+    const user = this.authService.currentUser();
+    const links: SettingsLink[] = [
+      { path: '/ai/config', label: 'AI provider', icon: 'fa-wand-magic-sparkles' },
+      { path: '/rendering', label: 'Rendering', icon: 'fa-image' },
+    ];
+    if (user?.isSuperUser) links.push({ path: '/system', label: 'System', icon: 'fa-gears' });
+    if (user?.isSuperUser && !this.authService.isUserManagementDisabled()) {
+      links.push({ path: '/users/manage', label: 'Users', icon: 'fa-users' });
+    }
+    return links;
+  });
+
+  protected readonly isSettingsRoute = computed(() =>
+    this.settingsLinks().some(link => this.currentUrl().startsWith(link.path)));
 
   constructor() {
     effect(() => {

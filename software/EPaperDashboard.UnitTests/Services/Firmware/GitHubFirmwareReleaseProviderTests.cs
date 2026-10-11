@@ -12,7 +12,7 @@ public class GitHubFirmwareReleaseProviderTests
     private static GitHubFirmwareReleaseProvider CreateSut(string assetPattern)
     {
         var config = new Mock<IEnvironmentConfiguration>();
-        config.SetupGet(c => c.FirmwareGitHubRepo).Returns("izdev-digital/e-paper-dashboard");
+        config.SetupGet(c => c.FirmwareGitHubRepo).Returns("beetnode/e-paper-dashboard");
         config.SetupGet(c => c.FirmwareAssetPattern).Returns(assetPattern);
 
         return new GitHubFirmwareReleaseProvider(

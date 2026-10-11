@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { RenderingSettingsComponent } from './rendering-settings.component';
 import { AuthService } from '../../services/auth.service';
+import { ToastService } from '../../services/toast.service';
 
 describe('RenderingSettingsComponent', () => {
   let http: HttpTestingController;
@@ -43,13 +44,14 @@ describe('RenderingSettingsComponent', () => {
   });
 
   it('keeps the existing setting when an enable request fails', () => {
+    const error = vi.spyOn(TestBed.inject(ToastService), 'error');
     const fixture = TestBed.createComponent(RenderingSettingsComponent);
     fixture.detectChanges();
     http.expectOne('/api/rendering').flush({ enabled: false, component: { state: 'NotInstalled', ready: false, supported: true } });
     fixture.componentInstance.setEnabled(true);
     http.expectOne('/api/rendering').flush({ message: 'Unsupported server' }, { status: 400, statusText: 'Bad Request' });
     expect(fixture.componentInstance.status()?.enabled).toBe(false);
-    expect(fixture.componentInstance.error()).toBe('Unsupported server');
+    expect(error).toHaveBeenCalledWith('Unsupported server');
     expect(fixture.componentInstance.busy()).toBe(false);
     fixture.destroy();
   });

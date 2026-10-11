@@ -32,7 +32,7 @@ describe('dashboard create', () => {
     await fixture.whenStable();
   }
 
-  it('creates a custom layout and opens its settings', () => {
+  it('creates a custom layout and opens it in the designer', () => {
     const component = create().componentInstance;
     component.name = 'Kitchen';
     component.onSubmit();
@@ -40,7 +40,7 @@ describe('dashboard create', () => {
     expect(request.request.body.renderingMode).toBe('Custom');
     expect(request.request.body.homeAssistantConnectionId).toBeUndefined();
     request.flush({ id: 'new-id' });
-    expect(navigate).toHaveBeenCalledWith(['/dashboards', 'new-id', 'edit']);
+    expect(navigate).toHaveBeenCalledWith(['/dashboards', 'new-id', 'designer']);
   });
 
   it('creates a Home Assistant dashboard with its connection and path, then opens its settings', async () => {

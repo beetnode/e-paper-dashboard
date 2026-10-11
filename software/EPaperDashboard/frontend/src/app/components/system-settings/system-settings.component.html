@@ -2,31 +2,28 @@
   <div class="app-page-header">
     <div>
       <h1 class="app-page-title">System</h1>
-      <p class="app-page-description">Manage optional capabilities installed on this izBoard instance.</p>
+      <p class="app-page-description">Optional components installed on this izBoard server.</p>
     </div>
   </div>
 
-  <div class="app-form-shell app-form-shell-wide">
+  <div>
     <section class="app-section-card" aria-labelledby="playwrightTitle">
-      <div class="d-flex flex-column flex-sm-row align-items-sm-start justify-content-between gap-3">
+      <div class="app-section-header mb-0">
         <div>
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <h2 id="playwrightTitle" class="app-section-title mb-0">Home Assistant dashboard rendering</h2>
-            @if (status(); as component) {
-              <span class="badge" [ngClass]="{
-                'text-bg-success': component.state === 'Installed' && component.ready,
-                'text-bg-primary': component.state === 'Installing',
-                'text-bg-warning': component.state === 'Incompatible' || (component.state === 'Installed' && !component.ready),
-                'text-bg-danger': component.state === 'Failed',
-                'text-bg-secondary': component.state === 'NotInstalled'
-              }">{{ component.state === 'NotInstalled' ? 'Not installed' : component.state === 'Installed' ? (component.ready ? 'Ready' : 'Not ready') : component.state }}</span>
-            }
-          </div>
-          <p class="app-section-description mb-0">
-            Installs the optional rendering component required for Home Assistant dashboards.
-            Custom izBoard layouts do not require it.
+          <h2 id="playwrightTitle" class="app-section-title">Home Assistant dashboard rendering</h2>
+          <p class="app-section-description">
+            The optional component that captures Home Assistant dashboards. Custom layouts do not require it.
           </p>
         </div>
+        @if (status(); as component) {
+          <span class="app-status-chip" [ngClass]="{
+            'app-status-chip-success': component.state === 'Installed' && component.ready,
+            'app-status-chip-info': component.state === 'Installing',
+            'app-status-chip-warning': component.state === 'Incompatible' || (component.state === 'Installed' && !component.ready),
+            'app-status-chip-danger': component.state === 'Failed',
+            'app-status-chip-muted': component.state === 'NotInstalled'
+          }">{{ component.state === 'NotInstalled' ? 'Not installed' : component.state === 'Installed' ? (component.ready ? 'Ready' : 'Not ready') : component.state }}</span>
+        }
       </div>
 
       @if (isLoading()) {

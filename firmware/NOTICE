@@ -1,5 +1,5 @@
 izBoard - Firmware Component
-Copyright (c) 2025 izdev-digital
+Copyright (c) 2025 beetnode (formerly izdev-digital)
 
 This firmware component is built using the ESP32 Arduino framework and
 includes the following third-party dependencies:

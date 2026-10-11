@@ -4,14 +4,14 @@
 
 <h1 align="center">izBoard</h1>
 
-<p align="center" style="margin:0 0 20px 0; font-weight:600;">Bring Home Assistant dashboards to an E-Paper display</p>
+<p align="center" style="margin:0 0 20px 0; font-weight:600;">Dashboards for battery-powered e-paper displays, updated on your schedule</p>
 <p align="center" style="margin:0 0 16px 0;">
   <a href="software/README.md">Software</a> ·
   <a href="firmware/README.md">Firmware</a> ·
   <a href="packaging/README.md">Packaging</a>
 </p>
 
-**izBoard** displays your [Home Assistant](https://www.home-assistant.io/) dashboards on a battery-powered E-Paper device. The device automatically fetches updated dashboard images from a server on a schedule you control. The server converts your dashboards into the right format for the display. Because the device only uses power during updates, a single battery charge can last weeks or even months. See examples of the device and real dashboards below.
+**izBoard** shows dashboards on a battery-powered e-paper device. Design a layout from widgets fed by your connected data, such as [Home Assistant](https://www.home-assistant.io/) or Google Calendar & Tasks, or show an existing Home Assistant dashboard. The device fetches an updated image from the server at the times you choose and deep-sleeps in between, so a single battery charge can last weeks or even months. See examples of the device and real dashboards below.
 
 <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center; margin:12px 0 20px 0;">
   <img src="device_setup.jpeg" alt="Device" style="width:32%;max-width:320px;border-radius:6px;" />
@@ -21,10 +21,11 @@
 
 ## Features
 
-- Visual dashboard designer with multiple widget types
-- AI-powered dashboard generation — describe what you want in plain language and let AI build the layout using your Home Assistant data
-- Home Assistant integration
-- E-Paper optimized image processing
+- Drag-and-drop designer for custom layouts built from widgets
+- Connections that feed widgets with data from Home Assistant and Google Calendar & Tasks
+- Existing Home Assistant dashboards, captured by the optional rendering component
+- AI generated widget content from a plain-language prompt, using an OpenAI-compatible provider or a Home Assistant conversation agent
+- E-paper optimized image processing
 - Configurable update schedules with deep sleep for long battery life
 - Secure device pairing and OTA firmware updates
 - Deploy as standalone Docker or Home Assistant Add-on
@@ -34,19 +35,20 @@
 
 izBoard has three components that work together:
 
-**1. [Firmware](firmware/)** – Runs on the ESP32 device. Connects to the server, fetches dashboard images on a schedule, displays them on the E-Paper screen, and deep-sleeps to save battery. Handles OTA firmware updates, secure device pairing, and initial setup via a captive portal.
+**1. [Firmware](firmware/)** – Runs on the ESP32 device. Connects to the server, fetches dashboard images on a schedule, displays them on the e-paper screen, and deep-sleeps to save battery. Handles OTA firmware updates, secure device pairing, and initial setup via a captive portal.
 
-**2. [Software](software/)** – ASP.NET Core server application with an Angular web interface. Renders dashboards as E-Paper-optimized images, manages devices and schedules, and integrates with Home Assistant. Runs in Docker or as a Home Assistant Add-on.
+**2. [Software](software/)** – ASP.NET Core server application with an Angular web interface. Renders dashboards as e-paper optimized images, manages devices, schedules and data connections, and captures Home Assistant dashboards through an optional rendering component. Runs in Docker or as a Home Assistant Add-on.
 
 **3. [Packaging](packaging/)** – 3D-printable enclosure designs for the device hardware.
 
 ## Getting Started
 
-1. **Deploy the server** using Docker (see [Software README](software/README.md)) or the [Home Assistant Add-on](https://github.com/izdev-digital/hass-add-ons/tree/master/e-paper-dashboard)
-2. **Flash the firmware** to your ESP32 device with an E-Paper display (see [Firmware README](firmware/README.md))
+1. **Deploy the server** using Docker (see [Software README](software/README.md)) or the [Home Assistant Add-on](https://github.com/beetnode/hass-add-ons/tree/master/e-paper-dashboard)
+2. **Flash the firmware** to your ESP32 device with an e-paper display (see [Firmware README](firmware/README.md))
 3. **Pair the device** — scan the setup Wi-Fi QR, enter Wi-Fi and server details, then claim the display code from any network that can reach the server
-4. **Create a dashboard** — use the visual designer or connect a Home Assistant dashboard view
-5. **Assign the dashboard** to your device and configure the update schedule
+4. **Connect your data** on the Connections page, such as Home Assistant or Google Calendar & Tasks
+5. **Create a dashboard** — design a custom layout, or show a Home Assistant dashboard view (enable Rendering first)
+6. **Assign the dashboard** to your device and configure the update schedule
 
 See the individual component READMEs for detailed setup instructions.
 

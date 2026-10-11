@@ -64,7 +64,7 @@ public static class EnvironmentConfiguration
 		GetStringFromEnvOrConfig(FirmwareReleaseProviderKey) ?? "github");
 
 	private static readonly Lazy<string> _firmwareGitHubRepo = new(() =>
-		GetStringFromEnvOrConfig(FirmwareGitHubRepoKey) ?? "izdev-digital/e-paper-dashboard");
+		GetStringFromEnvOrConfig(FirmwareGitHubRepoKey) ?? "beetnode/e-paper-dashboard");
 
 	private static readonly Lazy<string> _firmwareAssetPattern = new(() =>
 		GetStringFromEnvOrConfig(FirmwareAssetPatternKey) ?? "*.bin");

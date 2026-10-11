@@ -68,9 +68,6 @@ body {
   margin-inline: auto;
 }
 
-.app-form-shell-wide {
-  --app-form-max-width: 46rem;
-}
 
 .app-loading-state {
   display: grid;
@@ -105,6 +102,175 @@ body {
   margin: 0 0 1.25rem;
   color: var(--bs-secondary-color);
   font-size: 0.9rem;
+}
+
+/* Section title with actions on the right, wrapping under the title on narrow screens. */
+.app-section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1rem;
+
+  > :first-child {
+    min-width: 0;
+  }
+
+  .app-section-description {
+    margin-bottom: 0;
+  }
+}
+
+.app-section-stack {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+}
+
+/* Two columns of sections on wide screens, one on narrow ones. */
+.app-section-grid {
+  display: grid;
+  align-items: start;
+  gap: 1rem;
+
+  > .app-section-grid-full {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 992px) {
+  .app-section-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/*
+ * Save and Discard appear together only while there are unsaved changes, so they double as the
+ * unsaved-changes indicator. They sit at the end of the title side of a toolbar, or alone on the
+ * right of a page header, where appearing does not push any other control.
+ */
+.app-save-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.app-page-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* Rows of entities (dashboards, devices, connections, users). */
+.app-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.app-list-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--app-radius);
+  background: var(--bs-body-bg);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+
+  &:hover,
+  &:focus-within {
+    border-color: var(--bs-primary-border-subtle);
+  }
+}
+
+/* A row whose main area is a link stretches the link over the padding. */
+.app-list-item-link {
+  min-width: 0;
+  margin: -0.875rem 0 -0.875rem -1rem;
+  padding: 0.875rem 0 0.875rem 1rem;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--app-radius) 0 0 var(--app-radius);
+
+  &:hover .app-list-item-title {
+    color: var(--bs-primary);
+  }
+
+  &:focus-visible {
+    outline-offset: -3px;
+  }
+}
+
+.app-list-item-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.625rem;
+  min-width: 0;
+}
+
+.app-list-item-title {
+  margin: 0;
+  overflow: hidden;
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-list-item-description {
+  margin: 0.25rem 0 0;
+  overflow: hidden;
+  color: var(--bs-secondary-color);
+  font-size: 0.875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-list-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-top: 0.5rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.8125rem;
+
+  i {
+    margin-right: 0.25rem;
+  }
+}
+
+.app-list-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.375rem;
+}
+
+.app-list-item-body {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 575.98px) {
+  .app-list-item-title {
+    white-space: normal;
+  }
+
+  .app-list-item-wrap {
+    grid-template-columns: minmax(0, 1fr);
+
+    .app-list-item-actions {
+      justify-content: flex-start;
+    }
+  }
 }
 
 .app-action-bar {
@@ -151,6 +317,16 @@ body {
   background: var(--bs-secondary-bg);
 }
 
+.app-status-chip-danger {
+  color: var(--bs-danger-text-emphasis);
+  background: var(--bs-danger-bg-subtle);
+}
+
+.app-status-chip-info {
+  color: var(--bs-primary-text-emphasis);
+  background: var(--bs-primary-bg-subtle);
+}
+
 .app-empty-state {
   display: grid;
   justify-items: center;
@@ -173,11 +349,76 @@ body {
   font-size: 1.35rem;
 }
 
+/*
+ * Buttons center their content vertically at any height and never wrap.
+ * Icon-to-label spacing comes from the gap, so margin utilities and leading
+ * spaces inside buttons do not add up differently from button to button.
+ * Labels that might not fit are hidden at small widths (d-none d-sm-inline),
+ * leaving an icon-only button with an aria-label.
+ */
+.btn:not(.btn-link) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  white-space: nowrap;
+
+  > i,
+  > .spinner-border,
+  > .spinner-border-sm,
+  > span {
+    margin-inline: 0 !important;
+  }
+
+  /* Icons take the label's line height, so icon-only buttons match the height of labelled ones. */
+  > i {
+    line-height: inherit;
+  }
+}
+
 .app-icon-button {
-  display: inline-grid;
-  place-items: center;
   min-width: 2.75rem;
   min-height: 2.75rem;
+}
+
+/*
+ * Borderless buttons for actions repeated on every row (edit, test, delete) and in dialog headers,
+ * like the designer's layer rows. Bordered buttons stay for page, form and toolbar actions.
+ */
+.btn-ghost {
+  --bs-btn-color: var(--bs-secondary-color);
+  --bs-btn-bg: transparent;
+  --bs-btn-border-color: transparent;
+  --bs-btn-hover-color: var(--bs-body-color);
+  --bs-btn-hover-bg: var(--bs-tertiary-bg);
+  --bs-btn-hover-border-color: transparent;
+  --bs-btn-active-color: var(--bs-body-color);
+  --bs-btn-active-bg: var(--bs-secondary-bg);
+  --bs-btn-active-border-color: transparent;
+  --bs-btn-disabled-color: var(--bs-secondary-color);
+  --bs-btn-disabled-bg: transparent;
+  --bs-btn-disabled-border-color: transparent;
+}
+
+.btn-ghost-danger {
+  --bs-btn-hover-color: var(--bs-danger-text-emphasis);
+  --bs-btn-hover-bg: var(--bs-danger-bg-subtle);
+  --bs-btn-active-color: var(--bs-danger-text-emphasis);
+  --bs-btn-active-bg: var(--bs-danger-bg-subtle);
+}
+
+/* One switch size everywhere, large enough to tap, centered on its label's first line. */
+.form-switch {
+  .form-check-input {
+    width: 2.25rem;
+    height: 1.25rem;
+    margin-top: 0.125rem;
+    cursor: pointer;
+  }
+
+  .form-check-label {
+    cursor: pointer;
+  }
 }
 
 .form-control,
@@ -191,11 +432,13 @@ body {
   outline-offset: 2px;
 }
 
-@media (max-width: 575.98px) {
-  .app-page-header {
-    align-items: stretch;
-  }
+/* Header actions keep their natural size next to a title that may wrap. */
+.app-page-header > .btn,
+.app-page-header > .app-page-actions {
+  flex-shrink: 0;
+}
 
+@media (max-width: 575.98px) {
   .app-page-header .btn {
     min-width: 2.75rem;
   }

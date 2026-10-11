@@ -45,7 +45,7 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
         this.status.set(status);
         this.schedulePoll();
       },
-      error: err => this.toastService.error(err.error?.message || 'Could not start component installation.')
+      error: err => this.toastService.httpError(err, 'Could not start installing the rendering component.')
     });
   }
 
@@ -62,7 +62,7 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
           this.status.set(status);
           this.toastService.success('Rendering component removed.');
         } catch (err: any) {
-          this.toastService.error(err.error?.message || 'Could not remove the rendering component.');
+          this.toastService.httpError(err, 'Could not remove the rendering component.');
         } finally {
           this.isUninstalling.set(false);
         }
@@ -78,7 +78,7 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
         this.isTesting.set(false);
       },
       error: err => {
-        this.toastService.error(err.error?.message || 'Rendering component test failed.');
+        this.toastService.httpError(err, 'Could not render the test page.');
         this.isTesting.set(false);
       }
     });
@@ -101,13 +101,13 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
         } else if (previousState === 'Installing' && status.state === 'Installed' && status.ready) {
           this.toastService.success('Rendering component installed and ready.');
         } else if (previousState === 'Installing' && status.state === 'Failed') {
-          this.toastService.error(status.error || 'Rendering component installation failed.');
+          this.toastService.error(status.error || 'Could not install the rendering component.');
         }
         if (status.state === 'Installed' && !status.ready) this.schedulePoll();
       },
       error: () => {
         this.isLoading.set(false);
-        this.toastService.error('Could not load component status.');
+        this.toastService.error('Could not load the rendering component status.');
         if (this.status()?.state === 'Installing') this.schedulePoll();
       }
     });

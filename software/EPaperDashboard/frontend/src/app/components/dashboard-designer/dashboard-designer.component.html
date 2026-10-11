@@ -34,13 +34,29 @@
         }
       </div>
       }
+      <!-- Shown together only with unsaved changes, after the title so no other control moves. -->
+      @if (isDirty() || isSaving()) {
+      <div class="app-save-actions">
+        <button type="button" class="btn btn-sm btn-primary" (click)="saveDashboard()" [disabled]="isSaving()" title="Save layout" aria-label="Save layout">
+          @if (isSaving()) {
+            <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+          } @else {
+            <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+          }
+          <span class="d-none d-xl-inline">Save</span>
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="discardChanges()" [disabled]="isSaving()" title="Discard unsaved changes" aria-label="Discard unsaved changes">
+          <i class="fa-solid fa-rotate-left" aria-hidden="true"></i><span class="d-none d-xl-inline">Discard</span>
+        </button>
+      </div>
+      }
     </div>
     <!-- Desktop and tablet actions -->
     @if (!isMobile()) {
     <div class="designer-toolbar-actions">
       <ng-container *ngTemplateOutlet="canvasTools"></ng-container>
       <span class="toolbar-divider" aria-hidden="true"></span>
-      <div class="ai-toggle-pill" [class.active]="aiEnabled()" [title]="aiConfigMode() === 'None' ? 'Configure an AI provider in AI Config or dashboard settings first' : 'AI generated widgets'">
+      <div class="ai-toggle-pill" [class.active]="aiEnabled()" [title]="aiConfigMode() === 'None' ? 'Set up an AI provider in Settings › AI provider or in the dashboard settings first' : 'AI generated widgets'">
         <div class="form-check form-switch mb-0">
           <input class="form-check-input" type="checkbox" id="aiEnabledHeader" role="switch"
             [checked]="aiEnabled()"
@@ -59,15 +75,6 @@
       <button type="button" class="btn btn-sm btn-success" (click)="previewServerSideRendered()" title="Preview the device image, including unsaved changes" aria-label="Preview">
         <i class="fa-solid fa-eye" aria-hidden="true"></i><span class="d-none d-xl-inline ms-1">Preview</span>
       </button>
-      <!-- Shown only with unsaved changes, so it doubles as the change indicator. -->
-      @if (isDirty()) {
-      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="discardChanges()" title="Discard unsaved changes" aria-label="Discard unsaved changes">
-        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i><span class="d-none d-xl-inline ms-1">Discard</span>
-      </button>
-      }
-      <button type="button" class="btn btn-sm btn-primary" (click)="saveDashboard()" [disabled]="!isDirty()" title="Save layout" aria-label="Save layout">
-        <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i><span class="d-none d-xl-inline ms-1">Save</span>
-      </button>
     </div>
     }
     <!-- Mobile actions -->
@@ -84,14 +91,6 @@
           </label>
         </div>
       </div>
-      @if (isDirty()) {
-      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="discardChanges()" aria-label="Discard unsaved changes">
-        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
-      </button>
-      }
-      <button type="button" class="btn btn-sm btn-primary" (click)="saveDashboard()" [disabled]="!isDirty()" aria-label="Save layout">
-        <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
-      </button>
       <div class="mobile-overflow-menu">
         <button type="button" class="btn btn-sm btn-outline-secondary" (click)="mobileOverflowOpen.set(!mobileOverflowOpen())"
           aria-label="More designer actions" [attr.aria-expanded]="mobileOverflowOpen()">

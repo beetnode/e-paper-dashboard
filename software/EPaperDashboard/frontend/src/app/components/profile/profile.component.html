@@ -6,8 +6,8 @@
     </div>
   </div>
 
-  <div class="app-form-shell app-form-shell-wide d-grid gap-3">
-    <section class="app-section-card" aria-labelledby="accountDetailsTitle">
+  <div class="app-section-grid">
+    <section class="app-section-card" [class.app-section-grid-full]="isUserManagementDisabled()" aria-labelledby="accountDetailsTitle">
       <h2 id="accountDetailsTitle" class="app-section-title">Account details</h2>
       <p class="app-section-description">Signed in as <strong>{{ currentUser?.username }}</strong>.</p>
 
@@ -40,7 +40,7 @@
       <h2 id="changePasswordTitle" class="app-section-title">Change password</h2>
       <p class="app-section-description">Use a unique password that you do not use elsewhere.</p>
       <div class="mb-3">
-        <label for="currentPassword" class="form-label">Current password</label>
+        <label for="currentPassword" class="form-label fw-semibold">Current password</label>
         <div class="input-group">
           <input [type]="showPasswords() ? 'text' : 'password'" class="form-control" id="currentPassword" [value]="currentPassword()"
             (input)="currentPassword.set($any($event.target).value)" [disabled]="isChangingPassword()" autocomplete="current-password" required />
@@ -51,14 +51,14 @@
         </div>
       </div>
       <div class="mb-3">
-        <label for="newPassword" class="form-label">New password</label>
+        <label for="newPassword" class="form-label fw-semibold">New password</label>
         <input [type]="showPasswords() ? 'text' : 'password'" class="form-control" id="newPassword" [value]="newPassword()"
           (input)="newPassword.set($any($event.target).value)" [disabled]="isChangingPassword()" autocomplete="new-password"
           minlength="6" aria-describedby="newPasswordHelp" required />
         <small id="newPasswordHelp" class="form-text text-muted">At least 6 characters</small>
       </div>
       <div class="mb-3">
-        <label for="confirmNewPassword" class="form-label">Confirm password</label>
+        <label for="confirmNewPassword" class="form-label fw-semibold">Confirm password</label>
         <input [type]="showPasswords() ? 'text' : 'password'" class="form-control" id="confirmNewPassword" [value]="confirmNewPassword()"
           (input)="confirmNewPassword.set($any($event.target).value)" [disabled]="isChangingPassword()" autocomplete="new-password" required />
         @if (confirmNewPassword() && newPassword() !== confirmNewPassword()) {
@@ -74,17 +74,19 @@
     </form>
     </section>
 
-    <section class="app-section-card border-danger" aria-labelledby="dangerZoneTitle">
-      <h2 id="dangerZoneTitle" class="app-section-title text-danger">Danger zone</h2>
-      <p class="app-section-description">Deleting your account is permanent and cannot be undone.</p>
-    <form (ngSubmit)="deleteProfile()">
-      <button type="submit" class="btn btn-danger" [disabled]="isDeletingProfile()">
-        @if (isDeletingProfile()) {
-        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-        }
-        Delete my profile
-      </button>
-    </form>
+    <section class="app-section-card border-danger app-section-grid-full" aria-labelledby="dangerZoneTitle">
+      <form class="app-section-header mb-0 align-items-center" (ngSubmit)="deleteProfile()">
+        <div>
+          <h2 id="dangerZoneTitle" class="app-section-title text-danger">Danger zone</h2>
+          <p class="app-section-description">Deleting your account is permanent and cannot be undone.</p>
+        </div>
+        <button type="submit" class="btn btn-danger" [disabled]="isDeletingProfile()">
+          @if (isDeletingProfile()) {
+          <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+          }
+          Delete my profile
+        </button>
+      </form>
     </section>
     }
   </div>

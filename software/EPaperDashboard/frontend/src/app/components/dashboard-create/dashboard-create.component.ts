@@ -197,8 +197,9 @@ export class DashboardCreateComponent implements OnInit {
       ...(isHomeAssistant ? { homeAssistantConnectionId: this.homeAssistantConnectionId, path } : {}),
     };
     this.dashboardService.createDashboard(request).subscribe({
+      // A custom layout is empty, so continue in the designer; a Home Assistant dashboard is ready to preview in its settings.
       next: (dashboard) => {
-        this.router.navigate(['/dashboards', dashboard.id, 'edit']);
+        this.router.navigate(['/dashboards', dashboard.id, isHomeAssistant ? 'edit' : 'designer']);
       },
       error: (error) => {
         this.errorMessage.set(error.error?.message || 'Failed to create dashboard.');
