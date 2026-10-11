@@ -187,4 +187,21 @@ public class RenderingUtilitiesTests
         path.Bounds.Left.Should().BeLessThanOrEqualTo(0);
         path.Bounds.Right.Should().BeGreaterThanOrEqualTo(10);
     }
+
+    [Fact]
+    public void GetSourceDisplayName_PrefersFriendlyNameAndNeverShowsOpaqueReferences()
+    {
+        var reference = EPaperDashboard.Services.Plugins.SourceReference.Create(Guid.NewGuid().ToString("N"), "sensor.living_room");
+        var data = new SsrData();
+
+        RenderingUtilities.GetSourceDisplayName(reference, data).Should().Be("sensor.living_room");
+        RenderingUtilities.GetSourceDisplayName("sensor.kitchen", data).Should().Be("sensor.kitchen");
+
+        data.EntityStates[reference] = new EPaperDashboard.Services.EntityState
+        {
+            EntityId = reference,
+            Attributes = new(StringComparer.OrdinalIgnoreCase) { ["friendly_name"] = "Living room" }
+        };
+        RenderingUtilities.GetSourceDisplayName(reference, data).Should().Be("Living room");
+    }
 }

@@ -145,6 +145,22 @@ public sealed class RenderingUtilities
     public static double? GetBadgeDoubleProp(JsonElement badge, string prop) =>
         badge.TryGetProperty(prop, out var p) && p.ValueKind == JsonValueKind.Number ? p.GetDouble() : null;
 
+    /// <summary>
+    /// Human-readable name for a widget source: its friendly name when the snapshot has one, otherwise the
+    /// provider-local ID. Never shows an opaque connection-qualified reference on the display.
+    /// </summary>
+    public static string GetSourceDisplayName(string sourceId, SsrData data)
+    {
+        if (data.EntityStates.TryGetValue(sourceId, out var state) && GetEntityAttr(state, "friendly_name") is { Length: > 0 } name)
+            return name;
+        if (data.HistoryData.TryGetValue(sourceId, out var history)
+            && history.LastOrDefault()?.Attributes.TryGetValue("friendly_name", out var attribute) == true
+            && attribute.ValueKind == System.Text.Json.JsonValueKind.String
+            && attribute.GetString() is { Length: > 0 } historyName)
+            return historyName;
+        return Plugins.SourceReference.TryParse(sourceId, out _, out var localId) ? localId : sourceId;
+    }
+
     public static string? GetEntityAttr(EntityState state, string key)
     {
         if (state.Attributes.TryGetValue(key, out var val) && val != null)

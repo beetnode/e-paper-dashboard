@@ -2,7 +2,8 @@ import type { Type } from '@angular/core';
 import type { DataSource } from '../services/data-provider.service';
 import type { WidgetConfig, WidgetType } from './types';
 
-export type WidgetCategory = 'content' | 'data' | 'home-assistant' | 'google' | 'chart' | 'asset' | 'system' | (string & {});
+/** Core categories; plugins add their own and name them with `categoryLabel`. */
+export type WidgetCategory = 'content' | 'data' | 'chart' | 'asset' | 'system' | (string & {});
 
 export interface WidgetDefinition {
   type: WidgetType;
@@ -21,6 +22,7 @@ export interface WidgetDefinition {
   minSize: { w: number; h: number };
   supportsTitle: boolean;
   createDefaultConfig: () => WidgetConfig['config'];
+  /** Optional extra filter for plugin widgets, applied after the capability check. */
   acceptsEntity?: (entity: DataSource) => boolean;
 }
 

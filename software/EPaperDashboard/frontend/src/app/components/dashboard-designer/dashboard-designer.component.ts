@@ -96,8 +96,6 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   readonly widgetCategories: ReadonlyArray<{ type: WidgetCategory; label: string }> = [
     { type: 'content', label: 'Content' },
     { type: 'data', label: 'Data' },
-    { type: 'home-assistant', label: 'Home Assistant' },
-    { type: 'google', label: 'Google' },
     { type: 'chart', label: 'Charts' },
     { type: 'asset', label: 'Assets' },
     { type: 'system', label: 'System' },
@@ -727,6 +725,13 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     return !!selected && !!this.renderedWidgetGeometry()[selected.id]?.editable;
   }
 
+
+  /** Readable name for a source in diagnostics; opaque connection references are never shown. */
+  private sourceLabel(sourceId: string): string {
+    const source = this.availableEntities().find(entity => entity.entityId === sourceId);
+    if (source) return source.connectionName ? `${source.connectionName} · ${source.friendlyName || sourceId}` : source.friendlyName || sourceId;
+    return sourceId.startsWith('source:') ? 'Unavailable source' : sourceId;
+  }
   selectedWidgetSourceStatuses(): Array<{ key: string; label: string; status: DataSourceStatus }> {
     const widget = this.selectedWidget();
     if (!widget) return [];
@@ -737,31 +742,31 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     switch (getWidgetRenderType(widget.type)) {
       case 'header':
         for (const badge of config?.badges ?? []) {
-          if (badge.entityId) sources.push({ key: `entity:${badge.entityId}`, label: badge.entityId });
+          if (badge.entityId) sources.push({ key: `entity:${badge.entityId}`, label: this.sourceLabel(badge.entityId) });
         }
         break;
       case 'weather':
-        if (entityId) sources.push({ key: `entity:${entityId}`, label: entityId });
+        if (entityId) sources.push({ key: `entity:${entityId}`, label: this.sourceLabel(entityId) });
         break;
       case 'weather-forecast':
         if (entityId) {
           const mode = config?.forecastMode === 'hourly' ? 'hourly' : 'daily';
-          sources.push({ key: `entity:${entityId}`, label: entityId });
+          sources.push({ key: `entity:${entityId}`, label: this.sourceLabel(entityId) });
           sources.push({ key: `forecast:${entityId}:${mode}`, label: `${mode} forecast` });
         }
         break;
       case 'todo':
-        if (entityId) sources.push({ key: `todo:${entityId}`, label: entityId });
+        if (entityId) sources.push({ key: `todo:${entityId}`, label: this.sourceLabel(entityId) });
         break;
       case 'calendar':
-        if (entityId) sources.push({ key: `calendar:${entityId}`, label: entityId });
+        if (entityId) sources.push({ key: `calendar:${entityId}`, label: this.sourceLabel(entityId) });
         break;
       case 'rss-feed':
-        if (entityId) sources.push({ key: `rss:${entityId}`, label: entityId });
+        if (entityId) sources.push({ key: `rss:${entityId}`, label: this.sourceLabel(entityId) });
         break;
       case 'graph':
         for (const series of config?.series ?? []) {
-          if (series.entityId) sources.push({ key: `history:${series.entityId}`, label: series.label || series.entityId });
+          if (series.entityId) sources.push({ key: `history:${series.entityId}`, label: series.label || this.sourceLabel(series.entityId) });
         }
         break;
       case 'ai-content':

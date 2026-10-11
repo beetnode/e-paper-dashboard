@@ -38,7 +38,9 @@ public sealed class GraphWidgetRenderer(RenderingUtilities utils) : IWidgetRende
             foreach (var s in series.EnumerateArray())
             {
                 var sEntityId = RenderingUtilities.GetStringProp(s, "entityId") ?? "";
-                var sLabel = RenderingUtilities.GetStringProp(s, "label") ?? sEntityId;
+                var sLabel = RenderingUtilities.GetStringProp(s, "label") is { Length: > 0 } label
+                    ? label
+                    : RenderingUtilities.GetSourceDisplayName(sEntityId, data);
                 var sColor = RenderingUtilities.GetStringProp(s, "color") ?? ColorUtils.GetDefaultSeriesColor(layout.ColorScheme, idx);
                 if (!string.IsNullOrEmpty(sEntityId))
                     seriesList.Add((sEntityId, sLabel, sColor));

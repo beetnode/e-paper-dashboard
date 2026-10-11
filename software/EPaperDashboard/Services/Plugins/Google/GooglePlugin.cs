@@ -10,8 +10,8 @@ namespace EPaperDashboard.Services.Plugins.Google;
 public sealed class GooglePlugin(GoogleOAuthService oauth, IHttpClientFactory clients, TimeProvider clock) : IOAuthDataProviderPlugin
 {
     public ProviderManifest Manifest { get; } = new("google", "Google Calendar & Tasks",
-        [new("clientId", "OAuth client ID"), new("clientSecret", "OAuth client secret", true), new("redirectUri", "OAuth redirect URI")], true, [new("google.calendar", "calendar"), new("google.tasks", "todo")],
-        "Use your own Google Cloud OAuth client (Web application). Enable the Calendar and Tasks APIs and add your account as a test user if needed. "
+        [new("clientId", "OAuth client ID"), new("clientSecret", "OAuth client secret", true), new("redirectUri", "OAuth redirect URI")], true,
+        SetupInstructions: "Use your own Google Cloud OAuth client (Web application). Enable the Calendar and Tasks APIs and add your account as a test user if needed. "
         + "Use HTTPS, or localhost for development. After saving, sign in and allow Calendar and Tasks access. Changing credentials requires signing in again.");
 
     public IReadOnlyCollection<string> AuthorizationCredentialKeys { get; } = [RefreshTokenKey];

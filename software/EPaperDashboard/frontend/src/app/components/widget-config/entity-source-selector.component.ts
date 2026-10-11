@@ -11,6 +11,21 @@ export interface EntitySourceOption {
   connectionName?: string;
 }
 
+export interface SourceGroup<T> {
+  name: string;
+  sources: T[];
+}
+
+/** Groups sources by connection, keeping the order in which connections first appear. */
+export function groupByConnection<T extends { connectionName?: string }>(sources: T[]): SourceGroup<T>[] {
+  const groups = new Map<string, T[]>();
+  for (const source of sources) {
+    const name = source.connectionName || 'Other sources';
+    groups.set(name, [...(groups.get(name) ?? []), source]);
+  }
+  return [...groups].map(([name, grouped]) => ({ name, sources: grouped }));
+}
+
 @Component({
   selector: 'app-entity-source-selector',
   standalone: true,
@@ -31,8 +46,12 @@ export interface EntitySourceOption {
         }
         <select id="entitySourceSelect" class="form-select" [ngModel]="value" (ngModelChange)="valueChange.emit($event)">
           <option value="">Select source…</option>
-          @for (entity of filteredEntities(); track entity.entity_id) {
-            <option [value]="entity.entity_id">{{ formatEntity(entity) }}</option>
+          @for (group of groupedEntities(); track group.name) {
+            <optgroup [label]="group.name">
+              @for (entity of group.sources; track entity.entity_id) {
+                <option [value]="entity.entity_id">{{ formatEntity(entity, false) }}</option>
+              }
+            </optgroup>
           }
         </select>
         @if (selectedEntity(); as selected) {
@@ -66,9 +85,13 @@ export class EntitySourceSelectorComponent {
     return this.entities.filter(entity => this.formatEntity(entity).toLowerCase().includes(query));
   }
 
-  formatEntity(entity: EntitySourceOption): string {
+  groupedEntities(): SourceGroup<EntitySourceOption>[] {
+    return groupByConnection(this.filteredEntities());
+  }
+
+  formatEntity(entity: EntitySourceOption, withConnection = true): string {
     const label = entity.friendly_name || entity.entity_id;
-    const name = entity.connectionName ? `${entity.connectionName} · ${label}` : label;
+    const name = withConnection && entity.connectionName ? `${entity.connectionName} · ${label}` : label;
     const details = [entity.domain, entity.device_class, entity.unit_of_measurement]
       .filter(Boolean)
       .join(', ');

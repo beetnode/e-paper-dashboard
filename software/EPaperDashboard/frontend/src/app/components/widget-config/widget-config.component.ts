@@ -33,7 +33,7 @@ import { AiService } from '../../services/ai.service';
 import { ToastService } from '../../services/toast.service';
 import { ResolveUrlPipe } from '../../pipes/resolve-url.pipe';
 import { isEntityCompatible, getWidgetRenderType, getWidgetDefinition } from '../../models/widget-catalog';
-import { EntitySourceSelectorComponent } from './entity-source-selector.component';
+import { EntitySourceSelectorComponent, groupByConnection } from './entity-source-selector.component';
 import { WidgetTitleConfigComponent } from './widget-title-config.component';
 
 @Component({
@@ -63,9 +63,13 @@ export class WidgetConfigComponent implements OnChanges {
   showImageUrlInput = false;
   imageUrlValue = '';
 
-  formatEntityLabel(entity: any): string {
+  getGroupedEntities() {
+    return groupByConnection(this.getFilteredEntities());
+  }
+
+  formatEntityLabel(entity: any, withConnection = true): string {
     const name = entity?.friendly_name || entity?.entity_id || 'Unknown';
-    const base = entity?.connectionName ? `${entity.connectionName} · ${name}` : name;
+    const base = withConnection && entity?.connectionName ? `${entity.connectionName} · ${name}` : name;
     const details: string[] = [];
 
     const domain = entity?.domain;

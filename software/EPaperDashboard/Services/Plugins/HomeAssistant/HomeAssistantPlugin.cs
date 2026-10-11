@@ -20,7 +20,7 @@ public sealed class HomeAssistantPlugin(
     private const string TokenKey = "token";
 
     public ProviderManifest Manifest { get; } = new("home-assistant", "Home Assistant",
-        [new("host", "Server URL"), new(TokenKey, "Long-lived access token", true)], Widgets: [new("home-assistant.weather", "weather"), new("home-assistant.forecast", "weather-forecast")],
+        [new("host", "Server URL"), new(TokenKey, "Long-lived access token", true)],
         SetupInstructions: "Enter a server URL reachable from izBoard, then paste a long-lived access token or sign in with Home Assistant after saving.");
 
     // Sign-in is optional: it creates a long-lived token, which can also be pasted.
@@ -73,9 +73,19 @@ public sealed class HomeAssistantPlugin(
         }).ToList();
     }
 
-    private static string[] Capabilities(HassEntity entity)
+    // Domains whose history graphs meaningfully even when the current state is not numeric.
+    private static readonly HashSet<string> GraphableDomains = new(StringComparer.OrdinalIgnoreCase)
     {
-        var capabilities = new List<string> { SourceCapabilities.State, SourceCapabilities.History };
+        "sensor", "binary_sensor", "input_number", "number", "counter", "climate", "light", "cover", "fan",
+        "humidifier", "water_heater", "weather", "person", "device_tracker", "sun", "zone"
+    };
+
+    internal static string[] Capabilities(HassEntity entity)
+    {
+        var capabilities = new List<string> { SourceCapabilities.State };
+        if (GraphableDomains.Contains(entity.Domain)
+            || double.TryParse(entity.State, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _))
+            capabilities.Add(SourceCapabilities.History);
         switch (entity.Domain)
         {
             case "calendar": capabilities.Add(SourceCapabilities.Calendar); break;

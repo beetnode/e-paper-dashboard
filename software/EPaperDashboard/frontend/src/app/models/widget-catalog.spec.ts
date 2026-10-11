@@ -1,4 +1,4 @@
-import { createDefaultWidgetConfig, getWidgetDefaultSize, getWidgetDefinition, isEntityCompatible, WIDGET_DEFINITIONS } from './widget-catalog';
+import { buildWidgetDefinitions, createDefaultWidgetConfig, getWidgetDefaultSize, getWidgetDefinition, isEntityCompatible, WIDGET_DEFINITIONS } from './widget-catalog';
 
 describe('widget catalog', () => {
   it('defines every widget type once', () => {
@@ -15,18 +15,20 @@ describe('widget catalog', () => {
   it('provides widget-specific sizes and capabilities', () => {
     expect(getWidgetDefaultSize('header', 8, 12)).toEqual({ w: 8, h: 1 });
     expect(getWidgetDefinition('app-icon').supportsTitle).toBe(false);
-    expect(isEntityCompatible('calendar', { entityId: 'calendar.home', friendlyName: 'Home', domain: 'calendar' })).toBe(true);
-    expect(isEntityCompatible('calendar', { entityId: 'sensor.temp', friendlyName: 'Temp', domain: 'sensor' })).toBe(false);
+    expect(isEntityCompatible('calendar', { entityId: 'calendar.home', friendlyName: 'Home', domain: 'calendar', capabilities: ['calendar'] })).toBe(true);
+    // A provider-specific domain alone never makes a source compatible.
+    expect(isEntityCompatible('calendar', { entityId: 'calendar.home', friendlyName: 'Home', domain: 'calendar' })).toBe(false);
+    expect(isEntityCompatible('graph', { entityId: 'sensor.temp', friendlyName: 'Temp', domain: 'sensor', capabilities: ['state'] })).toBe(false);
+    expect(isEntityCompatible('graph', { entityId: 'sensor.temp', friendlyName: 'Temp', domain: 'sensor', capabilities: ['state', 'history'] })).toBe(true);
   });
 });
 
 describe('provider widget registration', () => {
   const calendar = (pluginId: string) => ({ entityId: 'source:connection:calendar', friendlyName: 'Calendar', domain: 'calendar', pluginId, capabilities: ['calendar'] });
-  it('allows common calendars to consume either plugin while keeping plugin widgets scoped', () => {
+  it('lets common widgets consume sources from any plugin', () => {
     expect(isEntityCompatible('calendar', calendar('google'))).toBe(true);
     expect(isEntityCompatible('calendar', calendar('home-assistant'))).toBe(true);
-    expect(isEntityCompatible('google.calendar', calendar('google'))).toBe(true);
-    expect(isEntityCompatible('google.calendar', calendar('home-assistant'))).toBe(false);
+    expect(isEntityCompatible('todo', { ...calendar('google'), capabilities: ['todo'] })).toBe(true);
   });
   it('uses explicit capabilities rather than guessing from source ID or domain', () => {
     expect(isEntityCompatible('calendar', { ...calendar('example'), domain: 'custom-domain' })).toBe(true);
@@ -35,11 +37,14 @@ describe('provider widget registration', () => {
     expect(isEntityCompatible('weather', { ...calendar('example'), capabilities: ['weather', 'state'] })).toBe(true);
     expect(isEntityCompatible('header', calendar('google'))).toBe(false);
   });
-  it('registers independent plugin widget defaults and their shared renderer', () => {
-    expect(getWidgetDefinition('google.tasks').renderAs).toBe('todo');
-    const first = createDefaultWidgetConfig('google.calendar') as any;
-    const second = createDefaultWidgetConfig('calendar') as any;
-    first.items[0].visible = false;
-    expect(second.items[0].visible).toBe(true);
+  it('builds plugin variants from a common widget and rejects incomplete bespoke widgets', () => {
+    const variant = { type: 'example.calendar', renderAs: 'calendar', label: 'Example calendar', category: 'example', pluginId: 'example' };
+    const definitions = buildWidgetDefinitions(WIDGET_DEFINITIONS, [variant]);
+    const built = definitions.find(d => d.type === 'example.calendar')!;
+    expect(built.capability).toBe('calendar');
+    expect(built.pluginId).toBe('example');
+    expect(built.createDefaultConfig()).toEqual(getWidgetDefinition('calendar').createDefaultConfig());
+    expect(() => buildWidgetDefinitions(WIDGET_DEFINITIONS, [{ ...variant, renderAs: 'missing' }])).toThrow();
+    expect(() => buildWidgetDefinitions(WIDGET_DEFINITIONS, [{ type: 'example.bespoke', label: 'Bespoke', category: 'example', pluginId: 'example' } as any])).toThrow();
   });
 });
