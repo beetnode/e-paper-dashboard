@@ -358,6 +358,11 @@ body {
   > span {
     margin-inline: 0 !important;
   }
+
+  /* Icons take the label's line height, so icon-only buttons match the height of labelled ones. */
+  > i {
+    line-height: inherit;
+  }
 }
 
 .app-icon-button {
