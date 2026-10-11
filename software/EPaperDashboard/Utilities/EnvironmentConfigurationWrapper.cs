@@ -12,7 +12,6 @@ public sealed class EnvironmentConfigurationWrapper : IEnvironmentConfiguration
     public bool IsAddonMode => EnvironmentConfiguration.IsAddonMode;
     public string? HomeAssistantHost => EnvironmentConfiguration.HomeAssistantHost;
     public Uri? ClientUri => EnvironmentConfiguration.ClientUri;
-    public string? StateSigningKey => EnvironmentConfiguration.StateSigningKey;
     public TimeSpan DashboardScheduleCheckInterval => EnvironmentConfiguration.DashboardScheduleCheckInterval;
     public TimeSpan DashboardMissedScheduleTolerance => EnvironmentConfiguration.DashboardMissedScheduleTolerance;
     public string ConfigDir => EnvironmentConfiguration.ConfigDir;

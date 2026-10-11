@@ -6,7 +6,8 @@ The server component of the izBoard system. An ASP.NET Core web application with
 
 - Visual dashboard designer with multiple widget types
 - AI-powered dashboard generation — describe your ideal layout in natural language and have AI create it using your Home Assistant entities, calendars, weather, and more
-- Home Assistant integration
+- Built-in data provider plugins: Home Assistant and Google Calendar / Tasks
+- Multiple named connections per user, shared across their dashboards
 - E-Paper optimized image processing
 - Device management and pairing
 - Configurable update schedules
@@ -15,13 +16,16 @@ The server component of the izBoard system. An ASP.NET Core web application with
 - Deployable as standalone Docker or Home Assistant Add-on
 - Optional Home Assistant dashboard screenshots through an on-demand rendering component
 
+## Data providers
+
+Use **Connections** to configure your own Home Assistant and Google accounts. Common widgets can select compatible sources across providers. Existing Home Assistant dashboards remain compatible. See [provider setup and the plugin extension API](docs/data-provider-plugins.md) for Google OAuth setup, migration requirements, and adding plugins.
+
 ## Deployment
 
 ### Docker Compose
 
 For a standalone deployment, copy `.env.example` to `.env` in the `software` directory and fill in
-`CLIENT_URL` and `STATE_SIGNING_KEY` before starting. Generate a unique signing
-key with `openssl rand -hex 32`. Set `CLIENT_URL` to an address reachable by both the display and
+`CLIENT_URL` before starting. Set `CLIENT_URL` to an address reachable by both the display and
 your Home Assistant OAuth browser; `localhost` is suitable only for local testing. The `.env` file
 and any personal `docker-compose.yml` are ignored by Git. The tracked `docker-compose.base.yml`
 contains no credentials and is used by the renderer deployment and manual test commands below.
@@ -37,7 +41,6 @@ services:
       - <host-path>/data:/data:rw
     environment:
       - CLIENT_URL=http://dashboard.local:<port>
-      - STATE_SIGNING_KEY=<random-secret>
       - TZ=<time-zone>
 ```
 
@@ -62,7 +65,6 @@ Install via the [izBoard Home Assistant Add-on repository](https://github.com/iz
 | Variable | Required | Description |
 |---|---|---|
 | `CLIENT_URL` | Yes | Absolute HTTP or HTTPS URL reachable from the display network. In standalone/host mode it is also the Home Assistant OAuth client URL; in add-on mode it is the direct device endpoint. |
-| `STATE_SIGNING_KEY` | Yes (standalone) | Random secret for signing auth state |
 | `TZ` | Recommended | Timezone (e.g. `Europe/London`) |
 | `APP_MODE` | No | Deployment mode: `standalone` (default) or `addon` |
 | `DATABASE_PROVIDER` | No | `litedb` (default) or `postgresql`. Independent of `APP_MODE`. |
@@ -72,6 +74,7 @@ Install via the [izBoard Home Assistant Add-on repository](https://github.com/iz
 | `RENDERING_COMPONENT_RELEASE_TAG` | No | Override the component release tag; normally set by the official image |
 | `RENDERING_COMPONENT_BASE_URL` | No | Direct component artifact source for manual deployment testing; bypasses GitHub release lookup |
 | `RENDERING_COMPONENT_SOCKET` | No | Standalone app's private renderer Unix socket (default: `/run/izboard-rendering/renderer.sock`) |
+| `RENDERING_LOG_WORKER_ERRORS` | No | Set to `1` on the renderer to log raw browser errors for troubleshooting. They can contain dashboard URLs and page text. Default: `0` |
 | `RENDERING_MAX_CONCURRENT_RENDERS` | No | Concurrent worker limit, 1–16 (default: 2); increase only after measuring memory use |
 | `RENDERING_MAX_QUEUED_RENDERS` | No | Waiting request limit, 0–1000 (default: 100) |
 

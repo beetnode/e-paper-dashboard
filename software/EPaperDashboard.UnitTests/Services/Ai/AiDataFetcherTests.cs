@@ -21,7 +21,7 @@ public class AiDataFetcherTests
     {
         _entityStateProvider
             .Setup(p => p.FetchAllEntityStatesAsync(It.IsAny<string>()))
-            .ReturnsAsync(Result.Success<List<HassEntityState>, string>([]));
+            .ReturnsAsync(Result.Success<List<EntityState>, string>([]));
         _todoDataProvider
             .Setup(p => p.FetchAllTodoItemsAsync(It.IsAny<string>()))
             .ReturnsAsync(Result.Success<Dictionary<string, List<TodoItem>>, string>([]));
@@ -50,7 +50,7 @@ public class AiDataFetcherTests
         var sut = CreateSut();
         _entityStateProvider
             .Setup(p => p.FetchAllEntityStatesAsync("dash1"))
-            .ReturnsAsync(Result.Success<List<HassEntityState>, string>([new HassEntityState { EntityId = "sensor.x" }]));
+            .ReturnsAsync(Result.Success<List<EntityState>, string>([new EntityState { EntityId = "sensor.x" }]));
 
         var result = await sut.FetchAsync("dash1");
 
@@ -63,7 +63,7 @@ public class AiDataFetcherTests
         var sut = CreateSut();
         _entityStateProvider
             .Setup(p => p.FetchAllEntityStatesAsync(It.IsAny<string>()))
-            .ReturnsAsync(Result.Failure<List<HassEntityState>, string>("boom"));
+            .ReturnsAsync(Result.Failure<List<EntityState>, string>("boom"));
         _todoDataProvider
             .Setup(p => p.FetchAllTodoItemsAsync(It.IsAny<string>()))
             .ReturnsAsync(Result.Success<Dictionary<string, List<TodoItem>>, string>(
@@ -95,7 +95,7 @@ public class AiDataFetcherTests
     {
         var sut = CreateSut();
         _entityStateProvider.Setup(p => p.FetchAllEntityStatesAsync(It.IsAny<string>()))
-            .ReturnsAsync(Result.Failure<List<HassEntityState>, string>("x"));
+            .ReturnsAsync(Result.Failure<List<EntityState>, string>("x"));
         _todoDataProvider.Setup(p => p.FetchAllTodoItemsAsync(It.IsAny<string>()))
             .ReturnsAsync(Result.Failure<Dictionary<string, List<TodoItem>>, string>("x"));
         _calendarDataProvider.Setup(p => p.FetchAllCalendarEventsAsync(It.IsAny<string>(), It.IsAny<int>()))

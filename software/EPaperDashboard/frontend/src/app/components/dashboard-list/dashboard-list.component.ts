@@ -77,7 +77,7 @@ import { Dashboard } from '../../models/types';
         <span class="app-empty-state-icon"><i class="fa-solid fa-table-cells-large" aria-hidden="true"></i></span>
         <div>
           <h2 class="h5 mb-1">Create your first dashboard</h2>
-          <p class="text-muted mb-0">Choose a display size, then add and arrange widgets in the designer.</p>
+          <p class="text-muted mb-0">Build a custom layout from widgets, or show an existing Home Assistant dashboard.</p>
         </div>
         <a routerLink="/dashboards/create" class="btn btn-primary"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i> Create dashboard</a>
       </div>
@@ -240,42 +240,14 @@ export class DashboardListComponent {
       confirmLabel: 'Delete',
       isDangerous: true,
       onConfirm: async () => {
-        // Optimistically remove from UI and allow undo
-        this.dashboards.update(list => list.filter(d => d.id !== id));
-
-        let didUndo = false;
-
-        const performDelete = async () => {
-          try {
-            await firstValueFrom(this.dashboardService.deleteDashboard(id));
-            if (!didUndo) {
-              this.toastService.success('Dashboard deleted successfully');
-            }
-          } catch (error: any) {
-            // On error, reload list and show error
-            this.toastService.error(error.error?.message || 'Failed to delete dashboard');
-            this.loadDashboards();
-          }
-        };
-
-        const timeoutMs = 5000;
-        const timeoutId = setTimeout(() => {
-          performDelete();
-        }, timeoutMs);
-
-        this.toastService.showWithAction(
-          `Dashboard "${dashboard.name}" deleted`,
-          'Undo',
-          () => {
-            didUndo = true;
-            clearTimeout(timeoutId);
-            // restore dashboard in UI
-            this.dashboards.update(list => [dashboard, ...list]);
-            this.toastService.info('Deletion undone');
-          },
-          'info',
-          timeoutMs
-        );
+        try {
+          await firstValueFrom(this.dashboardService.deleteDashboard(id));
+          this.dashboards.update(list => list.filter(d => d.id !== id));
+          this.toastService.success('Dashboard deleted successfully');
+        } catch (error: any) {
+          this.toastService.error(error.error?.message || 'Failed to delete dashboard');
+          this.loadDashboards();
+        }
       }
     });
   }

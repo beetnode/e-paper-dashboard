@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Net.Http.Json;
 using System.Net.Sockets;
 using EPaperDashboard.RenderingComponent;
+using EPaperDashboard.Services.Rendering;
 using EPaperDashboard.Utilities;
 
 namespace EPaperDashboard.Services.Components.Playwright;
@@ -106,7 +107,8 @@ public sealed class PlaywrightComponentRuntime
         }
         using var responseLease = response;
         if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException("The isolated rendering component failed. Check renderer container logs.");
+            throw new RenderingRequestException(await ReadFailureAsync(response, timeout.Token)
+                ?? "The isolated rendering component failed. Check renderer container logs.");
         if (response.Content.Headers.ContentLength is not (> 0 and <= RenderRequest.MaximumImageBytes))
             throw new InvalidOperationException("The rendering component produced a missing or oversized image.");
         await using var input = await response.Content.ReadAsStreamAsync(timeout.Token);
@@ -121,6 +123,19 @@ public sealed class PlaywrightComponentRuntime
         }
         return output.ToArray();
     }
+
+    // The renderer reports only reasons produced by RenderFailure, never raw browser errors.
+    private static async Task<string?> ReadFailureAsync(HttpResponseMessage response, CancellationToken token)
+    {
+        try
+        {
+            var failure = await response.Content.ReadFromJsonAsync<RenderFailureResponse>(token);
+            return failure?.Error is { Length: > 0 and <= 500 } error ? error : null;
+        }
+        catch (Exception exception) when (exception is JsonException or NotSupportedException or HttpRequestException) { return null; }
+    }
+
+    internal sealed record RenderFailureResponse(string? Error);
 
     internal async Task DrainRemoteAsync(CancellationToken cancellationToken)
     {
@@ -200,17 +215,19 @@ public sealed class PlaywrightComponentRuntime
             started = process.Start();
             if (!started) throw new InvalidOperationException("The rendering component could not be started.");
             output = ReadBoundedAsync(process.StandardOutput, token);
-            error = ReadBoundedAsync(process.StandardError, token);
+            error = ReadBoundedAsync(process.StandardError, token, keepTail: true);
             await process.StandardInput.WriteAsync(
                 JsonSerializer.Serialize(request with { OutputPath = outputPath }, JsonOptions).AsMemory(), token);
             process.StandardInput.Close();
             await process.WaitForExitAsync(token);
             var response = JsonSerializer.Deserialize<RenderResponse>(await output, JsonOptions);
-            await error;
+            var browserLog = await error;
             if (response?.ProtocolVersion != 2)
                 throw new InvalidOperationException("The rendering component protocol is incompatible.");
             if (process.ExitCode != 0 || response.Success != true)
-                throw new InvalidOperationException(response.Error ?? "The rendering component failed.");
+                throw new RenderWorkerFailedException(LogWorkerErrors && browserLog.Length > 0
+                    ? $"{response.Error}\nBrowser log:\n{browserLog[Math.Max(0, browserLog.Length - 8000)..]}"
+                    : response.Error);
             var file = new FileInfo(outputPath);
             if (!file.Exists || file.Length <= 0 || file.Length > RenderRequest.MaximumImageBytes)
                 throw new InvalidOperationException("The rendering component produced a missing or oversized image.");
@@ -242,7 +259,11 @@ public sealed class PlaywrightComponentRuntime
         }
     }
 
-    private static async Task<string> ReadBoundedAsync(StreamReader reader, CancellationToken token)
+    /// <summary>Operator opt-in; raw worker errors can contain dashboard URLs or page text.</summary>
+    internal static bool LogWorkerErrors => Environment.GetEnvironmentVariable("RENDERING_LOG_WORKER_ERRORS") == "1";
+
+    // Diagnostic streams keep their most recent output instead of failing the render.
+    private static async Task<string> ReadBoundedAsync(StreamReader reader, CancellationToken token, bool keepTail = false)
     {
         var text = new StringBuilder();
         var buffer = new char[4096];
@@ -250,7 +271,10 @@ public sealed class PlaywrightComponentRuntime
         while ((count = await reader.ReadAsync(buffer.AsMemory(), token)) != 0)
         {
             if (text.Length + count > 64_000)
-                throw new InvalidOperationException("The rendering component response exceeds the allowed size.");
+            {
+                if (!keepTail) throw new InvalidOperationException("The rendering component response exceeds the allowed size.");
+                text.Remove(0, text.Length + count - 64_000);
+            }
             text.Append(buffer, 0, count);
         }
         return text.ToString();
@@ -273,6 +297,8 @@ public sealed class PlaywrightComponentRuntime
         info.Environment["TMPDIR"] = temporaryDirectory;
         info.Environment["DOTNET_EnableDiagnostics"] = "0";
         info.Environment["IZBOARD_REQUIRE_BROWSER_SANDBOX"] = requireSandbox ? "1" : "0";
+        // Opt-in diagnostics: Playwright writes the browser's own output to the worker's error stream.
+        if (LogWorkerErrors) info.Environment["DEBUG"] = "pw:browser";
         info.Environment["PLAYWRIGHT_BROWSERS_PATH"] = component.BrowserPath;
         info.Environment["IZBOARD_PLAYWRIGHT_LIBRARY_PATH"] = component.LibraryPath;
         if (component.DataPath is not null) info.Environment["IZBOARD_PLAYWRIGHT_DATA_PATH"] = component.DataPath;

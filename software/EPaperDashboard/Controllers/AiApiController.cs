@@ -1,4 +1,5 @@
 using System.Text.Json;
+using CSharpFunctionalExtensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using EPaperDashboard.Models;
@@ -39,7 +40,7 @@ public sealed class AiApiController(
             return NotFound("User not found");
         }
 
-        var validationError = ValidateGlobalAiConfig(config);
+        var validationError = ValidateGlobalAiConfig(config) ?? ValidateConnection(config);
         if (validationError != null)
         {
             return BadRequest(validationError);
@@ -171,7 +172,7 @@ public sealed class AiApiController(
             return NotFound("Dashboard not found");
         }
 
-        var validationError = ValidateAiConfig(config);
+        var validationError = ValidateAiConfig(config) ?? ValidateConnection(config);
         if (validationError != null)
         {
             return BadRequest(validationError);
@@ -193,6 +194,12 @@ public sealed class AiApiController(
 
         return Ok(config);
     }
+
+    private string? ValidateConnection(AiConfig config) =>
+        string.IsNullOrEmpty(config.HomeAssistantConnectionId)
+        || homeAssistantConnectionService.FindConnection(config.HomeAssistantConnectionId, CurrentUserId) != null
+            ? null
+            : "Home Assistant connection not found";
 
     private static string? ValidateAiConfig(AiConfig config)
     {
@@ -287,7 +294,7 @@ public sealed class AiApiController(
     }
 
     [HttpGet("dashboards/{dashboardId}/conversation-agents")]
-    public async Task<IActionResult> GetConversationAgents(string dashboardId, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetConversationAgents(string dashboardId, [FromQuery] string? connectionId, CancellationToken cancellationToken)
     {
         var dashboard = GetOwnedDashboard(dashboardId);
         if (dashboard == null)
@@ -295,15 +302,17 @@ public sealed class AiApiController(
             return NotFound("Dashboard not found");
         }
 
-        var connectionInfo = homeAssistantConnectionService.GetConnectionInfo(dashboardId);
+        // The query names the connection being chosen; otherwise use the one already saved for this dashboard.
+        var scope = homeAssistantConnectionService.ResolveScope(dashboardId, connectionId ?? dashboard.AiConfig?.HomeAssistantConnectionId);
+        var connectionInfo = scope.Bind(homeAssistantConnectionService.GetConnectionInfo);
         if (connectionInfo.IsFailure)
         {
-            return BadRequest("This dashboard does not have a valid Home Assistant connection. Please configure Host and Access Token first.");
+            return BadRequest("Select a Home Assistant connection that is signed in to list its conversation agents.");
         }
 
         try
         {
-            using var ws = await homeAssistantConnectionService.ConnectAsync(dashboardId);
+            using var ws = await homeAssistantConnectionService.ConnectAsync(scope.Value);
 
             var message = new Dictionary<string, object>
             {

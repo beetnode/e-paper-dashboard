@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Authorization;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services;
 using EPaperDashboard.Guards;
+using EPaperDashboard.Services.Plugins.HomeAssistant;
 
 namespace EPaperDashboard.Controllers;
 
@@ -25,8 +26,7 @@ public sealed class RenderToImageController(
 	DashboardService dashboardService,
 	DeviceService deviceService,
 	DashboardImageRenderingService dashboardImageRenderingService,
-	IDeploymentStrategy deploymentStrategy,
-	IEnvironmentConfiguration environmentConfiguration) : ControllerBase
+	HomeAssistantDashboardTargetResolver homeAssistantTargets) : ControllerBase
 {
 	[HttpGet("binary")]
 	public async Task<IActionResult> GetAsBinary(
@@ -61,8 +61,8 @@ public sealed class RenderToImageController(
     {
         var dashboard = ResolveDashboardByApiKey(apiKey);
         if (dashboard.HasNoValue) return NotFound();
-        var uri = GetDashboardUri(dashboard.Value, deploymentStrategy);
-        if (uri.HasNoValue) return NotFound();
+        var uri = homeAssistantTargets.ResolveUri(dashboard.Value);
+        if (uri.IsFailure) return NotFound();
         return Ok(await renderingService.GetHealth(dashboard.Value.UserId, dashboard.Value.Id, uri.Value));
     }
 
@@ -147,20 +147,12 @@ public sealed class RenderToImageController(
 		string format,
 		Func<Dashboard, IImage, IImage>? transform = null)
 	{
-		var dashboardInfo = GetDashboardInfo(dashboard, deploymentStrategy, environmentConfiguration);
-		if (dashboardInfo.HasNoValue)
-		{
-			var hint = deploymentStrategy.IsAutoConnected
-				? "Dashboard configuration incomplete. The 'Home Assistant Dashboard' rendering mode requires " +
-				  "a Long-Lived Access Token. Create one in Home Assistant (Profile → Long-Lived Access Tokens) " +
-				  "and set it on the dashboard."
-				: "Dashboard configuration incomplete. Ensure Host, Path, and Access Token are set.";
-			return NotFound(hint);
-		}
+		var target = homeAssistantTargets.Resolve(dashboard);
+		if (target.IsFailure) return NotFound(target.Error);
 
 		var (contentType, encoder) = GetEncoder(format);
 		var result = await renderingService
-			.RenderDashboardAsync(dashboard.UserId, dashboard.Id, dashboardInfo.Value.DashboardUri, imageSize, dashboardInfo.Value.Tokens, HttpContext.RequestAborted)
+			.RenderDashboardAsync(dashboard.UserId, dashboard.Id, target.Value.DashboardUri, imageSize, target.Value.Tokens, HttpContext.RequestAborted)
 			.Map(image => transform?.Invoke(dashboard, image) ?? image);
 
 		if (result.IsSuccess)
@@ -172,60 +164,6 @@ public sealed class RenderToImageController(
 		return await result.Match(
 			image => ConvertToResult(image, encoder, contentType),
 			error => Task.FromResult<IActionResult>(BadRequest(error)));
-	}
-
-	private static Maybe<(Uri DashboardUri, HassTokens Tokens)> GetDashboardInfo(
-		Dashboard dashboard, IDeploymentStrategy deploymentStrategy, IEnvironmentConfiguration environmentConfiguration)
-	{
-		var (strategyHost, _) = deploymentStrategy.GetHomeAssistantConnection(dashboard);
-
-		var host = dashboard.Host;
-		if (string.IsNullOrWhiteSpace(host) && deploymentStrategy.Mode != DeploymentMode.Standalone)
-		{
-			// For browser-based rendering (Playwright), we need the actual HA web UI URL.
-			// The supervisor API proxy doesn't serve the HA frontend, so use the
-			// direct internal HA URL in addon mode.
-			host = deploymentStrategy.Mode == DeploymentMode.Addon
-				? Constants.HomeAssistantInternalUrl
-				: strategyHost;
-		}
-
-		// For Playwright rendering, always use the dashboard's stored access token.
-		// In addon mode, this is an auto-created long-lived HA Core token (not the supervisor token,
-		// which only works via the supervisor proxy and can't authenticate with HA frontend directly).
-		var accessToken = dashboard.AccessToken;
-
-		if (string.IsNullOrWhiteSpace(accessToken)
-			|| !Uri.TryCreate(host, UriKind.Absolute, out var hostUri)
-			|| !Uri.TryCreate(dashboard.Path, UriKind.Relative, out var pathUri))
-		{
-			return Maybe.None;
-		}
-
-		var hassUrl = hostUri.AbsoluteUri.TrimEnd('/');
-
-		// For OAuth-generated long-lived tokens, ClientId is not used for auth
-		// Use ClientUri if configured, otherwise use the HA host URL as a placeholder
-		var clientId = environmentConfiguration.ClientUri?.AbsoluteUri.TrimEnd('/') ?? hassUrl;
-
-		return (new Uri(hostUri, pathUri), new HassTokens(accessToken, "Bearer", hassUrl, clientId));
-	}
-
-	private static Maybe<Uri> GetDashboardUri(Dashboard dashboard, IDeploymentStrategy deploymentStrategy)
-	{
-		var host = dashboard.Host;
-		if (string.IsNullOrWhiteSpace(host) && deploymentStrategy.Mode != DeploymentMode.Standalone)
-		{
-			// For browser-based rendering, use HA direct URL in addon mode
-			host = deploymentStrategy.Mode == DeploymentMode.Addon
-				? Constants.HomeAssistantInternalUrl
-				: deploymentStrategy.GetHomeAssistantConnection(dashboard).host;
-		}
-
-		return Uri.TryCreate(host, UriKind.Absolute, out var hostUri) &&
-			Uri.TryCreate(dashboard.Path, UriKind.Relative, out var pathUri)
-			? new Uri(hostUri, pathUri)
-			: Maybe.None;
 	}
 
 	private static IDither? GetDither(bool shouldDither) =>

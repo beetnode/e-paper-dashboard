@@ -17,7 +17,7 @@ public class DashboardHomeAssistantController(
     [HttpGet("dashboards")]
     public async Task<IActionResult> GetDashboards(string dashboardId)
     {
-        var result = await _homeAssistantService.FetchDashboards(dashboardId);
+        var result = await _homeAssistantService.FetchDashboards(new HomeAssistantScope.DashboardSettings(dashboardId));
         return result.IsSuccess
             ? Ok(new { data = result.Value })
             : BadRequest(new { error = result.Error });
@@ -26,7 +26,7 @@ public class DashboardHomeAssistantController(
     [HttpGet("entities")]
     public async Task<IActionResult> GetEntities(string dashboardId)
     {
-        var result = await _homeAssistantService.FetchEntities(dashboardId);
+        var result = await _homeAssistantService.FetchEntities(new HomeAssistantScope.DashboardSettings(dashboardId));
         return result.IsSuccess
             ? Ok(new { data = result.Value })
             : BadRequest(new { error = result.Error });

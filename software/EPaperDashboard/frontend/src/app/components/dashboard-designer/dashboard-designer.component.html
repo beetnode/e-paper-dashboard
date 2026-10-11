@@ -1,3 +1,10 @@
+@if (sourceErrors().length) {
+  <div class="alert alert-warning m-3" role="status">
+    @for (error of sourceErrors(); track $index) { <div>{{ error }}</div> }
+    <a routerLink="/connections">Manage connections</a>
+    <button type="button" class="btn btn-link btn-sm" (click)="loadAvailableEntities()">Retry sources</button>
+  </div>
+}
 <div class="container-fluid py-2">
   @if (dashboard()) {
   <div class="row">
@@ -118,7 +125,7 @@
         </div>
         <div class="card-body p-2">
           <div class="widget-list">
-            @for (category of widgetCategories; track category.type) {
+            @for (category of allWidgetCategories; track category.type) {
               @if (!toolboxCollapsed()) {
                 <div class="designer-menu-label text-uppercase text-muted fw-semibold px-2 pt-2">
                   {{ category.label }}
@@ -370,7 +377,7 @@
       </button>
     </div>
     <div class="bottom-sheet-body">
-      @for (category of widgetCategories; track category.type) {
+      @for (category of allWidgetCategories; track category.type) {
         <div class="widget-category-label w-100 text-uppercase text-muted fw-semibold mt-2">{{ category.label }}</div>
         @for (widget of widgetsInCategory(category.type); track widget.type) {
           <button type="button" class="widget-grid-item" (click)="addWidgetToFirstSlot(widget)">

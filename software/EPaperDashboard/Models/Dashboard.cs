@@ -25,6 +25,8 @@ namespace EPaperDashboard.Models
         public string? AccessToken { get; set; }
         public string? Host { get; set; }
         public string? Path { get; set; }
+        /// <summary>Named Home Assistant connection used by "Home Assistant Dashboard" rendering; null uses Host/AccessToken.</summary>
+        public string? HomeAssistantConnectionId { get; set; }
         public List<TimeOnly>? UpdateTimes { get; set; }
         public LayoutConfig? LayoutConfig { get; set; }
         public DateTimeOffset? LastUpdateTime { get; set; }

@@ -17,7 +17,9 @@ public sealed class SsrDataProvider(
     IAiContentProvider aiContentProvider,
     IMemoryCache cache,
     TimeProvider timeProvider,
-    ILogger<SsrDataProvider> logger) : ISsrDataProvider
+    ILogger<SsrDataProvider> logger,
+    IRssFeedDataProvider rssFeedDataProvider,
+    Plugins.ProviderRegistry? plugins = null) : ISsrDataProvider
 {
     private static readonly TimeSpan StateCacheDuration = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan TodoCacheDuration = TimeSpan.FromSeconds(30);
@@ -32,12 +34,40 @@ public sealed class SsrDataProvider(
         bool bypassCache = false)
     {
         var data = new SsrData();
-        var plan = WidgetDataPlan.Create(layout);
+        var plan = WidgetDataPlan.Create(layout, plugins is null ? null : plugins.ResolveWidgetType);
 
-        await FetchEntityStatesAsync(dashboardId, plan, data, bypassCache, cancellationToken);
-        ResolveRssEntries(plan, data);
+        foreach (var group in plan.EntityStateIds.GroupBy(Plugins.SourceReference.ConnectionKey))
+            await FetchEntityStatesAsync(dashboardId, group.OrderBy(id => id, StringComparer.Ordinal).ToArray(), data, bypassCache, cancellationToken);
 
         var tasks = new List<Task>();
+        if (plugins is not null && entityStateProvider is Plugins.PluginDataRouter router)
+        {
+            foreach (var widget in layout.Widgets)
+            {
+                var plugin = plugins.WidgetOwner(widget.Type);
+                try
+                {
+                    var request = plugin?.GetWidgetDataRequest(widget);
+                    if (request is not null)
+                        tasks.Add(FetchPluginWidgetAsync(dashboardId, widget.Id, plugin!.Manifest.Id, request, router, data, bypassCache, cancellationToken));
+                }
+                catch (Exception)
+                {
+                    SetFailure(data, $"widget:{widget.Id}", "Invalid plugin widget configuration.");
+                }
+            }
+        }
+        tasks.AddRange(plan.RssEntityIds.Select(async entityId =>
+            {
+                var (result, fromCache) = await FetchCachedAsync($"source:{dashboardId}:{CacheVersion(dashboardId)}:rss:{entityId}", CalendarCacheDuration,
+                    () => rssFeedDataProvider.FetchRssFeedEntriesAsync(dashboardId, entityId, cancellationToken), bypassCache, cancellationToken);
+                if (result.IsFailure) SetFailure(data, DataSourceKeys.Rss(entityId), result.Error);
+                else
+                {
+                    data.RssFeedEntries[entityId] = result.Value;
+                    SetSuccess(data, DataSourceKeys.Rss(entityId), result.Value.Count, fromCache);
+                }
+            }));
         tasks.AddRange(plan.TodoEntityIds.Select(entityId =>
             FetchTodoAsync(dashboardId, entityId, data, bypassCache, cancellationToken)));
         tasks.AddRange(plan.CalendarEntityIds.Select(entityId =>
@@ -45,11 +75,11 @@ public sealed class SsrDataProvider(
         tasks.AddRange(plan.Forecasts.Select(request =>
             FetchWeatherAsync(dashboardId, request, data, bypassCache, cancellationToken)));
         tasks.AddRange(plan.HistoryHoursByEntityId
-            .GroupBy(item => item.Value)
+            .GroupBy(item => (Hours: item.Value, Connection: Plugins.SourceReference.ConnectionKey(item.Key)))
             .Select(group => FetchGraphHistoryAsync(
                 dashboardId,
                 group.Select(item => item.Key).OrderBy(id => id, StringComparer.Ordinal).ToList(),
-                group.Key,
+                group.Key.Hours,
                 data,
                 bypassCache,
                 cancellationToken)));
@@ -61,17 +91,34 @@ public sealed class SsrDataProvider(
         return data;
     }
 
+    private async Task FetchPluginWidgetAsync(string dashboardId, string widgetId, string pluginId,
+        Plugins.PluginWidgetRequest request, Plugins.PluginDataRouter router, SsrData data, bool bypassCache, CancellationToken ct)
+    {
+        var requestHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(request)));
+        var (result, fromCache) = await FetchCachedAsync(
+            $"source:{dashboardId}:{CacheVersion(dashboardId)}:widget:{pluginId}:{requestHash}",
+            TimeSpan.FromSeconds(30),
+            () => router.FetchAsync(dashboardId, new(request.Capability, request.Source, Parameters: request.Parameters), ct, pluginId),
+            bypassCache, ct);
+        if (result.IsFailure) SetFailure(data, $"widget:{widgetId}", result.Error);
+        else if (result.Value.Custom is { } value)
+        {
+            data.WidgetData[widgetId] = value;
+            SetSuccess(data, $"widget:{widgetId}", 1, fromCache);
+        }
+        else SetSuccess(data, $"widget:{widgetId}", 0, fromCache);
+    }
+
     private async Task FetchEntityStatesAsync(
         string dashboardId,
-        WidgetDataPlan plan,
+        string[] entityIds,
         SsrData data,
         bool bypassCache,
         CancellationToken cancellationToken)
     {
-        if (plan.EntityStateIds.Count == 0) return;
-
-        var entityIds = plan.EntityStateIds.OrderBy(id => id, StringComparer.Ordinal).ToArray();
-        var cacheKey = $"source:{dashboardId}:states:{string.Join('|', entityIds)}";
+        if (entityIds.Length == 0) return;
+        var cacheKey = $"source:{dashboardId}:{CacheVersion(dashboardId)}:states:{string.Join('|', entityIds)}";
         var (result, fromCache) = await FetchCachedAsync(
             cacheKey,
             StateCacheDuration,
@@ -105,7 +152,7 @@ public sealed class SsrDataProvider(
         CancellationToken cancellationToken)
     {
         var (result, fromCache) = await FetchCachedAsync(
-            $"source:{dashboardId}:todo:{entityId}",
+            $"source:{dashboardId}:{CacheVersion(dashboardId)}:todo:{entityId}",
             TodoCacheDuration,
             () => todoDataProvider.FetchTodoItemsAsync(dashboardId, entityId, cancellationToken),
             bypassCache,
@@ -130,7 +177,7 @@ public sealed class SsrDataProvider(
         CancellationToken cancellationToken)
     {
         var (result, fromCache) = await FetchCachedAsync(
-            $"source:{dashboardId}:calendar:{entityId}:168",
+            $"source:{dashboardId}:{CacheVersion(dashboardId)}:calendar:{entityId}:168",
             CalendarCacheDuration,
             () => calendarDataProvider.FetchCalendarEventsAsync(dashboardId, entityId, 168, cancellationToken),
             bypassCache,
@@ -155,7 +202,7 @@ public sealed class SsrDataProvider(
         CancellationToken cancellationToken)
     {
         var (result, fromCache) = await FetchCachedAsync(
-            $"source:{dashboardId}:forecast:{request.EntityId}:{request.ForecastType}",
+            $"source:{dashboardId}:{CacheVersion(dashboardId)}:forecast:{request.EntityId}:{request.ForecastType}",
             ForecastCacheDuration,
             () => weatherForecastProvider.FetchWeatherForecastAsync(
                 dashboardId,
@@ -185,7 +232,7 @@ public sealed class SsrDataProvider(
         CancellationToken cancellationToken)
     {
         var (result, fromCache) = await FetchCachedAsync(
-            $"source:{dashboardId}:history:{hours}:{string.Join('|', entityIds)}",
+            $"source:{dashboardId}:{CacheVersion(dashboardId)}:history:{hours}:{string.Join('|', entityIds)}",
             HistoryCacheDuration,
             () => entityHistoryProvider.FetchEntityHistoryAsync(dashboardId, entityIds, hours, cancellationToken),
             bypassCache,
@@ -203,43 +250,6 @@ public sealed class SsrDataProvider(
             var states = result.Value.GetValueOrDefault(entityId) ?? [];
             data.HistoryData[entityId] = states;
             SetSuccess(data, DataSourceKeys.History(entityId), states.Count, fromCache);
-        }
-    }
-
-    private void ResolveRssEntries(WidgetDataPlan plan, SsrData data)
-    {
-        foreach (var entityId in plan.RssEntityIds)
-        {
-            if (!data.EntityStates.TryGetValue(entityId, out var state))
-            {
-                var entityStatus = data.SourceStatuses.GetValueOrDefault(DataSourceKeys.Entity(entityId));
-                if (entityStatus?.State == "error")
-                    SetFailure(data, DataSourceKeys.Rss(entityId), entityStatus.Error ?? "Entity state unavailable");
-                else
-                    SetSuccess(data, DataSourceKeys.Rss(entityId), 0, entityStatus?.FromCache == true);
-                data.RssFeedEntries[entityId] = [];
-                continue;
-            }
-
-            var title = GetAttributeString(state, "title");
-            var link = GetAttributeString(state, "link");
-            var entries = string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(link)
-                ? []
-                : new List<RssFeedEntry>
-                {
-                    new()
-                    {
-                        Title = title ?? string.Empty,
-                        Link = link ?? string.Empty,
-                        Published = GetAttributeString(state, "published"),
-                        Summary = GetAttributeString(state, "description")
-                            ?? GetAttributeString(state, "summary")
-                            ?? GetAttributeString(state, "content")
-                    }
-                };
-            data.RssFeedEntries[entityId] = entries;
-            var fromCache = data.SourceStatuses.GetValueOrDefault(DataSourceKeys.Entity(entityId))?.FromCache == true;
-            SetSuccess(data, DataSourceKeys.Rss(entityId), entries.Count, fromCache);
         }
     }
 
@@ -272,6 +282,6 @@ public sealed class SsrDataProvider(
     private void SetFailure(SsrData data, string key, string error) =>
         data.SourceStatuses[key] = DataSourceStatus.Failed(error, timeProvider.GetUtcNow());
 
-    private static string? GetAttributeString(HassEntityState state, string name) =>
-        state.Attributes.TryGetValue(name, out var value) ? value?.ToString() : null;
+    private string CacheVersion(string dashboardId) => entityStateProvider is Plugins.PluginDataRouter router ? router.CacheVersion(dashboardId) : "";
+
 }

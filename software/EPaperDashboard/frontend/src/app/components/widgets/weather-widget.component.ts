@@ -5,7 +5,7 @@ import {
   DashboardLayout,
   DEFAULT_WEATHER_ITEMS,
   defaultWeatherItemIcon,
-  HassEntityState,
+  EntityState,
   WeatherConfig,
   WeatherItemConfig,
   WidgetConfig,
@@ -99,7 +99,7 @@ interface VisibleWeatherItem {
 export class WeatherWidgetComponent {
   @Input() widget!: WidgetConfig;
   @Input() colorScheme!: ColorScheme;
-  @Input() entityStates: Record<string, HassEntityState> | null = null;
+  @Input() entityStates: Record<string, EntityState> | null = null;
   @Input() designerSettings?: DashboardLayout;
 
   get config(): WeatherConfig {

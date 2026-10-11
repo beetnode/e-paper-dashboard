@@ -8,6 +8,22 @@ export interface EntitySourceOption {
   device_class?: string;
   unit_of_measurement?: string;
   state?: string;
+  connectionName?: string;
+}
+
+export interface SourceGroup<T> {
+  name: string;
+  sources: T[];
+}
+
+/** Groups sources by connection, keeping the order in which connections first appear. */
+export function groupByConnection<T extends { connectionName?: string }>(sources: T[]): SourceGroup<T>[] {
+  const groups = new Map<string, T[]>();
+  for (const source of sources) {
+    const name = source.connectionName || 'Other sources';
+    groups.set(name, [...(groups.get(name) ?? []), source]);
+  }
+  return [...groups].map(([name, grouped]) => ({ name, sources: grouped }));
 }
 
 @Component({
@@ -18,20 +34,24 @@ export interface EntitySourceOption {
     <div class="mb-3">
       <label class="form-label fw-semibold small" for="entitySourceSelect">Data source</label>
       @if (loading) {
-        <div class="text-muted small" role="status"><i class="fa fa-spinner fa-spin me-1" aria-hidden="true"></i>Loading entities…</div>
+        <div class="text-muted small" role="status"><i class="fa fa-spinner fa-spin me-1" aria-hidden="true"></i>Loading sources…</div>
       } @else if (entities.length === 0) {
         <div class="alert alert-warning mb-0">
-          <i class="fa fa-exclamation-triangle"></i> No compatible entities available.
+          <i class="fa fa-exclamation-triangle"></i> No compatible sources available. Add a connection from Connections.
         </div>
       } @else {
         @if (entities.length > 8) {
-          <input class="form-control form-control-sm mb-2" type="search" placeholder="Filter entities…" aria-label="Filter available data sources"
+          <input class="form-control form-control-sm mb-2" type="search" placeholder="Filter sources…" aria-label="Filter available data sources"
             [ngModel]="query()" (ngModelChange)="query.set($event)" />
         }
         <select id="entitySourceSelect" class="form-select" [ngModel]="value" (ngModelChange)="valueChange.emit($event)">
-          <option value="">Select entity…</option>
-          @for (entity of filteredEntities(); track entity.entity_id) {
-            <option [value]="entity.entity_id">{{ formatEntity(entity) }}</option>
+          <option value="">Select source…</option>
+          @for (group of groupedEntities(); track group.name) {
+            <optgroup [label]="group.name">
+              @for (entity of group.sources; track entity.entity_id) {
+                <option [value]="entity.entity_id">{{ formatEntity(entity, false) }}</option>
+              }
+            </optgroup>
           }
         </select>
         @if (selectedEntity(); as selected) {
@@ -65,8 +85,13 @@ export class EntitySourceSelectorComponent {
     return this.entities.filter(entity => this.formatEntity(entity).toLowerCase().includes(query));
   }
 
-  formatEntity(entity: EntitySourceOption): string {
-    const name = entity.friendly_name || entity.entity_id;
+  groupedEntities(): SourceGroup<EntitySourceOption>[] {
+    return groupByConnection(this.filteredEntities());
+  }
+
+  formatEntity(entity: EntitySourceOption, withConnection = true): string {
+    const label = entity.friendly_name || entity.entity_id;
+    const name = withConnection && entity.connectionName ? `${entity.connectionName} · ${label}` : label;
     const details = [entity.domain, entity.device_class, entity.unit_of_measurement]
       .filter(Boolean)
       .join(', ');

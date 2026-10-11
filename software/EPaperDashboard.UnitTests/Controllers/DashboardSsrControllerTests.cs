@@ -1,3 +1,4 @@
+using EPaperDashboard.Services.Plugins.HomeAssistant;
 using CSharpFunctionalExtensions;
 using EPaperDashboard.Controllers;
 using EPaperDashboard.Data.Repositories;
@@ -56,8 +57,8 @@ public class DashboardSsrControllerTests
             imageRenderer,
             new DesignerPreviewImageStore(TimeProvider.System),
             Mock.Of<IPageToImageRenderingService>(),
-            Mock.Of<IDeploymentStrategy>(),
-            Mock.Of<IEnvironmentConfiguration>(),
+            new HomeAssistantDashboardTargetResolver(Mock.Of<IDeploymentStrategy>(), Mock.Of<IEnvironmentConfiguration>(),
+                InMemoryProviderConnectionRepository.CreateStore()),
             TimeProvider.System);
     }
 

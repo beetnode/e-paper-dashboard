@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using EPaperDashboard.Services;
 using EPaperDashboard.Services.Providers;
 using EPaperDashboard.Guards;
+using EPaperDashboard.Services.Plugins.HomeAssistant;
 
 namespace EPaperDashboard.Controllers;
 
@@ -13,7 +14,8 @@ public class HomeAssistantController(
     HomeAssistantService homeAssistantService,
     IEntityStateProvider entityStateProvider,
     IEntityHistoryProvider entityHistoryProvider,
-    ILogger<HomeAssistantController> logger) : ControllerBase
+    HomeAssistantDashboardTargetResolver homeAssistantTargets,
+    ILogger<HomeAssistantController> logger) : BaseApiController
 {
     private readonly HomeAssistantService _homeAssistantService = homeAssistantService;
     private readonly IEntityStateProvider _entityStateProvider = entityStateProvider;
@@ -24,10 +26,24 @@ public class HomeAssistantController(
     [DashboardOwnerFromBody]
     public async Task<IActionResult> FetchDashboards([FromBody] FetchDashboardsRequest request)
     {
-        var result = await _homeAssistantService.FetchDashboards(request.DashboardId);
+        var result = await _homeAssistantService.FetchDashboards(new HomeAssistantScope.DashboardSettings(request.DashboardId));
 
         return result.IsSuccess
             ? Ok(new { dashboards = result.Value })
+            : BadRequest(new { error = result.Error });
+    }
+
+    [HttpGet("connections/{connectionId}/dashboards")]
+    public async Task<IActionResult> FetchConnectionDashboards(string connectionId)
+    {
+        var connection = homeAssistantTargets.FindConnection(connectionId, CurrentUserId);
+        if (connection is null)
+            return NotFound(new { error = "Home Assistant connection not found." });
+
+        var result = await _homeAssistantService.FetchDashboards(new HomeAssistantScope.Connection(connection));
+
+        return result.IsSuccess
+            ? Ok(new { data = result.Value })
             : BadRequest(new { error = result.Error });
     }
 
@@ -35,7 +51,7 @@ public class HomeAssistantController(
     [DashboardOwnerFromBody]
     public async Task<IActionResult> FetchEntities([FromBody] FetchEntitiesRequest request)
     {
-        var result = await _homeAssistantService.FetchEntities(request.DashboardId);
+        var result = await _homeAssistantService.FetchEntities(new HomeAssistantScope.DashboardSettings(request.DashboardId));
 
         return result.IsSuccess
             ? Ok(new { entities = result.Value })

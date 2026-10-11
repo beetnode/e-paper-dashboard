@@ -7,7 +7,6 @@ services:
       - "${IZBOARD_DEVICE_PORT:-8129}:8129"
     environment:
       CLIENT_URL: ${CLIENT_URL:?Set CLIENT_URL in software/.env}
-      STATE_SIGNING_KEY: ${STATE_SIGNING_KEY:?Set STATE_SIGNING_KEY in software/.env}
       DATABASE_PROVIDER: ${DATABASE_PROVIDER:-litedb}
       DATABASE_CONNECTION_STRING: ${DATABASE_CONNECTION_STRING:-}
       TZ: ${TZ:-UTC}

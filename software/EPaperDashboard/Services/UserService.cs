@@ -6,7 +6,7 @@ using System.Text;
 
 namespace EPaperDashboard.Services;
 
-public sealed class UserService(IUserRepository userRepository, IDashboardRepository dashboardRepository)
+public sealed class UserService(IUserRepository userRepository, IDashboardRepository dashboardRepository, IProviderConnectionRepository? connections = null)
 {
     public Maybe<User> GetUserByUsername(string username) =>
         userRepository.FindByUsername(username);
@@ -45,6 +45,7 @@ public sealed class UserService(IUserRepository userRepository, IDashboardReposi
                 u =>
                 {
                     dashboardRepository.DeleteByUserId(u.Id);
+                    connections?.DeleteByUserId(u.Id);
                     userRepository.Delete(u.Id);
                     return true;
                 },

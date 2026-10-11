@@ -44,11 +44,15 @@ export interface Dashboard {
   name: string;
   description: string;
   hasAccessToken: boolean;
+  /** Retired dashboard-level Home Assistant host/token are still stored and can be removed. */
+  hasLegacyConnection?: boolean;
   host?: string;
   path?: string;
+  /** Named Home Assistant connection used by 'HomeAssistant' rendering; null uses the dashboard host/token. */
+  homeAssistantConnectionId?: string | null;
   updateTimes?: string[];
   layoutConfig?: DashboardLayout;
-  renderingMode?: 'Custom' | 'HomeAssistant';
+  renderingMode?: RenderingMode;
   orientation?: DashboardOrientation;
   screenWidth: number;
   screenHeight: number;
@@ -61,24 +65,30 @@ export interface Dashboard {
   effectiveAiConfigMode?: AiConnectionMode;
 }
 
+export type RenderingMode = 'Custom' | 'HomeAssistant';
+
 export interface CreateDashboardRequest {
   name: string;
   description?: string;
   orientation?: DashboardOrientation;
   screenWidth?: number;
   screenHeight?: number;
+  renderingMode?: RenderingMode;
+  path?: string;
+  homeAssistantConnectionId?: string;
 }
 
 export interface UpdateDashboardRequest {
   name?: string;
   description?: string;
-  accessToken?: string;
+  /** Removes the retired dashboard-level Home Assistant host and token. */
   clearAccessToken?: boolean;
-  host?: string;
   path?: string;
+  /** Empty string switches back to the dashboard host/token settings. */
+  homeAssistantConnectionId?: string;
   updateTimes?: string[];
   layoutConfig?: DashboardLayout;
-  renderingMode?: 'Custom' | 'HomeAssistant';
+  renderingMode?: RenderingMode;
   orientation?: DashboardOrientation;
   screenWidth?: number;
   screenHeight?: number;
@@ -102,7 +112,8 @@ export type WidgetType =
   | 'image'
   | 'version'
   | 'rss-feed'
-  | 'ai-content';
+  | 'ai-content'
+  | (string & {});
 
 export interface WidgetPosition {
   x: number;
@@ -385,7 +396,7 @@ export interface ColorScheme {
   text: string;
 }
 
-export interface HassEntityState {
+export interface EntityState {
   entityId: string;
   state: string;
   attributes?: Record<string, any>;
@@ -492,6 +503,8 @@ export interface AiConfig {
   directApiKey?: string;
   directModel?: string;
   homeAssistantAgentId?: string;
+  /** Named Home Assistant connection for conversation agents; empty uses the add-on or legacy settings. */
+  homeAssistantConnectionId?: string;
 }
 
 export interface AiGenerationResult {

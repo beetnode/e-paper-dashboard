@@ -1,8 +1,11 @@
-@if (widget.config && ('entityId' in widget.config) && widget.type !== 'graph' && widget.type !== 'rss-feed' && widget.type !== 'weather' && widget.type !== 'calendar' && widget.type !== 'weather-forecast' && widget.type !== 'todo') {
+@if (pluginConfigComponent; as component) {
+  <ng-container *ngComponentOutlet="component; inputs: pluginConfigInputs" />
+} @else {
+@if (widget.config && ('entityId' in widget.config) && renderType !== 'graph' && renderType !== 'rss-feed' && renderType !== 'weather' && renderType !== 'calendar' && renderType !== 'weather-forecast' && renderType !== 'todo') {
   <app-entity-source-selector [value]="widget.config.entityId || ''" [entities]="getFilteredEntities()"
     [loading]="loadingEntities()" (valueChange)="updateEntityId($event)" />
 }
-@switch (widget.type) {
+@switch (renderType) {
 
 @case ('header') {
 <div class="mb-3">
@@ -67,9 +70,13 @@
         <i class="fa fa-link text-muted flex-shrink-0 widget-config-icon" aria-hidden="true"></i>
         <select class="form-select form-select-sm flex-grow-1 widget-config-grow"
           [(ngModel)]="badge.entityId" (ngModelChange)="onPropertyChanged()">
-          <option [ngValue]="undefined">No Entity</option>
-          @for (entity of entities(); track trackByEntityId($index, entity)) {
-            <option [ngValue]="entity.entity_id">{{ formatEntityLabel(entity) }}</option>
+          <option [ngValue]="undefined">No source</option>
+          @for (group of getGroupedEntities(); track group.name) {
+            <optgroup [label]="group.name">
+              @for (entity of group.sources; track trackByEntityId($index, entity)) {
+                <option [ngValue]="entity.entity_id">{{ formatEntityLabel(entity, false) }}</option>
+              }
+            </optgroup>
           }
         </select>
       </div>
@@ -273,7 +280,7 @@
 @case ('graph') {
 <app-widget-title-config [widget]="widget" (widgetChange)="applyWidgetChange($event)" />
 <label class="form-label fw-semibold small">Data Series</label>
-<small class="form-text text-muted d-block mb-3">Add multiple entities to compare over time</small>
+<small class="form-text text-muted d-block mb-3">Add multiple sources to compare over time</small>
 @if (graphConfig.series && graphConfig.series.length > 0) {
   <div class="series-list">
     @for (series of graphConfig.series; track trackByGraphSeries($index, series); let idx = $index) {
@@ -289,11 +296,15 @@
           <div class="row g-2">
             <!-- Entity Selection -->
             <div class="col-12">
-              <label class="form-label small mb-1">Entity</label>
+              <label class="form-label small mb-1">Source</label>
               <select class="form-select form-select-sm" [(ngModel)]="series.entityId" (ngModelChange)="onPropertyChanged()">
-                <option value="">Select entity…</option>
-                @for (ent of getFilteredEntities(); track trackByEntityId($index, ent)) {
-                  <option [value]="ent.entity_id">{{ formatEntityLabel(ent) }}</option>
+                <option value="">Select source…</option>
+                @for (group of getGroupedEntities(); track group.name) {
+                  <optgroup [label]="group.name">
+                    @for (ent of group.sources; track trackByEntityId($index, ent)) {
+                      <option [value]="ent.entity_id">{{ formatEntityLabel(ent, false) }}</option>
+                    }
+                  </optgroup>
                 }
               </select>
             </div>
@@ -302,7 +313,7 @@
             <div class="col-8">
               <label class="form-label small mb-1">Label</label>
               <input type="text" class="form-control form-control-sm" [(ngModel)]="series.label" (ngModelChange)="onPropertyChanged()" [placeholder]="series.entityId || 'Optional label'" />
-              <small class="form-text text-muted d-block mt-1">Leave empty to use entity ID</small>
+              <small class="form-text text-muted d-block mt-1">Leave empty to use the source name</small>
             </div>
             
             <div class="col-4">
@@ -533,7 +544,7 @@
     <option value="dashboard">Dashboard data</option>
     <option value="none">No smart-home data</option>
   </select>
-  <small class="form-text text-muted">Choose whether entity states, calendars, tasks, weather, and feeds are sent with the prompt.</small>
+  <small class="form-text text-muted">Choose whether source states, calendars, tasks, weather, and feeds are sent with the prompt.</small>
 </div>
 <div class="mb-3">
   <button class="btn btn-sm btn-outline-primary" type="button"
@@ -551,4 +562,6 @@
 </div>
 
 }
+}
+
 }

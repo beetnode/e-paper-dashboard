@@ -10,14 +10,14 @@ namespace EPaperDashboard.Services.Providers.HomeAssistant;
 /// </summary>
 public class HomeAssistantWeatherForecastProvider(
     HomeAssistantConnectionService connection,
-    ILogger<HomeAssistantWeatherForecastProvider> logger) : IWeatherForecastProvider
+    ILogger<HomeAssistantWeatherForecastProvider> logger)
 {
     private readonly HomeAssistantConnectionService _connection = connection;
     private readonly ILogger<HomeAssistantWeatherForecastProvider> _logger = logger;
 
-    public async Task<Result<List<WeatherForecast>, string>> FetchWeatherForecastAsync(string dashboardId, string weatherEntityId, string forecastType = "daily", CancellationToken cancellationToken = default)
+    public async Task<Result<List<WeatherForecast>, string>> FetchWeatherForecastAsync(HomeAssistantScope scope, string weatherEntityId, string forecastType = "daily", CancellationToken cancellationToken = default)
     {
-        var connectionInfo = _connection.GetConnectionInfo(dashboardId);
+        var connectionInfo = _connection.GetConnectionInfo(scope);
         if (connectionInfo.IsFailure)
             return connectionInfo.Error;
 
@@ -28,7 +28,7 @@ public class HomeAssistantWeatherForecastProvider(
 
         try
         {
-            using var ws = await WebSocketHelpers.ConnectAndAuthenticateAsync(hostUrl, token, _connection.WebSocketPath, cancellationToken);
+            using var ws = await WebSocketHelpers.ConnectAndAuthenticateAsync(hostUrl, token, connectionInfo.Value.WebSocketPath, cancellationToken);
 
             var messageId = _connection.NextMessageId();
 
@@ -126,25 +126,6 @@ public class HomeAssistantWeatherForecastProvider(
         }
     }
 
-    public async Task<Result<Dictionary<string, List<WeatherForecast>>, string>> FetchAllWeatherForecastsAsync(string dashboardId, string forecastType = "daily", CancellationToken cancellationToken = default)
-    {
-        var entityIds = await DiscoverEntitiesAsync(dashboardId, "weather", cancellationToken);
-        if (entityIds.IsFailure)
-            return entityIds.Error;
-
-        var result = new Dictionary<string, List<WeatherForecast>>();
-        foreach (var entityId in entityIds.Value)
-        {
-            var forecastResult = await FetchWeatherForecastAsync(dashboardId, entityId, forecastType, cancellationToken);
-            if (forecastResult.IsSuccess && forecastResult.Value.Count > 0)
-            {
-                result[entityId] = forecastResult.Value;
-            }
-        }
-
-        _logger.LogDebug("Fetched weather forecasts from {Count} entities for dashboard {DashboardId}", result.Count, dashboardId);
-        return result;
-    }
 
     private static WeatherForecast ParseForecast(JsonElement item) => new()
     {
@@ -172,45 +153,4 @@ public class HomeAssistantWeatherForecastProvider(
                 : null;
     }
 
-    private async Task<Result<List<string>, string>> DiscoverEntitiesAsync(string dashboardId, string domain, CancellationToken cancellationToken)
-    {
-        var connectionInfo = _connection.GetConnectionInfo(dashboardId);
-        if (connectionInfo.IsFailure)
-            return connectionInfo.Error;
-
-        var (hostUrl, token) = connectionInfo.Value;
-
-        try
-        {
-            using var ws = await WebSocketHelpers.ConnectAndAuthenticateAsync(hostUrl, token, _connection.WebSocketPath, cancellationToken);
-
-            await HomeAssistantConnectionService.SendMessageAsync(ws, new { id = 1, type = "get_states" }, cancellationToken);
-            var response = await HomeAssistantConnectionService.ReceiveMessageAsync(ws, cancellationToken);
-            var json = JsonSerializer.Deserialize<JsonElement>(response);
-
-            var entityIds = new List<string>();
-            if (json.TryGetProperty("success", out var success) && success.GetBoolean() &&
-                json.TryGetProperty("result", out var result) && result.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var entity in result.EnumerateArray())
-                {
-                    var entityId = entity.TryGetProperty("entity_id", out var eid) ? eid.GetString() : null;
-                    if (entityId != null && entityId.StartsWith(domain + ".", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var state = entity.TryGetProperty("state", out var s) ? s.GetString() : null;
-                        if (state is not "unavailable")
-                            entityIds.Add(entityId);
-                    }
-                }
-            }
-
-            try { await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Done", CancellationToken.None); } catch { /* using disposes socket */ }
-            return entityIds;
-        }
-        catch (OperationCanceledException) { throw; }
-        catch (Exception ex)
-        {
-            return $"Failed to discover {domain} entities: {ex.Message}";
-        }
-    }
 }

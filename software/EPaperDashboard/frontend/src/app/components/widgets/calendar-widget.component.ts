@@ -11,7 +11,7 @@ import { CommonModule } from '@angular/common';
 import {
   WidgetConfig,
   ColorScheme,
-  HassEntityState,
+  EntityState,
   CalendarConfig,
   CalendarEventItemConfig,
   DEFAULT_CALENDAR_EVENT_ITEMS,
@@ -101,7 +101,7 @@ import { resolveWidgetRenderContext } from './widget-render-context';
 export class CalendarWidgetComponent implements OnChanges {
   @Input() widget!: WidgetConfig;
   @Input() colorScheme!: ColorScheme;
-  @Input() entityStates: Record<string, HassEntityState> | null = null;
+  @Input() entityStates: Record<string, EntityState> | null = null;
   @Input() calendarEventsByEntityId: Record<string, any[]> | undefined;
   @Input() designerSettings?: DashboardLayout;
 

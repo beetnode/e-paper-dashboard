@@ -17,4 +17,6 @@ public class AiConfig
     public string? DirectApiKey { get; set; }
     public string? DirectModel { get; set; }
     public string? HomeAssistantAgentId { get; set; }
+    /// <summary>Named Home Assistant connection for conversation agents; null uses the dashboard settings or the add-on.</summary>
+    public string? HomeAssistantConnectionId { get; set; }
 }

@@ -14,7 +14,6 @@ public class HostModeStrategyTests
     {
         var config = new Mock<IEnvironmentConfiguration>();
         config.SetupGet(c => c.ClientUri).Returns(new Uri("https://example.com"));
-        config.SetupGet(c => c.StateSigningKey).Returns("signing-key");
         config.SetupGet(c => c.HomeAssistantHost).Returns("http://homeassistant.local:8123");
         return config;
     }

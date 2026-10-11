@@ -27,13 +27,13 @@ import {
   ColorScheme
 } from '../../models/types';
 import { HttpClient } from '@angular/common/http';
-import { HomeAssistantService, HassEntity } from '../../services/home-assistant.service';
+import { DataProviderService, DataSource } from '../../services/data-provider.service';
 import { AuthService } from '../../services/auth.service';
 import { AiService } from '../../services/ai.service';
 import { ToastService } from '../../services/toast.service';
 import { ResolveUrlPipe } from '../../pipes/resolve-url.pipe';
-import { isEntityCompatible } from '../../models/widget-catalog';
-import { EntitySourceSelectorComponent } from './entity-source-selector.component';
+import { isEntityCompatible, getWidgetRenderType, getWidgetDefinition } from '../../models/widget-catalog';
+import { EntitySourceSelectorComponent, groupByConnection } from './entity-source-selector.component';
 import { WidgetTitleConfigComponent } from './widget-title-config.component';
 
 @Component({
@@ -52,7 +52,7 @@ export class WidgetConfigComponent implements OnChanges {
     return entity.entity_id || index;
   }
 
-  private readonly homeAssistantService = inject(HomeAssistantService);
+  private readonly dataProviderService = inject(DataProviderService);
   private readonly authService = inject(AuthService);
   private readonly http = inject(HttpClient);
   private readonly aiService = inject(AiService);
@@ -63,8 +63,13 @@ export class WidgetConfigComponent implements OnChanges {
   showImageUrlInput = false;
   imageUrlValue = '';
 
-  formatEntityLabel(entity: any): string {
-    const base = entity?.friendly_name || entity?.entity_id || 'Unknown';
+  getGroupedEntities() {
+    return groupByConnection(this.getFilteredEntities());
+  }
+
+  formatEntityLabel(entity: any, withConnection = true): string {
+    const name = entity?.friendly_name || entity?.entity_id || 'Unknown';
+    const base = withConnection && entity?.connectionName ? `${entity.connectionName} · ${name}` : name;
     const details: string[] = [];
 
     const domain = entity?.domain;
@@ -85,7 +90,7 @@ export class WidgetConfigComponent implements OnChanges {
 
   @Input() widget!: WidgetConfig;
   @Input() dashboard!: Dashboard | null;
-  @Input() availableEntities: HassEntity[] = [];
+  @Input() availableEntities: DataSource[] = [];
   @Input() entitiesLoading: boolean = false;
   @Input() colorScheme?: ColorScheme;
   @Output() widgetChanged = new EventEmitter<WidgetConfig>();
@@ -93,6 +98,12 @@ export class WidgetConfigComponent implements OnChanges {
   entities = signal<any[]>([]);
   loadingEntities = signal(false);
   entityFetchError: string | null = null;
+
+  get pluginConfigComponent() { return getWidgetDefinition(this.widget.type).configComponent; }
+  readonly onPluginWidgetChange = (widget: WidgetConfig) => this.applyWidgetChange(widget);
+  get pluginConfigInputs() { return { widget: this.widget, dashboard: this.dashboard, sources: this.availableEntities, onChange: this.onPluginWidgetChange }; }
+
+  get renderType() { return getWidgetRenderType(this.widget.type); }
 
   get headerConfig(): HeaderConfig {
     return this.widget.config as HeaderConfig;
@@ -156,7 +167,7 @@ export class WidgetConfigComponent implements OnChanges {
   }
 
   applyWidgetChange(widget: WidgetConfig): void {
-    if (widget.type === 'weather' && widget.showTitle !== this.widget.showTitle) {
+    if (getWidgetRenderType(widget.type) === 'weather' && widget.showTitle !== this.widget.showTitle) {
       const config = widget.config as WeatherConfig;
       const items = (config.items ?? DEFAULT_WEATHER_ITEMS).map(item =>
         item.type === 'title' ? { ...item, visible: widget.showTitle !== false } : item);
@@ -211,7 +222,8 @@ export class WidgetConfigComponent implements OnChanges {
         unit_of_measurement: e.unitOfMeasurement ?? undefined,
         icon: e.icon ?? undefined,
         state: e.state ?? undefined,
-        supported_features: e.supportedFeatures ?? undefined
+        supported_features: e.supportedFeatures ?? undefined,
+        capabilities: e.capabilities, pluginId: e.pluginId, connectionName: e.connectionName
       }));
       this.entities.set(mapped);
       this.loadingEntities.set(false);
@@ -223,10 +235,7 @@ export class WidgetConfigComponent implements OnChanges {
     }
 
     if (changes['dashboard'] && this.availableEntities.length === 0) {
-      // In addon mode, HA connection is auto-managed (no host/token needed per dashboard)
-      const canLoad = this.authService.isAddonMode()
-        ? !!this.dashboard
-        : (this.dashboard?.hasAccessToken && this.dashboard?.host);
+      const canLoad = !!this.dashboard;
       if (canLoad) {
         this.loadEntities();
       }
@@ -243,6 +252,7 @@ export class WidgetConfigComponent implements OnChanges {
       icon: entity.icon,
       state: entity.state,
       supportedFeatures: entity.supported_features,
+      capabilities: entity.capabilities, pluginId: entity.pluginId,
     }));
   }
 
@@ -250,7 +260,7 @@ export class WidgetConfigComponent implements OnChanges {
     if (!this.dashboard) return;
     this.loadingEntities.set(true);
     this.entityFetchError = null;
-    this.homeAssistantService.getEntities(this.dashboard.id).subscribe({
+    this.dataProviderService.getEntities(this.dashboard.id).subscribe({
       next: (entities) => {
         const mapped = entities.map(e => ({
           entity_id: e.entityId,
@@ -260,7 +270,8 @@ export class WidgetConfigComponent implements OnChanges {
           unit_of_measurement: e.unitOfMeasurement ?? undefined,
           icon: e.icon ?? undefined,
           state: e.state ?? undefined,
-          supported_features: e.supportedFeatures ?? undefined
+          supported_features: e.supportedFeatures ?? undefined,
+          capabilities: e.capabilities, pluginId: e.pluginId, connectionName: e.connectionName
         }));
         this.entities.set(mapped);
         this.loadingEntities.set(false);
@@ -412,7 +423,7 @@ export class WidgetConfigComponent implements OnChanges {
   toggleTitleVisibility(): void {
     this.widget.showTitle = !(this.widget.showTitle !== false);
     // Keep weather title item visibility in sync
-    if (this.widget.type === 'weather') {
+    if (getWidgetRenderType(this.widget.type) === 'weather') {
       const items = this.getWeatherItems();
       const idx = items.findIndex(i => i.type === 'title');
       if (idx >= 0) {
