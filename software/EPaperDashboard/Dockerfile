@@ -44,7 +44,7 @@ RUN cp /src/LICENSE /app/publish/ && \
   cp /src/NOTICE /app/publish/ && \
   cp /src/THIRD-PARTY-NOTICES.txt /app/publish/
 
-FROM base AS final
+FROM base AS runtime
 ARG COMPONENT_RELEASE_TAG
 WORKDIR /app
 EXPOSE 8128 8129
@@ -52,7 +52,16 @@ COPY --from=publish /app/publish .
 ENV RENDERING_COMPONENT_RELEASE_TAG=$COMPONENT_RELEASE_TAG
 RUN mkdir -p /data/DataProtection-Keys /data/components /run/izboard-rendering && \
   chown -R app:app /data /run/izboard-rendering && chmod -R 770 /data /run/izboard-rendering
-USER app
-
-# Use CMD instead of ENTRYPOINT for better compatibility with HA addon wrappers
 CMD ["dotnet", "EPaperDashboard.dll"]
+
+# Home Assistant add-on: stays root because Supervisor mounts /data owned by root
+FROM runtime AS addon
+ARG ADDON_VERSION=latest
+LABEL io.hass.name="izBoard" \
+  io.hass.description="E-Paper Dashboard for Home Assistant" \
+  io.hass.type="addon" \
+  io.hass.version="${ADDON_VERSION}"
+
+# Standalone image; must stay the last stage so it remains the default target
+FROM runtime AS final
+USER app

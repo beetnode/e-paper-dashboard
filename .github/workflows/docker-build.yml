@@ -105,6 +105,7 @@ jobs:
         with:
           context: ./software
           file: ./software/EPaperDashboard/Dockerfile
+          target: final
           platforms: ${{ inputs.platforms }}
           push: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
           tags: ${{ steps.metadata.outputs.tags }}
@@ -115,3 +116,26 @@ jobs:
             VERSION=${{ needs.version.outputs.version }}
             BUILD_CONFIGURATION=Release
             COMPONENT_RELEASE_TAG=rendering-v${{ needs.version.outputs.version }}
+      - name: Extract add-on image metadata
+        id: addon-metadata
+        uses: docker/metadata-action@v5
+        with:
+          images: izdevdigital/izboard-addon
+          tags: type=raw,value=${{ inputs.is_release && needs.version.outputs.base_version || 'latest' }}
+      # Home Assistant add-on variant; reuses the cached stages of the build above.
+      - name: Build and push add-on image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./software
+          file: ./software/EPaperDashboard/Dockerfile
+          target: addon
+          platforms: ${{ inputs.platforms }}
+          push: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
+          tags: ${{ steps.addon-metadata.outputs.tags }}
+          labels: ${{ steps.addon-metadata.outputs.labels }}
+          cache-from: type=gha
+          build-args: |
+            VERSION=${{ needs.version.outputs.version }}
+            BUILD_CONFIGURATION=Release
+            COMPONENT_RELEASE_TAG=rendering-v${{ needs.version.outputs.version }}
+            ADDON_VERSION=${{ inputs.is_release && needs.version.outputs.base_version || 'latest' }}
