@@ -252,7 +252,7 @@ import { Dashboard } from '../../models/types';
               </div>
             </div>
             <div class="app-list-item-actions">
-              <button type="button" class="btn btn-outline-danger app-icon-button" (click)="removeDevice(device)" [attr.aria-label]="'Remove ' + device.name" title="Remove">
+              <button type="button" class="btn btn-ghost btn-ghost-danger app-icon-button" (click)="removeDevice(device)" [attr.aria-label]="'Remove ' + device.name" title="Remove">
                 <i class="fa-solid fa-trash" aria-hidden="true"></i>
               </button>
             </div>

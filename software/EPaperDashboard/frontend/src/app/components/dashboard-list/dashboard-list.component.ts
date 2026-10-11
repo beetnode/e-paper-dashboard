@@ -62,12 +62,12 @@ import { Dashboard } from '../../models/types';
             </a>
             <div class="app-list-item-actions">
               @if (dashboard.renderingMode !== 'HomeAssistant') {
-                <a class="btn btn-outline-primary app-icon-button" [routerLink]="['/dashboards', dashboard.id, 'designer']"
+                <a class="btn btn-ghost app-icon-button" [routerLink]="['/dashboards', dashboard.id, 'designer']"
                   [attr.aria-label]="'Open ' + dashboard.name + ' in the designer'" title="Open designer">
                   <i class="fa-solid fa-paintbrush" aria-hidden="true"></i>
                 </a>
               }
-              <button type="button" class="btn btn-outline-danger app-icon-button" (click)="deleteDashboard(dashboard.id)"
+              <button type="button" class="btn btn-ghost btn-ghost-danger app-icon-button" (click)="deleteDashboard(dashboard.id)"
                 [attr.aria-label]="'Delete ' + dashboard.name" title="Delete">
                 <i class="fa-solid fa-trash" aria-hidden="true"></i>
               </button>

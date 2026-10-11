@@ -16,7 +16,7 @@ import { A11yModule } from '@angular/cdk/a11y';
           <div class="preview-header d-flex justify-content-between align-items-center p-3">
             <h2 id="renderedPreviewTitle" class="h5 mb-0">{{ title }}</h2>
             <div class="d-flex gap-2 align-items-center">
-              <button type="button" class="btn btn-sm app-icon-button" aria-label="Reload preview" (click)="onReloadClick()">
+              <button type="button" class="btn btn-ghost app-icon-button" aria-label="Reload preview" title="Reload" (click)="onReloadClick()">
                 <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>
               </button>
               <button #closeButton type="button" class="btn-close" aria-label="Close" (click)="onCloseClick()"></button>

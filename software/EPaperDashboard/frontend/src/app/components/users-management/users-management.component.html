@@ -87,7 +87,7 @@
       </div>
       <div class="app-list-item-actions">
         @if (!user.isSuperUser) {
-        <button type="button" (click)="deleteUser(user.id, user.username)" class="btn btn-outline-danger app-icon-button"
+        <button type="button" (click)="deleteUser(user.id, user.username)" class="btn btn-ghost btn-ghost-danger app-icon-button"
           [disabled]="isDeletingUser()[user.id]" [attr.aria-label]="'Delete user ' + user.username" title="Delete">
           <i class="fa-solid fa-trash" aria-hidden="true"></i>
         </button>

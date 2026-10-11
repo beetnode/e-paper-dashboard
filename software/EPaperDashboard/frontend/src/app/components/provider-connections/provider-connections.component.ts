@@ -91,21 +91,21 @@ import { ToastService } from '../../services/toast.service';
                     <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i><span class="d-none d-md-inline">Sign in to {{ pluginName(connection.pluginId) }}</span><span class="d-md-none">Sign in</span>
                   </button>
                 }
-                <button type="button" class="btn btn-outline-secondary app-icon-button" [disabled]="busy() || !connection.connected" (click)="test(connection)"
+                <button type="button" class="btn btn-ghost app-icon-button" [disabled]="busy() || !connection.connected" (click)="test(connection)"
                   [attr.aria-label]="'Test ' + connection.name" title="Test connection">
                   <i class="fa-solid fa-plug-circle-check" aria-hidden="true"></i>
                 </button>
                 @if (supportsSignIn(connection.pluginId) && connection.connected) {
-                  <button type="button" class="btn btn-outline-secondary app-icon-button" [disabled]="busy()" (click)="authorize(connection)"
+                  <button type="button" class="btn btn-ghost app-icon-button" [disabled]="busy()" (click)="authorize(connection)"
                     [attr.aria-label]="'Sign in to ' + pluginName(connection.pluginId) + ' again'" title="Sign in again">
                     <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i>
                   </button>
                 }
-                <button type="button" class="btn btn-outline-primary app-icon-button" [disabled]="busy()" (click)="edit(connection)"
+                <button type="button" class="btn btn-ghost app-icon-button" [disabled]="busy()" (click)="edit(connection)"
                   [attr.aria-label]="'Edit ' + connection.name" title="Edit">
                   <i class="fa-solid fa-pen" aria-hidden="true"></i>
                 </button>
-                <button type="button" class="btn btn-outline-danger app-icon-button" [disabled]="busy()" (click)="remove(connection)"
+                <button type="button" class="btn btn-ghost btn-ghost-danger app-icon-button" [disabled]="busy()" (click)="remove(connection)"
                   [attr.aria-label]="'Remove ' + connection.name" title="Remove">
                   <i class="fa-solid fa-trash" aria-hidden="true"></i>
                 </button>
