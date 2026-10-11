@@ -6,8 +6,8 @@
     </div>
   </div>
 
-  <div class="app-form-shell app-form-shell-wide d-grid gap-3">
-    <section class="app-section-card" aria-labelledby="accountDetailsTitle">
+  <div class="app-section-grid">
+    <section class="app-section-card" [class.app-section-grid-full]="isUserManagementDisabled()" aria-labelledby="accountDetailsTitle">
       <h2 id="accountDetailsTitle" class="app-section-title">Account details</h2>
       <p class="app-section-description">Signed in as <strong>{{ currentUser?.username }}</strong>.</p>
 
@@ -74,17 +74,19 @@
     </form>
     </section>
 
-    <section class="app-section-card border-danger" aria-labelledby="dangerZoneTitle">
-      <h2 id="dangerZoneTitle" class="app-section-title text-danger">Danger zone</h2>
-      <p class="app-section-description">Deleting your account is permanent and cannot be undone.</p>
-    <form (ngSubmit)="deleteProfile()">
-      <button type="submit" class="btn btn-danger" [disabled]="isDeletingProfile()">
-        @if (isDeletingProfile()) {
-        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-        }
-        Delete my profile
-      </button>
-    </form>
+    <section class="app-section-card border-danger app-section-grid-full" aria-labelledby="dangerZoneTitle">
+      <form class="app-section-header mb-0 align-items-center" (ngSubmit)="deleteProfile()">
+        <div>
+          <h2 id="dangerZoneTitle" class="app-section-title text-danger">Danger zone</h2>
+          <p class="app-section-description">Deleting your account is permanent and cannot be undone.</p>
+        </div>
+        <button type="submit" class="btn btn-danger" [disabled]="isDeletingProfile()">
+          @if (isDeletingProfile()) {
+          <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+          }
+          Delete my profile
+        </button>
+      </form>
     </section>
     }
   </div>
