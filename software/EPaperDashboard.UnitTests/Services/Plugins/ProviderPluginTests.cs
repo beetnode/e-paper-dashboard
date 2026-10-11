@@ -332,6 +332,17 @@ public sealed class ProviderPluginTests : IDisposable
     }
 
     [Fact]
+    public async Task TestReportsDiscoveredSourcesForOwnConnectionsOnly()
+    {
+        var connection = Add(name: "Office");
+        var controller = Controller();
+
+        var ok = (await controller.Test(connection.Id)).Should().BeOfType<OkObjectResult>().Subject;
+        JsonSerializer.Serialize(ok.Value).Should().Contain("Office works: 1 source available");
+        (await controller.Test(Add(UserId.New()).Id)).Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
     public void PluginListAdvertisesSignInSupport()
     {
         var serialized = JsonSerializer.Serialize(((OkObjectResult)Controller().Plugins()).Value);

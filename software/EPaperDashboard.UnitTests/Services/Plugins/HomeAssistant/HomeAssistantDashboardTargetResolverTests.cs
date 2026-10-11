@@ -46,6 +46,16 @@ public class HomeAssistantDashboardTargetResolverTests
     }
 
     [Fact]
+    public void Resolve_ConnectionWithoutToken_NamesTheConnection()
+    {
+        var connection = new ProviderConnection { UserId = _owner, PluginId = "home-assistant", Name = "Holiday home" };
+        _connections.Create(connection, new() { ["host"] = "https://ha.example.test" });
+        var dashboard = new Dashboard { UserId = _owner, HomeAssistantConnectionId = connection.Id, Path = "lovelace/0" };
+
+        CreateSut().Resolve(dashboard).Error.Should().Contain("'Holiday home'").And.Contain("not signed in");
+    }
+
+    [Fact]
     public void Resolve_ConnectionOwnedByAnotherUser_Fails()
     {
         var connection = AddConnection(UserId.New());
@@ -99,7 +109,7 @@ public class HomeAssistantDashboardTargetResolverTests
         var dashboard = new Dashboard { UserId = _owner, Host = "http://legacy.test", Path = "lovelace/0" };
         var sut = CreateSut();
 
-        sut.Resolve(dashboard).Error.Should().Contain("access token");
+        sut.Resolve(dashboard).Error.Should().Contain("Select a Home Assistant connection");
         sut.ResolveUri(dashboard).IsSuccess.Should().BeTrue();
     }
 }

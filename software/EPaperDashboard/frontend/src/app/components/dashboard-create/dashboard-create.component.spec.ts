@@ -67,13 +67,32 @@ describe('dashboard create', () => {
     const fixture = create();
     const component = fixture.componentInstance;
     await chooseHomeAssistant(fixture);
-    expect(component.renderingMode).toBe('HomeAssistant');
     http.expectOne('/api/providers/connections').flush({ data: [] });
     component.name = 'Hallway';
     component.onSubmit();
     expect(component.errorMessage()).toContain('connection');
-    component.homeAssistantConnectionId = 'ha-1';
+    window.dispatchEvent(new Event('focus'));
+    http.expectOne('/api/rendering').flush({ enabled: true, component: { state: 'ready', supported: true, ready: true } });
+    http.expectOne('/api/providers/connections').flush({ data: [
+      { id: 'ha-1', name: 'Home', pluginId: 'home-assistant', connected: true, credentials: {} },
+    ] });
     component.onSubmit();
     expect(component.errorMessage()).toContain('path');
+  });
+
+  it('rejects a Home Assistant connection that still needs sign-in', async () => {
+    const fixture = create();
+    const component = fixture.componentInstance;
+    await chooseHomeAssistant(fixture);
+    http.expectOne('/api/providers/connections').flush({ data: [
+      { id: 'ha-1', name: 'Home', pluginId: 'home-assistant', connected: false, credentials: {} },
+    ] });
+    fixture.detectChanges();
+    expect(component.homeAssistantConnectionId).toBe('ha-1');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('sign-in required');
+    component.name = 'Hallway';
+    component.path = 'lovelace/0';
+    component.onSubmit();
+    expect(component.errorMessage()).toContain('sign-in');
   });
 });

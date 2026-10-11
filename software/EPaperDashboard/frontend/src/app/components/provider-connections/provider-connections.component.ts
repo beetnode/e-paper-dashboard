@@ -20,6 +20,7 @@ import { DataProviderService, ProviderConnection, ProviderManifest } from '../..
               <p class="text-muted mb-2">{{ pluginName(connection.pluginId) }} · {{ connection.connected ? 'Configured' : 'Sign-in required' }}</p>
               <div class="d-flex flex-wrap gap-2">
                 <button class="btn btn-outline-secondary btn-sm" [disabled]="busy()" (click)="edit(connection)">Edit</button>
+                <button class="btn btn-outline-secondary btn-sm" [disabled]="busy() || !connection.connected" (click)="test(connection)">Test</button>
                 @if (supportsSignIn(connection.pluginId)) {
                   <button class="btn btn-sm" [ngClass]="connection.connected ? 'btn-outline-primary' : 'btn-primary'" [disabled]="busy()" (click)="authorize(connection)">
                     {{ connection.connected ? 'Sign in again' : 'Sign in' }} to {{ pluginName(connection.pluginId) }}
@@ -29,7 +30,7 @@ import { DataProviderService, ProviderConnection, ProviderManifest } from '../..
               </div>
             </div></article>
           } @empty { @if (!loading()) { <p>No connections yet. Add one to get started.</p> } }
-          <p class="small text-muted">Existing dashboard Home Assistant connections remain available in their dashboard. Add a named connection here to reuse it across dashboards.</p>
+          <p class="small text-muted">Connections belong to your account and can be used by all of your dashboards.</p>
         </section>
         <section class="col-md-6">
           <form class="card card-body" (ngSubmit)="save()">
@@ -140,6 +141,13 @@ export class ProviderConnectionsComponent implements OnInit {
     this.api.authorize(connectionId).subscribe({
       next: result => { popup.location.href = result.authUrl; this.busy.set(false); },
       error: e => { popup.close(); this.fail(e); },
+    });
+  }
+  test(connection: ProviderConnection) {
+    this.busy.set(true); this.error.set(''); this.notice.set('');
+    this.api.test(connection.id).subscribe({
+      next: result => { this.busy.set(false); this.notice.set(result.message); },
+      error: e => this.fail(e),
     });
   }
   remove(connection: ProviderConnection) {

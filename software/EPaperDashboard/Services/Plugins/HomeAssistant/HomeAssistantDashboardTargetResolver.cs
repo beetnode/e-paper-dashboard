@@ -25,11 +25,14 @@ public sealed class HomeAssistantDashboardTargetResolver(
         return connection?.PluginId == PluginId ? connection : null;
     }
 
-    public (string Host, string Token) ConnectionServer(ProviderConnection connection)
+    private (string Host, string Token) ConnectionServer(ProviderConnection connection)
     {
         var credentials = connections.Credentials(connection);
         return (credentials.GetValueOrDefault("host") ?? "", credentials.GetValueOrDefault("token") ?? "");
     }
+
+    private string? ConnectionName(Dashboard dashboard) =>
+        UsesConnection(dashboard) ? FindConnection(dashboard.HomeAssistantConnectionId!, dashboard.UserId)?.Name : null;
 
     public Result<(string Host, string Token), string> ResolveServer(Dashboard dashboard)
     {
@@ -59,8 +62,8 @@ public sealed class HomeAssistantDashboardTargetResolver(
         if (server.IsFailure) return server.Error;
         if (!Uri.TryCreate(server.Value.Host, UriKind.Absolute, out var hostUri) || hostUri.Scheme is not ("http" or "https"))
             return UsesConnection(dashboard)
-                ? "The selected Home Assistant connection has no valid server URL."
-                : "Dashboard configuration incomplete. Set the Home Assistant host.";
+                ? $"The Home Assistant connection '{ConnectionName(dashboard)}' has no valid server URL. Fix it on the Connections page."
+                : "Dashboard configuration incomplete. The legacy Home Assistant host is missing; select a connection instead.";
         if (string.IsNullOrWhiteSpace(dashboard.Path) || !Uri.TryCreate(dashboard.Path, UriKind.Relative, out var pathUri))
             return "Dashboard configuration incomplete. Select the Home Assistant dashboard path.";
         return new Uri(hostUri, pathUri);
@@ -72,10 +75,9 @@ public sealed class HomeAssistantDashboardTargetResolver(
         if (uri.IsFailure) return uri.Error;
         var (host, token) = ResolveServer(dashboard).Value;
         if (string.IsNullOrWhiteSpace(token))
-            return deployment.IsAutoConnected && !UsesConnection(dashboard)
-                ? "Dashboard configuration incomplete. The 'Home Assistant Dashboard' rendering mode requires a Long-Lived Access Token. " +
-                  "Create one in Home Assistant (Profile → Long-Lived Access Tokens) and set it on the dashboard, or select a Home Assistant connection."
-                : "Dashboard configuration incomplete. A Home Assistant access token is required.";
+            return UsesConnection(dashboard)
+                ? $"The Home Assistant connection '{ConnectionName(dashboard)}' is not signed in. Sign in or add a token on the Connections page."
+                : "Dashboard configuration incomplete. Select a Home Assistant connection for this dashboard.";
 
         var hassUrl = new Uri(host).AbsoluteUri.TrimEnd('/');
         // Long-lived tokens do not use the client ID; prefer the configured client URI as a stable value.

@@ -46,6 +46,7 @@ export class DataProviderService {
       ? this.http.put<{ data: ProviderConnection }>(`/api/providers/connections/${id}`, body)
       : this.http.post<{ data: ProviderConnection }>('/api/providers/connections', body);
   }
+  test(id: string) { return this.http.post<{ message: string }>(`/api/providers/connections/${id}/test`, {}); }
   remove(id: string) { return this.http.delete(`/api/providers/connections/${id}`); }
   authorize(id: string) { return this.http.post<{ authUrl: string }>(`/api/providers/connections/${id}/authorize`, {}); }
 }

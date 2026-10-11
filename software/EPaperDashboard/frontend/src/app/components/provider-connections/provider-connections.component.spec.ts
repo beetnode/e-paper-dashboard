@@ -93,4 +93,13 @@ describe('provider connections', () => {
     expect(popup.location.href).toBe('https://ha.example.test/auth/authorize?x=1');
     open.mockRestore();
   });
+  it('tests a connection and shows the result', () => {
+    const fixture = create(); const component = fixture.componentInstance;
+    component.test({ id: 'one', name: 'Home', pluginId: 'home-assistant', connected: true, credentials: {} });
+    http.expectOne('/api/providers/connections/one/test').flush({ message: 'Home works: 12 sources available.' });
+    expect(component.notice()).toBe('Home works: 12 sources available.');
+    component.test({ id: 'one', name: 'Home', pluginId: 'home-assistant', connected: true, credentials: {} });
+    http.expectOne('/api/providers/connections/one/test').flush({ message: 'Home: unreachable' }, { status: 400, statusText: 'Bad Request' });
+    expect(component.error()).toBe('Home: unreachable');
+  });
 });

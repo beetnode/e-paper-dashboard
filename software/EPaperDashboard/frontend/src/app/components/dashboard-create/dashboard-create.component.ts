@@ -1,4 +1,4 @@
-import { Component, HostListener, OnInit, inject, signal } from '@angular/core';
+import { Component, HostListener, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
@@ -89,7 +89,7 @@ interface DashboardKind {
               </div>
             }
           }
-          <app-home-assistant-target-picker
+          <app-home-assistant-target-picker #picker
             [connectionId]="homeAssistantConnectionId"
             (connectionIdChange)="homeAssistantConnectionId = $event"
             [path]="path"
@@ -145,6 +145,7 @@ export class DashboardCreateComponent implements OnInit {
   readonly errorMessage = signal('');
   readonly isLoading = signal(false);
   readonly renderingStatus = signal<UserRenderingStatus | null>(null);
+  @ViewChild('picker') private picker?: HomeAssistantTargetPickerComponent;
 
   get selectedSize(): DashboardSizePreset {
     return this.sizePresets[this.selectedSizeIndex] ?? DEFAULT_DASHBOARD_SIZE;
@@ -171,6 +172,10 @@ export class DashboardCreateComponent implements OnInit {
     const path = this.path.trim();
     if (isHomeAssistant && !this.homeAssistantConnectionId) {
       this.errorMessage.set('Select a Home Assistant connection.');
+      return;
+    }
+    if (isHomeAssistant && this.picker && !this.picker.isSelectedReady()) {
+      this.errorMessage.set('The selected Home Assistant connection needs a sign-in or access token first.');
       return;
     }
     if (isHomeAssistant && !path) {

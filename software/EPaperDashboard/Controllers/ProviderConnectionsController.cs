@@ -72,6 +72,30 @@ public sealed class ProviderConnectionsController(ProviderRegistry registry, Pro
         return NoContent();
     }
 
+    /// <summary>Checks that the connection works by discovering its sources, without touching any dashboard.</summary>
+    [HttpPost("connections/{id}/test")]
+    public async Task<IActionResult> Test(string id)
+    {
+        if (!HasAccount) return Forbid();
+        var connection = connections.Find(id, CurrentUserId);
+        if (connection is null) return NotFound();
+        var plugin = registry.Find(connection.PluginId);
+        if (plugin is null) return BadRequest(new { message = "This provider is no longer available." });
+        try
+        {
+            var result = await plugin.DiscoverAsync(new ProviderContext("", connection), HttpContext.RequestAborted);
+            return result.IsSuccess
+                ? Ok(new { message = $"{connection.Name} works: {result.Value.Count} source{(result.Value.Count == 1 ? "" : "s")} available." })
+                : BadRequest(new { message = $"{connection.Name}: {result.Error}" });
+        }
+        catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested) { throw; }
+        catch (Exception)
+        {
+            // Provider exceptions can contain credentials or remote responses.
+            return BadRequest(new { message = $"{connection.Name}: the provider is unavailable. Check the connection settings." });
+        }
+    }
+
     [HttpPost("connections/{id}/authorize")]
     public IActionResult Authorize(string id)
     {

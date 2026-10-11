@@ -30,7 +30,7 @@ export const HOME_ASSISTANT_PLUGIN_ID = 'home-assistant';
             <option value="" disabled>{{ loading() ? 'Loading connections…' : 'Select a connection' }}</option>
           }
           @for (connection of connections(); track connection.id) {
-            <option [value]="connection.id">{{ connection.name }}</option>
+            <option [value]="connection.id">{{ connection.name }}{{ connection.connected ? '' : ' (sign-in required)' }}</option>
           }
           @if (isSelectedMissing()) {
             <option [value]="connectionId">Unavailable connection</option>
@@ -46,6 +46,10 @@ export const HOME_ASSISTANT_PLUGIN_ID = 'home-assistant';
       </small>
       @if (isSelectedMissing()) {
         <div class="alert alert-warning small mt-2 mb-0" role="alert">The selected connection was removed. Choose another connection.</div>
+      } @else if (isSelectedUnauthorized()) {
+        <div class="alert alert-warning small mt-2 mb-0" role="alert">
+          This connection has no access token yet. <a routerLink="/connections" target="_blank" rel="noopener" class="alert-link">Sign in or add a token</a>, then come back to this tab.
+        </div>
       } @else if (!loading() && connections().length === 0 && !allowDashboardSettings) {
         <div class="alert alert-info small mt-2 mb-0" role="status">
           No Home Assistant connection yet. <a routerLink="/connections" target="_blank" rel="noopener" class="alert-link">Add one</a>, then come back to this tab.
@@ -99,11 +103,25 @@ export class HomeAssistantTargetPickerComponent implements OnInit {
         this.connections.set(connections.filter(c => c.pluginId === HOME_ASSISTANT_PLUGIN_ID));
         this.loading.set(false);
         this.loaded.set(true);
-        if (this.autoSelect && !this.connectionId && this.connections().length > 0)
-          this.selectConnection(this.connections()[0].id);
+        // Prefer a connection that can already render; one that still needs sign-in is the fallback.
+        const candidate = this.connections().find(c => c.connected) ?? this.connections()[0];
+        if (this.autoSelect && !this.connectionId && candidate) this.selectConnection(candidate.id);
       },
       error: () => { this.loading.set(false); this.loaded.set(true); },
     });
+  }
+
+  /** True when the selection exists and can be used for rendering and browsing. */
+  isSelectedReady(): boolean {
+    return !!this.selected() && !!this.selected()!.connected;
+  }
+
+  isSelectedUnauthorized(): boolean {
+    return !!this.selected() && !this.selected()!.connected;
+  }
+
+  private selected(): ProviderConnection | undefined {
+    return this.connections().find(c => c.id === this.connectionId);
   }
 
   isSelectedMissing(): boolean {
@@ -116,7 +134,7 @@ export class HomeAssistantTargetPickerComponent implements OnInit {
   }
 
   canBrowse(): boolean {
-    if (this.connectionId) return !this.isSelectedMissing();
+    if (this.connectionId) return this.isSelectedReady();
     return this.allowDashboardSettings && !!this.dashboardId && this.dashboardSettingsReady;
   }
 
