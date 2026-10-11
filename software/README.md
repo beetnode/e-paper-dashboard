@@ -209,7 +209,7 @@ a renderer offline for maintenance. Users only enable/disable their own capabili
 Fresh processes, browser contexts, temporary directories, stripped environments, and ownership checks provide application-level
 separation. Worker processes still share the sidecar's OS identity and aggregate CPU/memory limits. This is not a per-job container,
 hard per-user resource boundary, or enforced per-job network-egress policy. Hostile-tenant OS isolation requires additional deployment
-sandboxing. See [the implementation plan](../docs/account-and-rendering-plan.md) for the boundary and verification scope.
+sandboxing.
 
 Only the single-user Home Assistant add-on retains an in-app-container compatibility worker with browser sandboxing disabled.
 Standalone and host deployments require the isolated sidecar and browser sandboxing; they never fall back to compatibility mode.
