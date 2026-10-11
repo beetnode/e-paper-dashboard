@@ -9,8 +9,6 @@ public static class EnvironmentConfiguration
 	private const string DatabaseConnectionStringKey = "DATABASE_CONNECTION_STRING";
 	private const string ClientUrlKey = "CLIENT_URL";
 	private const string HomeAssistantHostKey = "HOME_ASSISTANT_HOST";
-	private const string SuperuserUsernameKey = "SUPERUSER_USERNAME";
-	private const string SuperuserPasswordKey = "SUPERUSER_PASSWORD";
 	private const string StateSigningKeyKey = "STATE_SIGNING_KEY";
 	private const string DashboardScheduleCheckIntervalMinutesKey = "DASHBOARD_SCHEDULE_CHECK_INTERVAL_MINUTES";
 	private const string DashboardMissedScheduleToleranceMinutesKey = "DASHBOARD_MISSED_SCHEDULE_TOLERANCE_MINUTES";
@@ -46,12 +44,6 @@ public static class EnvironmentConfiguration
 
 	private static readonly Lazy<string?> _homeAssistantHost = new(() =>
 		GetStringFromEnvOrConfig(HomeAssistantHostKey));
-
-	private static readonly Lazy<string?> _superuserUsername = new(() =>
-		GetStringFromEnvOrConfig(SuperuserUsernameKey));
-
-	private static readonly Lazy<string?> _superuserPassword = new(() =>
-		GetStringFromEnvOrConfig(SuperuserPasswordKey));
 
 	private static readonly Lazy<string?> _stateSigningKey = new(() =>
 		GetStringFromEnvOrConfig(StateSigningKeyKey));
@@ -92,9 +84,7 @@ public static class EnvironmentConfiguration
 
 	public static Uri? ClientUri => _clientUri.Value;
 
-	public static string? SuperUserUsername => _superuserUsername.Value;
 
-	public static string? SuperUserPassword => _superuserPassword.Value;
 
 	public static string? StateSigningKey => _stateSigningKey.Value;
 

@@ -5,6 +5,7 @@ services:
       RENDERING_COMPONENT_SOCKET: /run/izboard-rendering/renderer.sock
       RENDERING_MAX_CONCURRENT_RENDERS: ${RENDERING_MAX_CONCURRENT_RENDERS:-2}
       RENDERING_MAX_QUEUED_RENDERS: ${RENDERING_MAX_QUEUED_RENDERS:-100}
+      RENDERING_MAX_QUEUED_RENDERS_PER_USER: ${RENDERING_MAX_QUEUED_RENDERS_PER_USER:-5}
     depends_on:
       renderer:
         condition: service_healthy

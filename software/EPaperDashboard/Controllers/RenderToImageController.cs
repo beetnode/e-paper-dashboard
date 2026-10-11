@@ -57,12 +57,14 @@ public sealed class RenderToImageController(
 		await RenderImage(apiKey, format);
 
 	[HttpGet("health")]
-	public async Task<IActionResult> GetHealth([FromHeader(Name = HttpHeaderNames.ApiKeyHeaderName)] string apiKey) =>
-		await ResolveDashboardByApiKey(apiKey)
-			.Bind(d => GetDashboardUri(d, deploymentStrategy))
-			.Match(
-				Some: async (uri, _) => (IActionResult)Ok(await renderingService.GetHealth(uri)),
-				None: _ => Task.FromResult<IActionResult>(NotFound()));
+    public async Task<IActionResult> GetHealth([FromHeader(Name = HttpHeaderNames.ApiKeyHeaderName)] string apiKey)
+    {
+        var dashboard = ResolveDashboardByApiKey(apiKey);
+        if (dashboard.HasNoValue) return NotFound();
+        var uri = GetDashboardUri(dashboard.Value, deploymentStrategy);
+        if (uri.HasNoValue) return NotFound();
+        return Ok(await renderingService.GetHealth(dashboard.Value.UserId, dashboard.Value.Id, uri.Value));
+    }
 
 	private Maybe<Dashboard> ResolveDashboardByApiKey(string apiKey)
 	{
@@ -71,7 +73,8 @@ public sealed class RenderToImageController(
 		{
 			device.Value.LastSeenAt = DateTimeOffset.UtcNow;
 			deviceService.UpdateDevice(device.Value);
-			return dashboardService.GetDashboardById(device.Value.DashboardId);
+			return dashboardService.GetDashboardById(device.Value.DashboardId)
+                .Where(d => d.UserId == device.Value.UserId);
 		}
 
 		return Maybe.None;
@@ -157,7 +160,7 @@ public sealed class RenderToImageController(
 
 		var (contentType, encoder) = GetEncoder(format);
 		var result = await renderingService
-			.RenderDashboardAsync(dashboardInfo.Value.DashboardUri, imageSize, dashboardInfo.Value.Tokens, HttpContext.RequestAborted)
+			.RenderDashboardAsync(dashboard.UserId, dashboard.Id, dashboardInfo.Value.DashboardUri, imageSize, dashboardInfo.Value.Tokens, HttpContext.RequestAborted)
 			.Map(image => transform?.Invoke(dashboard, image) ?? image);
 
 		if (result.IsSuccess)

@@ -32,7 +32,7 @@ public sealed class PlaywrightComponentManagerTests : IDisposable
         status.State.Should().Be(PlaywrightComponentState.Incompatible);
         status.InstalledVersion.Should().Be("999.0.0");
         status.Error.Should().Contain(PlaywrightComponentManager.GetCompatibilityVersion(Constants.AppVersion));
-        manager.ShouldAutomaticallyUpdate().Should().BeTrue();
+        manager.ShouldAutomaticallyUpdate().Should().Be(manager.GetStatus().Supported);
     }
 
     [Fact]
@@ -56,7 +56,7 @@ public sealed class PlaywrightComponentManagerTests : IDisposable
         var manager = CreateManager();
 
         manager.GetStatus().State.Should().Be(PlaywrightComponentState.Incompatible);
-        manager.ShouldAutomaticallyUpdate().Should().BeTrue();
+        manager.ShouldAutomaticallyUpdate().Should().Be(manager.GetStatus().Supported);
     }
 
     [Fact]

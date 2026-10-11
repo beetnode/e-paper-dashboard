@@ -52,7 +52,7 @@ export class SystemSettingsComponent implements OnInit, OnDestroy {
   async uninstall(): Promise<void> {
     await this.dialogService.confirm({
       title: 'Remove rendering component?',
-      message: 'Home Assistant dashboard rendering will stop working until the component is installed again.',
+      message: 'This removes the shared component for every user on this server. An enabled user can prepare it again on their next render.',
       confirmLabel: 'Remove component',
       isDangerous: true,
       onConfirm: async () => {

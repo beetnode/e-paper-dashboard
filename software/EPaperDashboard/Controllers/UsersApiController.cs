@@ -68,12 +68,10 @@ public class UsersApiController(UserService userService) : BaseApiController
     [Authorize(Policy = "SuperUserOnly")]
     public IActionResult AddUser([FromBody] AddUserRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
-        {
-            return BadRequest(new { message = "Username and password are required." });
-        }
+        var error = UserService.ValidateCredentials(request.Username, request.Password);
+        if (error is not null) return BadRequest(new { message = error });
 
-        if (userService.TryCreateUser(request.Username, request.Password))
+        if (userService.TryCreateUser(request.Username.Trim(), request.Password))
         {
             return Ok(new { message = "User added successfully." });
         }

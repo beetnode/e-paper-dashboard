@@ -54,7 +54,12 @@ internal sealed class LiteDbContext : IPersistenceInitializer, IDisposable
         // which causes NRE when setting struct (value-type) properties via reflection.
         MigrateNullObjectIds();
         PairingSessions.EnsureIndex(session => session.Code);
+        if (Users.Exists(_ => true))
+            ServiceState.Upsert(new BsonDocument { ["_id"] = "setup", ["complete"] = true });
     }
+
+    internal object UserWriteLock { get; } = new();
+    internal ILiteCollection<BsonDocument> ServiceState => _db.GetCollection("serviceState");
 
     internal ILiteCollection<User> Users => _db.GetCollection<User>("users");
     internal ILiteCollection<Dashboard> Dashboards => _db.GetCollection<Dashboard>("dashboards");

@@ -22,6 +22,45 @@ internal sealed class LiteDbUserRepository(LiteDbContext context) : IUserReposit
     public bool ExistsSuperUser() =>
         context.Users.Exists(u => u.IsSuperUser);
 
+    public bool IsSetupComplete() => context.ServiceState.Exists(s => s["_id"] == "setup") || context.Users.Exists(_ => true);
+
+    public bool TryCreateAdministrator(User user)
+    {
+        lock (context.UserWriteLock)
+        {
+            context.BeginTransaction();
+            try
+            {
+                if (IsSetupComplete()) { context.Rollback(); return false; }
+                user.IsSuperUser = true;
+                Insert(user);
+                context.ServiceState.Insert(new BsonDocument { ["_id"] = "setup", ["complete"] = true });
+                context.Commit();
+                return true;
+            }
+            catch { context.Rollback(); throw; }
+        }
+    }
+
+    public bool? GetRenderingEnabled(UserId id)
+    {
+        var state = context.ServiceState.FindById("rendering:" + id.Value);
+        return state is null ? null : state["enabled"].AsBoolean;
+    }
+
+    public void SetRenderingEnabled(UserId id, bool enabled) =>
+        context.ServiceState.Upsert(new BsonDocument { ["_id"] = "rendering:" + id.Value, ["enabled"] = enabled });
+
+    public bool TryInsert(User user)
+    {
+        lock (context.UserWriteLock)
+        {
+            if (ExistsByUsername(user.Username)) return false;
+            Insert(user);
+            return true;
+        }
+    }
+
     public void Insert(User user)
     {
         if (user.Id == UserId.Empty)

@@ -46,5 +46,5 @@ internal sealed record RenderRequest(
 
 internal sealed record RenderResponse(bool Success, string? Error, int ProtocolVersion = 0);
 
-internal sealed record RemoteRenderRequest(string ComponentDirectory, string AppVersion, RenderRequest Request);
-internal sealed record RenderingHostHealth(string AppVersion, string RuntimeIdentifier, int ProtocolVersion, bool SandboxRequired);
+internal sealed record RemoteRenderRequest(string ComponentDirectory, string AppVersion, RenderRequest Request, Guid JobId);
+internal sealed record RenderingHostHealth(string AppVersion, string RuntimeIdentifier, int ProtocolVersion, bool SandboxRequired, bool SupportsJobCancellation = false);

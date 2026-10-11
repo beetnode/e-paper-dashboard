@@ -1,7 +1,7 @@
 import { Component, inject, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 
 @Component({
@@ -11,8 +11,8 @@ import { AuthService } from '../../services/auth.service';
     <div class="app-page py-4 py-sm-5">
       <div class="app-form-shell">
         <div class="text-center mb-4">
-          <h1 class="app-page-title">Create your account</h1>
-          <p class="app-page-description mx-auto">Set up izBoard to start creating e-paper dashboards.</p>
+          <h1 class="app-page-title">{{ isSetup ? 'Create the service administrator' : 'Create your account' }}</h1>
+          <p class="app-page-description mx-auto">{{ isSetup ? 'This account manages the service and its users. You can create a separate account for your dashboards.' : 'Create your own e-paper dashboards.' }}</p>
         </div>
         <form (ngSubmit)="onSubmit()" class="app-form-card" novalidate>
         <div class="mb-3">
@@ -44,11 +44,11 @@ import { AuthService } from '../../services/auth.service';
         @if (errorMessage()) {
           <div class="alert alert-danger" role="alert">{{ errorMessage() }}</div>
         }
-        <button type="submit" class="btn btn-success w-100" [disabled]="isLoading()">
+        <button type="submit" class="btn btn-success w-100" [disabled]="isLoading() || !registrationAllowed()">
           @if (isLoading()) {
             <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
           }
-          {{ isLoading() ? 'Creating account…' : 'Create account' }}
+          {{ isLoading() ? 'Creating account…' : isSetup ? 'Complete setup' : 'Create account' }}
         </button>
         <div class="mt-3 text-center">
           <span class="text-muted">Already have an account?</span><a class="ms-1" routerLink="/login">Sign in</a>
@@ -62,6 +62,9 @@ export class RegisterComponent {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
 
+  readonly isSetup = inject(ActivatedRoute).snapshot.data['setup'] === true;
+  readonly registrationAllowed = signal(false);
+
   username = '';
   password = '';
   confirmPassword = '';
@@ -70,15 +73,26 @@ export class RegisterComponent {
   readonly isLoading = signal(false);
 
   constructor() {
+    this.authService.getSetupStatus().subscribe({
+      next: status => {
+        this.registrationAllowed.set(this.isSetup ? status.setupRequired : status.registrationEnabled);
+        if (status.setupRequired && !this.isSetup) this.router.navigate(['/setup']);
+        else if (!status.setupRequired && this.isSetup) this.router.navigate(['/login']);
+        else if (!status.registrationEnabled && !status.setupRequired)
+          this.errorMessage.set('Local account registration is unavailable in this deployment.');
+      },
+      error: () => this.errorMessage.set('Could not check account setup. Reload to try again.')
+    });
     // Effect to redirect when authenticated
     effect(() => {
       if (this.authService.isAuthReady() && this.authService.isAuthenticated()) {
-        this.router.navigate(['/dashboards']);
+        this.router.navigate([this.isSetup ? '/users/manage' : '/dashboards']);
       }
     });
   }
 
   onSubmit(): void {
+    if (!this.registrationAllowed()) return;
     const username = this.username.trim();
     if (!username || !this.password || !this.confirmPassword) {
       this.errorMessage.set('Please fill in all fields.');
@@ -103,9 +117,10 @@ export class RegisterComponent {
     this.isLoading.set(true);
     this.errorMessage.set('');
 
-    this.authService.register({ username, password: this.password }).subscribe({
+    const request = { username, password: this.password };
+    (this.isSetup ? this.authService.setup(request) : this.authService.register(request)).subscribe({
       next: () => {
-        this.router.navigate(['/dashboards']);
+        this.router.navigate([this.isSetup ? '/users/manage' : '/dashboards']);
       },
       error: (error) => {
         this.errorMessage.set(error.error?.message || 'Registration failed. Please try again.');

@@ -142,7 +142,7 @@ public class UsersApiControllerTests
         _userRepository.Setup(r => r.ExistsByUsername("bob")).Returns(true);
         var sut = CreateSut();
 
-        var result = sut.AddUser(new AddUserRequest("bob", "pw"));
+        var result = sut.AddUser(new AddUserRequest("bob", "password"));
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
@@ -151,12 +151,13 @@ public class UsersApiControllerTests
     public void AddUser_NewUsername_CreatesUserAndReturnsOk()
     {
         _userRepository.Setup(r => r.ExistsByUsername("bob")).Returns(false);
+        _userRepository.Setup(r => r.TryInsert(It.IsAny<User>())).Returns(true);
         var sut = CreateSut();
 
-        var result = sut.AddUser(new AddUserRequest("bob", "pw"));
+        var result = sut.AddUser(new AddUserRequest("bob", "password"));
 
         result.Should().BeOfType<OkObjectResult>();
-        _userRepository.Verify(r => r.Insert(It.Is<User>(u => u.Username == "bob")), Times.Once);
+        _userRepository.Verify(r => r.TryInsert(It.Is<User>(u => u.Username == "bob")), Times.Once);
     }
 
     [Fact]

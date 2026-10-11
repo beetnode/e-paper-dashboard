@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
+import { of } from 'rxjs';
 import { provideRouter } from '@angular/router';
 import { App } from './app';
 import { AuthService } from './services/auth.service';
@@ -16,7 +17,8 @@ describe('App', () => {
           useValue: {
             isAuthenticated: signal(false),
             currentUser: signal(null),
-            checkAuth: () => undefined
+            checkAuth: () => undefined,
+            getSetupStatus: () => of({ setupRequired: false, registrationEnabled: true })
           }
         },
         {

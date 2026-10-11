@@ -21,6 +21,17 @@ export class AuthService {
   readonly isHostMode = computed(() => this.deploymentMode() === 'host');
   readonly isUserManagementDisabled = computed(() => this.deploymentMode() === 'addon');
 
+  getSetupStatus(): Observable<{ setupRequired: boolean; registrationEnabled: boolean }> {
+    return this.http.get<{ setupRequired: boolean; registrationEnabled: boolean }>('/api/auth/setup');
+  }
+
+  setup(credentials: RegisterRequest): Observable<User> {
+    return this.http.post<User>('/api/auth/setup', credentials).pipe(tap(user => {
+      this.currentUserSignal.set(user);
+      this.authReadySignal.set(true);
+    }));
+  }
+
   login(credentials: LoginRequest): Observable<User> {
     return this.http.post<User>('/api/auth/login', credentials).pipe(
       tap(user => {

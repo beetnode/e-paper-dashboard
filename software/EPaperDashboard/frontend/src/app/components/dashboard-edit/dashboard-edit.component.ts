@@ -14,7 +14,7 @@ import { Dashboard, DashboardOrientation, DashboardSizePreset, DASHBOARD_SIZE_PR
 import { DashboardSelectorDialogComponent } from '../dashboard-selector-dialog/dashboard-selector-dialog.component';
 import { RenderedPreviewModalComponent } from '../rendered-preview-modal/rendered-preview-modal.component';
 import { HasUnsavedChanges } from '../../guards/unsaved-changes.guard';
-import { PlaywrightComponentService, PlaywrightComponentStatus } from '../../services/playwright-component.service';
+import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../services/playwright-component.service';
 
 @Component({
   selector: 'app-dashboard-edit',
@@ -225,17 +225,13 @@ import { PlaywrightComponentService, PlaywrightComponentStatus } from '../../ser
                 </div>
 
                 @if (previewModeValue === 'homeassistant') {
-                @if (playwrightStatus()?.state !== 'Installed') {
+                @if (!renderingEnabled() || !playwrightStatus()?.ready) {
                 <div class="alert alert-warning d-flex align-items-start gap-2" role="alert">
                   <i class="fa-solid fa-puzzle-piece mt-1" aria-hidden="true"></i>
                   <div>
-                    <strong>Optional renderer required.</strong>
-                    The rendering component must be installed before this mode can render images.
-                    @if (authService.currentUser()?.isSuperUser) {
-                      <a routerLink="/system" target="_blank" class="alert-link">Install it in System settings.</a>
-                    } @else {
-                      Ask an administrator to install it from System settings.
-                    }
+                    <strong>Rendering is not ready.</strong>
+                    Enable rendering for your account and wait for preparation to complete.
+                    <a routerLink="/rendering" target="_blank" class="alert-link">Enable it in your Rendering settings.</a>
                   </div>
                 </div>
                 }
@@ -418,7 +414,8 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
   readonly previewImageUrl = signal('');
   readonly shouldClearAccessToken = signal(false);
   readonly previewMode = signal<'ssr' | 'homeassistant'>('ssr');
-  readonly playwrightStatus = signal<PlaywrightComponentStatus | null>(null);
+  readonly renderingEnabled = signal(false);
+  readonly playwrightStatus = signal<UserRenderingComponentStatus | null>(null);
   
   readonly devices = signal<Device[]>([]);
   readonly isLoadingDevices = signal(false);
@@ -469,8 +466,11 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
   }
 
   private loadPlaywrightStatus(): void {
-    this.playwrightComponentService.getStatus().subscribe({
-      next: status => this.playwrightStatus.set(status)
+    this.playwrightComponentService.getUserStatus().subscribe({
+      next: status => {
+        this.playwrightStatus.set(status.component);
+        this.renderingEnabled.set(status.enabled);
+      }
     });
   }
 
