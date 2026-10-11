@@ -181,66 +181,69 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
               }
             </section>
 
-            <section class="app-section-card" aria-labelledby="aiSettingsTitle">
-              <h2 id="aiSettingsTitle" class="app-section-title">AI provider</h2>
-              <p class="app-section-description">Used for AI generated widgets. Defaults to the <a routerLink="/ai/config">global AI provider</a>.</p>
-              <div [class.mb-3]="aiConfig().connectionMode === 'HomeAssistant'">
-                <label class="form-label fw-semibold" for="aiConnectionMode">Provider</label>
-                <select id="aiConnectionMode" class="form-select"
-                  [ngModel]="aiConfig().connectionMode"
-                  (ngModelChange)="onAiConnectionModeChange($event)"
-                  [ngModelOptions]="{standalone: true}">
-                  <option value="None">Global AI provider</option>
-                  <option value="HomeAssistant">Home Assistant conversation agent</option>
-                </select>
-              </div>
+            <!-- AI generated widgets exist only in custom layouts. -->
+            @if (previewModeValue === 'ssr') {
+              <section class="app-section-card" aria-labelledby="aiSettingsTitle">
+                <h2 id="aiSettingsTitle" class="app-section-title">AI provider</h2>
+                <p class="app-section-description">Used for AI generated widgets. Defaults to the <a routerLink="/ai/config">global AI provider</a>.</p>
+                <div [class.mb-3]="aiConfig().connectionMode === 'HomeAssistant'">
+                  <label class="form-label fw-semibold" for="aiConnectionMode">Provider</label>
+                  <select id="aiConnectionMode" class="form-select"
+                    [ngModel]="aiConfig().connectionMode"
+                    (ngModelChange)="onAiConnectionModeChange($event)"
+                    [ngModelOptions]="{standalone: true}">
+                    <option value="None">Global AI provider</option>
+                    <option value="HomeAssistant">Home Assistant conversation agent</option>
+                  </select>
+                </div>
 
-              @if (aiConfig().connectionMode === 'HomeAssistant') {
-                <div class="row g-3">
-                  <div class="col-12 col-sm-6">
-                    <label class="form-label fw-semibold" for="aiHomeAssistantConnection">Connection</label>
-                    <select id="aiHomeAssistantConnection" class="form-select"
-                      [ngModel]="aiConfig().homeAssistantConnectionId || ''"
-                      (ngModelChange)="onAiHomeAssistantConnectionChange($event)"
-                      [ngModelOptions]="{standalone: true}">
-                      @if (isAddonMode()) {
-                        <option value="">Home Assistant add-on</option>
-                      } @else if (dashboard()!.hasLegacyConnection) {
-                        <option value="">Legacy dashboard settings</option>
-                      } @else {
-                        <option value="" disabled>Select a connection</option>
-                      }
-                      @for (connection of homeAssistantConnections(); track connection.id) {
-                        <option [value]="connection.id">{{ connection.name }}{{ connection.connected ? '' : ' (sign-in required)' }}</option>
-                      }
-                    </select>
-                    <small class="form-text text-muted"><a routerLink="/connections" target="_blank" rel="noopener">Manage connections</a></small>
-                  </div>
-                  <div class="col-12 col-sm-6">
-                    <label class="form-label fw-semibold" for="aiConversationAgent">Conversation agent</label>
-                    @if (isLoadingAgents()) {
-                      <div class="d-flex align-items-center gap-2 py-2" role="status">
-                        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-                        <span class="text-muted">Loading agents…</span>
-                      </div>
-                    } @else {
-                      <select id="aiConversationAgent" class="form-select"
-                        [ngModel]="aiConfig().homeAssistantAgentId || ''"
-                        (ngModelChange)="updateAiField('homeAssistantAgentId', $event)"
+                @if (aiConfig().connectionMode === 'HomeAssistant') {
+                  <div class="row g-3">
+                    <div class="col-12 col-sm-6">
+                      <label class="form-label fw-semibold" for="aiHomeAssistantConnection">Connection</label>
+                      <select id="aiHomeAssistantConnection" class="form-select"
+                        [ngModel]="aiConfig().homeAssistantConnectionId || ''"
+                        (ngModelChange)="onAiHomeAssistantConnectionChange($event)"
                         [ngModelOptions]="{standalone: true}">
-                        <option value="">Default agent</option>
-                        @for (agent of conversationAgents(); track agent.id) {
-                          <option [value]="agent.id">{{ agent.name }}</option>
+                        @if (isAddonMode()) {
+                          <option value="">Home Assistant add-on</option>
+                        } @else if (dashboard()!.hasLegacyConnection) {
+                          <option value="">Legacy dashboard settings</option>
+                        } @else {
+                          <option value="" disabled>Select a connection</option>
+                        }
+                        @for (connection of homeAssistantConnections(); track connection.id) {
+                          <option [value]="connection.id">{{ connection.name }}{{ connection.connected ? '' : ' (sign-in required)' }}</option>
                         }
                       </select>
-                      @if (conversationAgents().length === 0) {
-                        <small class="form-text text-muted">No agents found. Check that the connection is signed in.</small>
+                      <small class="form-text text-muted"><a routerLink="/connections" target="_blank" rel="noopener">Manage connections</a></small>
+                    </div>
+                    <div class="col-12 col-sm-6">
+                      <label class="form-label fw-semibold" for="aiConversationAgent">Conversation agent</label>
+                      @if (isLoadingAgents()) {
+                        <div class="d-flex align-items-center gap-2 py-2" role="status">
+                          <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                          <span class="text-muted">Loading agents…</span>
+                        </div>
+                      } @else {
+                        <select id="aiConversationAgent" class="form-select"
+                          [ngModel]="aiConfig().homeAssistantAgentId || ''"
+                          (ngModelChange)="updateAiField('homeAssistantAgentId', $event)"
+                          [ngModelOptions]="{standalone: true}">
+                          <option value="">Default agent</option>
+                          @for (agent of conversationAgents(); track agent.id) {
+                            <option [value]="agent.id">{{ agent.name }}</option>
+                          }
+                        </select>
+                        @if (conversationAgents().length === 0) {
+                          <small class="form-text text-muted">No agents found. Check that the connection is signed in.</small>
+                        }
                       }
-                    }
+                    </div>
                   </div>
-                </div>
-              }
-            </section>
+                }
+              </section>
+            }
           </div>
         </div>
 
@@ -444,7 +447,7 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
         const config = dashboard.aiConfig ?? { connectionMode: 'None' as AiConnectionMode };
         this.aiConfig.set(config);
         this.originalAiConfig = JSON.parse(JSON.stringify(config));
-        if (config.connectionMode === 'HomeAssistant') {
+        if (config.connectionMode === 'HomeAssistant' && dashboard.renderingMode !== 'HomeAssistant') {
           this.loadConversationAgents(dashboard.id);
         }
 
