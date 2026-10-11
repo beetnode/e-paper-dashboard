@@ -79,7 +79,8 @@ public class DashboardScheduleMonitorService : BackgroundService
         }
 
         var hasHost = !string.IsNullOrWhiteSpace(dashboard.Host) || EnvironmentConfiguration.AppMode != DeploymentMode.Standalone;
-        if (!hasHost || string.IsNullOrWhiteSpace(dashboard.AccessToken))
+        var usesConnection = !string.IsNullOrEmpty(dashboard.HomeAssistantConnectionId);
+        if (!usesConnection && (!hasHost || string.IsNullOrWhiteSpace(dashboard.AccessToken)))
         {
             return;
         }

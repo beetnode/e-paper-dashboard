@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using EPaperDashboard.Services;
 using EPaperDashboard.Services.Providers;
 using EPaperDashboard.Guards;
+using EPaperDashboard.Services.Plugins.HomeAssistant;
 
 namespace EPaperDashboard.Controllers;
 
@@ -13,7 +14,8 @@ public class HomeAssistantController(
     HomeAssistantService homeAssistantService,
     IEntityStateProvider entityStateProvider,
     IEntityHistoryProvider entityHistoryProvider,
-    ILogger<HomeAssistantController> logger) : ControllerBase
+    HomeAssistantDashboardTargetResolver homeAssistantTargets,
+    ILogger<HomeAssistantController> logger) : BaseApiController
 {
     private readonly HomeAssistantService _homeAssistantService = homeAssistantService;
     private readonly IEntityStateProvider _entityStateProvider = entityStateProvider;
@@ -28,6 +30,21 @@ public class HomeAssistantController(
 
         return result.IsSuccess
             ? Ok(new { dashboards = result.Value })
+            : BadRequest(new { error = result.Error });
+    }
+
+    [HttpGet("connections/{connectionId}/dashboards")]
+    public async Task<IActionResult> FetchConnectionDashboards(string connectionId)
+    {
+        var connection = homeAssistantTargets.FindConnection(connectionId, CurrentUserId);
+        if (connection is null)
+            return NotFound(new { error = "Home Assistant connection not found." });
+
+        var (host, token) = homeAssistantTargets.ConnectionServer(connection);
+        var result = await _homeAssistantService.FetchConnectionDashboards(host, token);
+
+        return result.IsSuccess
+            ? Ok(new { data = result.Value })
             : BadRequest(new { error = result.Error });
     }
 

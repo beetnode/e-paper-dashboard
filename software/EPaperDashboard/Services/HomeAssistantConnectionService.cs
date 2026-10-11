@@ -95,7 +95,9 @@ public class HomeAssistantConnectionService(
             var connection = connections?.Find(parts[1], scopedDashboard.Value.UserId);
             if (connection is null || connection.PluginId != "home-assistant") return "Connection not found";
             var credentials = connections!.Credentials(connection);
-            return (credentials["host"].TrimEnd('/'), credentials["token"]);
+            if (!credentials.TryGetValue("token", out var connectionToken) || string.IsNullOrWhiteSpace(connectionToken))
+                return "Sign in to this Home Assistant connection from Connections first.";
+            return (credentials["host"].TrimEnd('/'), connectionToken);
         }
 
         var dashboardResult = ValidateAndGetDashboard(dashboardId);

@@ -11,7 +11,7 @@ import { DialogService } from '../../services/dialog.service';
 import { DeviceService, Device } from '../../services/device.service';
 import { AiService } from '../../services/ai.service';
 import { Dashboard, DashboardOrientation, DashboardSizePreset, DASHBOARD_SIZE_PRESETS, DEFAULT_DASHBOARD_SIZE, AiConfig, AiConnectionMode, ConversationAgent } from '../../models/types';
-import { DashboardSelectorDialogComponent } from '../dashboard-selector-dialog/dashboard-selector-dialog.component';
+import { HomeAssistantTargetPickerComponent } from '../home-assistant-target-picker/home-assistant-target-picker.component';
 import { RenderedPreviewModalComponent } from '../rendered-preview-modal/rendered-preview-modal.component';
 import { HasUnsavedChanges } from '../../guards/unsaved-changes.guard';
 import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../services/playwright-component.service';
@@ -19,7 +19,7 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
 @Component({
   selector: 'app-dashboard-edit',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterModule, DashboardSelectorDialogComponent, RenderedPreviewModalComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterModule, RenderedPreviewModalComponent, HomeAssistantTargetPickerComponent],
   styles: [`
     .btn-group[role="group"] {
       display: grid !important;
@@ -52,7 +52,6 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
     }
   `],
   template: `
-    <app-dashboard-selector-dialog></app-dashboard-selector-dialog>
 
     @if (isLoading()) {
       <div class="app-loading-state">
@@ -149,79 +148,13 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
 
               <div class="col-12 col-lg-6">
                 <h3 class="h6 text-uppercase text-muted mb-3">Content and display</h3>
-                @if (!hideHostField()) {
-                  <div class="mb-3">
-                    <label class="form-label fw-semibold" for="dashboardHost">Dashboard host</label>
-                    <input 
-                      id="dashboardHost"
-                      type="text" 
-                      class="form-control" 
-                      formControlName="host"
-                      placeholder="https://your-ha-instance.com" 
-                    />
-                  </div>
-                }
-
-                @if (!isAddonMode() || previewModeValue === 'homeassistant') {
                 <div class="mb-3">
-                  <label class="form-label fw-semibold" for="dashboardAccessToken">Access token</label>
-                  @if (isAddonMode()) {
-                    <small class="form-text text-muted d-block mb-2">
-                      <i class="fa-solid fa-info-circle"></i> The "Home Assistant Dashboard" mode requires an Access Token.
-                      Paste a <strong>Long-Lived Access Token</strong> below.
-                    </small>
-                  }
-                  <div class="input-group">
-                    <input 
-                      id="dashboardAccessToken"
-                      type="password" 
-                      class="form-control" 
-                      formControlName="accessToken"
-                      [placeholder]="isAddonMode() ? 'Paste a long-lived access token…' : 'Paste a token or select Fetch…'"
-                    />
-                    @if (!isAddonMode()) {
-                      <button 
-                        type="button" 
-                        class="btn btn-outline-primary" 
-                        (click)="authenticateWithHomeAssistant()"
-                        [disabled]="isAuthenticating()"
-                        title="Authenticate via Home Assistant"
-                      >
-                        <i class="fa-solid fa-key" aria-hidden="true"></i> {{ isAuthenticating() ? 'Authenticating…' : 'Fetch' }}
-                      </button>
-                    }
-                    @if (dashboard()?.hasAccessToken || dashboardForm.get('accessToken')?.value) {
-                      <button 
-                        type="button" 
-                        class="btn btn-outline-danger" 
-                        (click)="clearAccessToken()"
-                        title="Clear the access token"
-                      >
-                        <i class="fa-solid fa-trash"></i> Clear
-                      </button>
-                    }
-                  </div>
-                  <small class="form-text text-muted d-block mt-2">
-                    @if (dashboard()?.hasAccessToken) {
-                      <span class="d-block mt-1 text-success">Token is configured</span>
-                    }
-                  </small>
-                </div>
-                } @else {
-                  <div class="mb-3">
-                    <span class="d-block text-success"><i class="fa-solid fa-check-circle"></i> Connected to Home Assistant via add-on</span>
-                  </div>
-                }
-
-                <div class="mb-3">
-                  <span class="form-label fw-semibold d-block">Rendering mode</span>
-                  <div class="btn-group d-flex" role="group">
-                    <input type="radio" class="btn-check" name="previewMode" id="ssrMode" value="ssr" [(ngModel)]="previewModeValue" [ngModelOptions]="{standalone: true}" (change)="onRenderingModeChange()" />
-                    <label class="btn btn-outline-secondary flex-grow-1" for="ssrMode">Custom Layout</label>
-
-                    <input type="radio" class="btn-check" name="previewMode" id="haMode" value="homeassistant" [(ngModel)]="previewModeValue" [ngModelOptions]="{standalone: true}" (change)="onRenderingModeChange()" />
-                    <label class="btn btn-outline-secondary flex-grow-1" for="haMode">Home Assistant Dashboard</label>
-                  </div>
+                  <span class="form-label fw-semibold d-block">Dashboard type</span>
+                  <!-- The type is chosen when the dashboard is created and cannot be changed afterwards. -->
+                  <span class="badge text-bg-secondary">
+                    <i class="fa-solid me-1" [ngClass]="previewModeValue === 'homeassistant' ? 'fa-house-signal' : 'fa-table-cells-large'" aria-hidden="true"></i>
+                    {{ previewModeValue === 'homeassistant' ? 'Home Assistant dashboard' : 'Custom layout' }}
+                  </span>
                 </div>
 
                 @if (previewModeValue === 'homeassistant') {
@@ -258,36 +191,41 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
                     </label>
                   </div>
                 </div>
-                }
 
-                @if (previewModeValue === 'ssr') {
+                <app-home-assistant-target-picker
+                  [connectionId]="dashboardForm.controls.homeAssistantConnectionId.value"
+                  (connectionIdChange)="onHomeAssistantConnectionChange($event)"
+                  [path]="dashboardForm.controls.path.value"
+                  (pathChange)="onHomeAssistantPathChange($event)"
+                  [allowDashboardSettings]="true"
+                  [dashboardSettingsLabel]="isAddonMode() ? 'Home Assistant add-on (dashboard token)' : 'Dashboard settings (host and token)'"
+                  [dashboardId]="dashboard()!.id"
+                  [dashboardSettingsReady]="dashboardSettingsReady()" />
+
+                @if (!dashboardForm.controls.homeAssistantConnectionId.value) {
+                  <ng-container *ngTemplateOutlet="dashboardConnectionSettings" />
+                }
+                } @else {
                   <div class="mb-3">
                     <span class="form-label fw-semibold d-block">Layout</span>
                     <button type="button" class="btn btn-success w-100" (click)="openDesigner()">
                       <i class="fa-solid fa-paint-brush"></i> Open Layout Designer
                     </button>
                   </div>
-                } @else {
                   <div class="mb-3">
-                    <label class="form-label fw-semibold" for="pathField">Dashboard path</label>
-                    <div class="input-group">
-                      <input 
-                        type="text" 
-                        class="form-control" 
-                        formControlName="path"
-                        id="pathField"
-                      />
-                      <button 
-                        type="button" 
-                        class="btn btn-outline-secondary" 
-                        (click)="openDashboardSelector()"
-                      [disabled]="hideHostField() ? false : (!dashboardForm.get('host')?.value || (!dashboard()!.hasAccessToken && !dashboardForm.get('accessToken')?.value))"
-                      >
-                        <i class="fa-solid fa-list"></i> Select
-                      </button>
-                    </div>
-                    <small class="form-text text-muted">Example: lovelace/0 or lovelace/energy</small>
+                    <span class="form-label fw-semibold d-block">Data</span>
+                    <small class="form-text text-muted d-block">
+                      Widgets use data from your <a routerLink="/connections" target="_blank" rel="noopener">connections</a>.
+                      @if (isAddonMode()) { Home Assistant is also connected through the add-on. }
+                    </small>
                   </div>
+                  @if (!isAddonMode() && (dashboard()!.host || dashboard()!.hasAccessToken)) {
+                    <details class="mb-3">
+                      <summary class="fw-semibold">Dashboard Home Assistant connection (legacy)</summary>
+                      <small class="form-text text-muted d-block my-2">Existing widgets keep using these settings. New widgets can use a named connection instead.</small>
+                      <ng-container *ngTemplateOutlet="dashboardConnectionSettings" />
+                    </details>
+                  }
                 }
 
                 <div class="mb-3">
@@ -367,6 +305,66 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
           </div>
         </details>
 
+        <ng-template #dashboardConnectionSettings>
+          @if (!hideHostField()) {
+            <div class="mb-3">
+              <label class="form-label fw-semibold" for="dashboardHost">Dashboard host</label>
+              <input 
+                id="dashboardHost"
+                type="text" 
+                class="form-control" 
+                formControlName="host"
+                placeholder="https://your-ha-instance.com" 
+              />
+            </div>
+          }
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold" for="dashboardAccessToken">Access token</label>
+            @if (isAddonMode()) {
+              <small class="form-text text-muted d-block mb-2">
+                <i class="fa-solid fa-info-circle"></i> The "Home Assistant Dashboard" mode requires an Access Token.
+                Paste a <strong>Long-Lived Access Token</strong> below.
+              </small>
+            }
+            <div class="input-group">
+              <input 
+                id="dashboardAccessToken"
+                type="password" 
+                class="form-control" 
+                formControlName="accessToken"
+                [placeholder]="isAddonMode() ? 'Paste a long-lived access token…' : 'Paste a token or select Fetch…'"
+              />
+              @if (!isAddonMode()) {
+                <button 
+                  type="button" 
+                  class="btn btn-outline-primary" 
+                  (click)="authenticateWithHomeAssistant()"
+                  [disabled]="isAuthenticating()"
+                  title="Authenticate via Home Assistant"
+                >
+                  <i class="fa-solid fa-key" aria-hidden="true"></i> {{ isAuthenticating() ? 'Authenticating…' : 'Fetch' }}
+                </button>
+              }
+              @if (dashboard()?.hasAccessToken || dashboardForm.get('accessToken')?.value) {
+                <button 
+                  type="button" 
+                  class="btn btn-outline-danger" 
+                  (click)="clearAccessToken()"
+                  title="Clear the access token"
+                >
+                  <i class="fa-solid fa-trash"></i> Clear
+                </button>
+              }
+            </div>
+            <small class="form-text text-muted d-block mt-2">
+              @if (dashboard()?.hasAccessToken) {
+                <span class="d-block mt-1 text-success">Token is configured</span>
+              }
+            </small>
+          </div>
+        </ng-template>
+
       </form>
 
       <!-- Preview Modal -->
@@ -401,8 +399,6 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
   readonly isHostMode = this.authService.isHostMode;
   readonly hideHostField = computed(() => this.isAddonMode() || this.isHostMode());
 
-  @ViewChild(DashboardSelectorDialogComponent) dashboardSelectorDialog!: DashboardSelectorDialogComponent;
-
   readonly dashboard = signal<Dashboard | null>(null);
   readonly isLoading = signal(false);
   readonly isSaving = signal(false);
@@ -431,6 +427,7 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
     host: new FormControl('', { nonNullable: true }),
     path: new FormControl('', { nonNullable: true }),
     accessToken: new FormControl('', { nonNullable: true }),
+    homeAssistantConnectionId: new FormControl('', { nonNullable: true }),
   });
 
   newUpdateTime: string = '';
@@ -487,6 +484,7 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
           host: dashboard.host || '',
           path: dashboard.path || '',
           accessToken: '',
+          homeAssistantConnectionId: dashboard.homeAssistantConnectionId || '',
         });
 
         if (dashboard.updateTimes) {
@@ -643,46 +641,6 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
     });
   }
 
-  openDashboardSelector(): void {
-    const currentDashboard = this.dashboard();
-    if (!currentDashboard) {
-      this.toastService.error('Dashboard not loaded.');
-      return;
-    }
-
-    if (!this.hideHostField()) {
-      const hostValue = this.dashboardForm.get('host')?.value;
-      const accessTokenValue = this.dashboardForm.get('accessToken')?.value;
-      if (!hostValue || (!currentDashboard.hasAccessToken && !accessTokenValue)) {
-        this.toastService.error('Please configure host and access token first.');
-        return;
-      }
-    }
-
-    this.dashboardSelectorDialog.openWithLoading();
-
-    this.homeAssistantService.getDashboards(currentDashboard.id)
-      .subscribe({
-        next: (dashboards) => {
-          const transformedDashboards = dashboards.map((item: any) => ({
-            url_path: item.id,
-            title: item.title,
-            id: item.id
-          }));
-
-          this.dashboardSelectorDialog.open(transformedDashboards).then((selectedPath) => {
-            if (selectedPath) {
-              this.dashboardForm.patchValue({ path: selectedPath });
-              this.dashboardForm.markAsDirty();
-            }
-          });
-        },
-        error: (error) => {
-          this.dashboardSelectorDialog.setError(error.error?.message || 'Failed to fetch dashboards');
-        }
-      });
-  }
-
   onSubmit(): void {
     const currentDashboard = this.dashboard();
     if (!currentDashboard) {
@@ -705,7 +663,8 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
       host: formValue.host?.trim() || undefined,
       path: formValue.path?.trim() || undefined,
       updateTimes: this.updateTimes().length > 0 ? this.updateTimes() : undefined,
-      renderingMode: this.previewModeValue === 'homeassistant' ? 'HomeAssistant' : 'Custom',
+      // Only Home Assistant mode edits the connection; an empty value selects the dashboard settings.
+      ...(this.previewModeValue === 'homeassistant' ? { homeAssistantConnectionId: formValue.homeAssistantConnectionId } : {}),
       orientation: this.orientationValue,
       screenWidth: selectedSize.width,
       screenHeight: selectedSize.height,
@@ -729,7 +688,8 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
           description: updated.description || '',
           host: updated.host || '',
           path: updated.path || '',
-          accessToken: ''
+          accessToken: '',
+          homeAssistantConnectionId: updated.homeAssistantConnectionId || '',
         });
         this.dashboardForm.markAsPristine();
         if (updated.updateTimes && Array.isArray(updated.updateTimes)) {
@@ -768,6 +728,7 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
       host: dashboard.host || '',
       path: dashboard.path || '',
       accessToken: '',
+      homeAssistantConnectionId: dashboard.homeAssistantConnectionId || '',
     });
 
     this.updateTimes.set([...this.originalUpdateTimes]);
@@ -813,10 +774,6 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
     });
   }
 
-  onRenderingModeChange(): void {
-    this.dashboardForm.markAsDirty();
-  }
-
   onOrientationChange(): void {
     this.dashboardForm.markAsDirty();
   }
@@ -859,17 +816,29 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
     const mode = this.previewMode();
     if (mode === 'ssr') {
       return !this.dashboard()?.layoutConfig;
-    } else {
-      const pathValue = this.dashboardForm.get('path')?.value;
-      const currentDashboard = this.dashboard();
-      const accessTokenValue = this.dashboardForm.get('accessToken')?.value;
-      // In addon mode, host is auto-managed but HA rendering still needs a long-lived token
-      if (this.isAddonMode()) {
-        return !pathValue || (!currentDashboard?.hasAccessToken && !accessTokenValue);
-      }
-      const hostValue = this.dashboardForm.get('host')?.value;
-      return !hostValue || !pathValue || (!currentDashboard?.hasAccessToken && !accessTokenValue);
     }
+    if (!this.dashboardForm.controls.path.value) {
+      return true;
+    }
+    return !this.dashboardForm.controls.homeAssistantConnectionId.value && !this.dashboardSettingsReady();
+  }
+
+  /** Whether the dashboard's own host/token settings can reach Home Assistant. */
+  dashboardSettingsReady(): boolean {
+    const hasToken = !!this.dashboard()?.hasAccessToken || !!this.dashboardForm.controls.accessToken.value;
+    // The add-on and host modes manage the host; Home Assistant rendering still needs a long-lived token.
+    return hasToken && (this.hideHostField() || !!this.dashboardForm.controls.host.value);
+  }
+
+  onHomeAssistantConnectionChange(connectionId: string): void {
+    if (connectionId === this.dashboardForm.controls.homeAssistantConnectionId.value) return;
+    this.dashboardForm.patchValue({ homeAssistantConnectionId: connectionId });
+    this.dashboardForm.markAsDirty();
+  }
+
+  onHomeAssistantPathChange(path: string): void {
+    this.dashboardForm.patchValue({ path });
+    this.dashboardForm.markAsDirty();
   }
 
   openPreview(): void {
@@ -942,17 +911,8 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
     const currentDashboard = this.dashboard();
     if (!currentDashboard) return;
 
-    const hostValue = this.dashboardForm.get('host')?.value;
-    const pathValue = this.dashboardForm.get('path')?.value;
-    const accessTokenValue = this.dashboardForm.get('accessToken')?.value;
-
-    if (this.isAddonMode()) {
-      if (!pathValue || (!currentDashboard.hasAccessToken && !accessTokenValue)) {
-        this.toastService.error('Preview requires a Dashboard Path and an Access Token. Click "Fetch" to authenticate with Home Assistant.');
-        return;
-      }
-    } else if (!hostValue || !pathValue || (!currentDashboard.hasAccessToken && !accessTokenValue)) {
-      this.toastService.error('Preview requires Home Assistant configuration and access token. Please configure Host, Dashboard Path, and add an access token first.');
+    if (this.disablePreviewButton()) {
+      this.toastService.error('Preview requires a Home Assistant connection (or host and access token) and a dashboard path.');
       return;
     }
 
@@ -981,7 +941,6 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
       },
       error: async (error) => {
         this.previewLoading.set(false);
-        const dashboard = this.dashboard();
         let errorMessage = 'Failed to load Home Assistant preview';
 
         if (error.error instanceof Blob) {
@@ -996,9 +955,6 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
           } catch (e) {
             errorMessage = `HTTP Error ${error.status}`;
           }
-        } else if (error.status === 404) {
-          const configDebug = dashboard ? `Host: ${dashboard.host || 'MISSING'}, Path: ${dashboard.path || 'MISSING'}, Token: ${dashboard.hasAccessToken ? 'SET' : 'MISSING'}` : 'No dashboard';
-          errorMessage = `404 Not Found. Config: [${configDebug}] - Make sure Home Assistant settings are complete and saved.`;
         } else if (error.error && typeof error.error === 'string') {
           errorMessage = error.error;
         } else if (error.error && error.error.error) {

@@ -10,7 +10,7 @@ public static class SourceCapabilities
 }
 
 public sealed record CredentialField(string Key, string Label, bool Secret = false);
-public sealed record ProviderManifest(string Id, string Name, IReadOnlyList<CredentialField> Credentials, bool RequiresOAuth = false, IReadOnlyList<ProviderWidget>? Widgets = null);
+public sealed record ProviderManifest(string Id, string Name, IReadOnlyList<CredentialField> Credentials, bool RequiresOAuth = false, IReadOnlyList<ProviderWidget>? Widgets = null, string? SetupInstructions = null);
 public sealed record ProviderWidget(string Type, string? RenderAs = null);
 public sealed record ProviderContext(string DashboardId, ProviderConnection? Connection);
 public sealed record SourceQuery(string Capability, string SourceId, int Hours = 168, string ForecastType = "daily", JsonElement? Parameters = null);
@@ -68,6 +68,36 @@ public interface IDataProviderPlugin
     }
 }
 
+/// <summary>
+/// Plugins whose connections can be authorized through a browser redirect. The core exposes a generic
+/// authorize endpoint and an anonymous <c>/api/providers/{id}/callback</c> endpoint for them.
+/// Sign-in is mandatory only when the manifest sets <see cref="ProviderManifest.RequiresOAuth"/>.
+/// </summary>
+public interface IOAuthDataProviderPlugin : IDataProviderPlugin
+{
+    /// <summary>
+    /// Credentials produced by authorization. When other credentials change they are discarded,
+    /// unless the same update supplies them explicitly.
+    /// </summary>
+    IReadOnlyCollection<string> AuthorizationCredentialKeys { get; }
+    bool IsAuthorized(IReadOnlyDictionary<string, string> credentials);
+    /// <summary>Returns the provider sign-in URL and a one-time state value that the core binds to the browser.</summary>
+    Result<(string Url, string State), string> StartAuthorization(ProviderConnection connection, HttpContext httpContext);
+    Task<UnitResult<string>> CompleteAuthorizationAsync(string? state, string? browserState, string? code, CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// A plugin that can serve sources configured on the dashboard itself instead of a named connection.
+/// Unqualified (bare) source IDs are routed to it. At most one plugin may provide this.
+/// </summary>
+public interface IDashboardConnectionPlugin : IDataProviderPlugin
+{
+    string DashboardConnectionName { get; }
+    bool HasDashboardConnection(Dashboard dashboard);
+    /// <summary>Changes whenever the dashboard's connection settings change, invalidating cached source data.</summary>
+    string DashboardConnectionVersion(Dashboard dashboard);
+}
+
 public sealed class ProviderRegistry
 {
     private readonly Dictionary<string, IDataProviderPlugin> plugins;
@@ -76,15 +106,25 @@ public sealed class ProviderRegistry
     public ProviderRegistry(IEnumerable<IDataProviderPlugin> plugins)
     {
         this.plugins = plugins.ToDictionary(p => p.Manifest.Id, StringComparer.Ordinal);
+        var dashboardConnections = this.plugins.Values.OfType<IDashboardConnectionPlugin>().ToList();
+        if (dashboardConnections.Count > 1)
+            throw new InvalidOperationException("Only one plugin can provide dashboard connections.");
+        DashboardConnectionPlugin = dashboardConnections.SingleOrDefault();
         foreach (var plugin in this.plugins.Values)
+        {
+            if (plugin.Manifest.RequiresOAuth && plugin is not IOAuthDataProviderPlugin)
+                throw new InvalidOperationException($"Plugin {plugin.Manifest.Id} requires OAuth and must implement {nameof(IOAuthDataProviderPlugin)}.");
             foreach (var widget in plugin.Manifest.Widgets ?? [])
             {
                 if (!widget.Type.StartsWith(plugin.Manifest.Id + ".", StringComparison.Ordinal))
                     throw new InvalidOperationException($"Widget {widget.Type} must be namespaced with {plugin.Manifest.Id}.");
                 widgets.Add(widget.Type, (plugin, widget));
             }
+        }
     }
 
+    public IDashboardConnectionPlugin? DashboardConnectionPlugin { get; }
+    public IEnumerable<IDataProviderPlugin> Plugins => plugins.Values;
     public IEnumerable<ProviderManifest> Manifests => plugins.Values.Select(p => p.Manifest);
     public IEnumerable<ProviderWidget> Widgets => widgets.Values.Select(value => value.Widget);
     public IDataProviderPlugin? WidgetOwner(string type) => widgets.TryGetValue(type, out var value) ? value.Owner : null;

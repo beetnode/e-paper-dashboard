@@ -14,9 +14,11 @@ LiteDB initializes the new connection collection automatically. PostgreSQL deplo
 
 ### Home Assistant
 
-Create a connection with a server URL and a long-lived access token from your Home Assistant profile. The server must be reachable from izBoard. Each connection can point to a different Home Assistant installation.
+Create a connection with a server URL, then either paste a long-lived access token from your Home Assistant profile or choose **Save and sign in** (or **Sign in** on a saved connection). Sign-in uses Home Assistant's login page, creates a long-lived token and stores it encrypted in the connection; the token never passes through the browser. Sign-in needs `CLIENT_URL` (or add-on ingress) like the dashboard token fetch, and the server URL must be reachable from both your browser and izBoard. Changing the server URL discards a signed-in token unless you paste a new one. Each connection can point to a different Home Assistant installation.
 
-Existing dashboard host/token settings and entity IDs continue to work without rewriting saved layouts. The add-on's automatic Home Assistant connection also remains available. They appear as **Dashboard Home Assistant** in the source picker. Named connections are additional reusable connections. Existing full-dashboard Home Assistant screenshot configuration continues using its dashboard-specific settings.
+Existing dashboard host/token settings and entity IDs continue to work without rewriting saved layouts. The add-on's automatic Home Assistant connection also remains available. They appear as **Dashboard Home Assistant** in the source picker. Named connections are additional reusable connections.
+
+When creating a dashboard, choose its type, which cannot be changed later: **Custom layout** (widgets fed by any provider, edited in the designer) or **Home Assistant dashboard** (an existing Home Assistant dashboard captured by the rendering component). A Home Assistant dashboard references a named Home Assistant connection plus a dashboard path; the connection list refreshes when you return from a Connections tab. Existing screenshot dashboards keep their dashboard-specific host/token settings, available as **Dashboard settings** in the connection picker. Removing a referenced connection makes the dashboard report an unavailable connection until another one is selected.
 
 ### Google Calendar and Tasks
 
@@ -44,6 +46,8 @@ Backend contracts live under `Services/Plugins`:
 - `DataSource` exposes an opaque provider-local ID, a display name, and explicit capabilities. Compatibility is based on capabilities, not on a Home Assistant domain or source ID prefix.
 - `SourceData` contains normalized `EntityState`, `CalendarEvent`, `TodoItem`, `WeatherForecast`, `HistoryState`, and `RssFeedEntry` values. Translate remote API formats inside the plugin. Weather state uses the shared weather attribute keys consumed by the common weather renderer.
 - `ProviderContext` carries the dashboard identity and resolved connection. The router owns authorization; plugins receive only an owner-validated connection.
+- `IOAuthDataProviderPlugin` is implemented by plugins whose connections support browser sign-in. Set `ProviderManifest.RequiresOAuth` when sign-in is mandatory (the registry rejects it without the interface); Home Assistant offers optional sign-in next to a pasted token. The core serves `POST /api/providers/connections/{id}/authorize` and the anonymous `GET /api/providers/{plugin-id}/callback`, binds the plugin's one-time state to the browser in an `izboard-{plugin-id}-oauth` cookie, and drops `AuthorizationCredentialKeys` whenever other credentials change, unless the same update supplies them. `IsAuthorized` drives the connection's status. Use `ProviderManifest.SetupInstructions` for provider-specific setup text shown on the Connections page.
+- `IDashboardConnectionPlugin` lets one plugin serve sources configured on the dashboard itself. Unqualified source IDs are routed to it, `HasDashboardConnection` decides whether its sources are discovered, and `DashboardConnectionVersion` invalidates caches when the dashboard settings change. Home Assistant provides this for legacy dashboard host/token settings and the add-on; at most one plugin may implement it.
 
 To add a plugin:
 

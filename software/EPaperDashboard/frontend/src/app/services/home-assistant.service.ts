@@ -34,6 +34,12 @@ export class HomeAssistantService {
     );
   }
 
+  getConnectionDashboards(connectionId: string): Observable<any[]> {
+    return this.http.get<{ data: any[] }>(`/api/homeassistant/connections/${encodeURIComponent(connectionId)}/dashboards`).pipe(
+      map(response => response.data || [])
+    );
+  }
+
   getEntities(dashboardId: string): Observable<HassEntity[]> {
     return this.http.get<{ data: HassEntity[] }>(`/api/dashboards/${dashboardId}/homeassistant/designer/entity-metadata`).pipe(
       map(response => response.data || [])

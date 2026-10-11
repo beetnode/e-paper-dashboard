@@ -14,6 +14,7 @@ public static class HomeAssistantModule
         services.AddSingleton<HomeAssistantWeatherForecastProvider>();
         services.AddSingleton<HomeAssistantEntityHistoryProvider>();
         services.AddSingleton<HomeAssistantRssFeedDataProvider>();
+        services.AddSingleton<HomeAssistantDashboardTargetResolver>();
         services.AddSingleton<IDataProviderPlugin, HomeAssistantPlugin>();
         return services;
     }

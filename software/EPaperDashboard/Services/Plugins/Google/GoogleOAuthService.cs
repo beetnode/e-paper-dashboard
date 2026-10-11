@@ -11,7 +11,7 @@ namespace EPaperDashboard.Services.Plugins.Google;
 /// <summary>Per-connection OAuth clients, browser-bound one-time state, and encrypted refresh tokens.</summary>
 public sealed class GoogleOAuthService(ProviderConnectionStore connections, IHttpClientFactory clients, IMemoryCache cache)
 {
-    public const string CookieName = "izboard-google-oauth";
+    public const string RefreshTokenKey = "refreshToken";
     private const string Scopes = "https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/calendar.events.readonly https://www.googleapis.com/auth/tasks.readonly";
     private readonly object stateLock = new();
     private sealed record Pending(UserId Owner, string ConnectionId, string CredentialsVersion, string Verifier);
@@ -57,7 +57,7 @@ public sealed class GoogleOAuthService(ProviderConnectionStore connections, IHtt
         if (Scopes.Split(' ').Any(scope => !granted.Contains(scope))) return "Grant access to both Calendar and Tasks, then reconnect.";
         var refreshToken = String(token, "refresh_token");
         if (string.IsNullOrEmpty(refreshToken)) return "Google did not return offline access. Reconnect and grant access again.";
-        credentials["refreshToken"] = refreshToken;
+        credentials[RefreshTokenKey] = refreshToken;
         // Recheck after the network request, so deleting/editing a connection invalidates the pending sign-in.
         var current = connections.Find(pending.ConnectionId, pending.Owner);
         if (current is null || current.ProtectedCredentials != pending.CredentialsVersion) return "Connection changed. Start sign-in again.";
@@ -71,7 +71,7 @@ public sealed class GoogleOAuthService(ProviderConnectionStore connections, IHtt
         var key = "google-token:" + connection.Id + ":" + connection.ProtectedCredentials;
         if (cache.TryGetValue<string>(key, out var cached) && cached is not null) return Result.Success<string, string>(cached);
         var credentials = connections.Credentials(connection);
-        if (!credentials.TryGetValue("refreshToken", out var refresh) || string.IsNullOrEmpty(refresh))
+        if (!credentials.TryGetValue(RefreshTokenKey, out var refresh) || string.IsNullOrEmpty(refresh))
             return Result.Failure<string, string>("Connect this Google account from Connections first.");
         var result = await TokenRequest(credentials, new() { ["grant_type"] = "refresh_token", ["refresh_token"] = refresh }, ct);
         if (result.IsFailure) return Result.Failure<string, string>(result.Error);

@@ -46,9 +46,11 @@ export interface Dashboard {
   hasAccessToken: boolean;
   host?: string;
   path?: string;
+  /** Named Home Assistant connection used by 'HomeAssistant' rendering; null uses the dashboard host/token. */
+  homeAssistantConnectionId?: string | null;
   updateTimes?: string[];
   layoutConfig?: DashboardLayout;
-  renderingMode?: 'Custom' | 'HomeAssistant';
+  renderingMode?: RenderingMode;
   orientation?: DashboardOrientation;
   screenWidth: number;
   screenHeight: number;
@@ -61,12 +63,17 @@ export interface Dashboard {
   effectiveAiConfigMode?: AiConnectionMode;
 }
 
+export type RenderingMode = 'Custom' | 'HomeAssistant';
+
 export interface CreateDashboardRequest {
   name: string;
   description?: string;
   orientation?: DashboardOrientation;
   screenWidth?: number;
   screenHeight?: number;
+  renderingMode?: RenderingMode;
+  path?: string;
+  homeAssistantConnectionId?: string;
 }
 
 export interface UpdateDashboardRequest {
@@ -76,9 +83,11 @@ export interface UpdateDashboardRequest {
   clearAccessToken?: boolean;
   host?: string;
   path?: string;
+  /** Empty string switches back to the dashboard host/token settings. */
+  homeAssistantConnectionId?: string;
   updateTimes?: string[];
   layoutConfig?: DashboardLayout;
-  renderingMode?: 'Custom' | 'HomeAssistant';
+  renderingMode?: RenderingMode;
   orientation?: DashboardOrientation;
   screenWidth?: number;
   screenHeight?: number;

@@ -20,6 +20,11 @@ export interface ProviderManifest {
   id: string;
   name: string;
   requiresOAuth: boolean;
+  setupInstructions?: string | null;
+  /** The provider offers browser sign-in; mandatory only when requiresOAuth is set. */
+  supportsSignIn?: boolean;
+  /** Credentials that sign-in produces, so they are optional in the form. */
+  signInCredentialKeys?: string[];
   credentials: { key: string; label: string; secret: boolean }[];
 }
 export interface ProviderConnection {
@@ -37,7 +42,9 @@ export class DataProviderService {
   sources(dashboardId: string) { return this.http.get<{ data: DataSource[]; errors: string[] }>(`/api/dashboards/${dashboardId}/sources`); }
   getEntities(dashboardId: string) { return this.sources(dashboardId).pipe(map(r => r.data)); }
   save(id: string | null, body: { name: string; pluginId: string; credentials: Record<string, string> }) {
-    return id ? this.http.put(`/api/providers/connections/${id}`, body) : this.http.post('/api/providers/connections', body);
+    return id
+      ? this.http.put<{ data: ProviderConnection }>(`/api/providers/connections/${id}`, body)
+      : this.http.post<{ data: ProviderConnection }>('/api/providers/connections', body);
   }
   remove(id: string) { return this.http.delete(`/api/providers/connections/${id}`); }
   authorize(id: string) { return this.http.post<{ authUrl: string }>(`/api/providers/connections/${id}/authorize`, {}); }

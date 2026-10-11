@@ -1,4 +1,7 @@
+using System.Security.Cryptography;
+using System.Text;
 using CSharpFunctionalExtensions;
+using EPaperDashboard.Models;
 using EPaperDashboard.Services.Providers.HomeAssistant;
 namespace EPaperDashboard.Services.Plugins.HomeAssistant;
 
@@ -9,16 +12,51 @@ public sealed class HomeAssistantPlugin(
     HomeAssistantTodoDataProvider tasks,
     HomeAssistantWeatherForecastProvider weather,
     HomeAssistantEntityHistoryProvider history,
-    HomeAssistantRssFeedDataProvider feeds) : IDataProviderPlugin
+    HomeAssistantRssFeedDataProvider feeds,
+    IDeploymentStrategy deployment,
+    HomeAssistantAuthService auth,
+    ProviderConnectionStore connections) : IDashboardConnectionPlugin, IOAuthDataProviderPlugin
 {
+    private const string TokenKey = "token";
+
     public ProviderManifest Manifest { get; } = new("home-assistant", "Home Assistant",
-        [new("host", "Server URL"), new("token", "Long-lived access token", true)], Widgets: [new("home-assistant.weather", "weather"), new("home-assistant.forecast", "weather-forecast")]);
+        [new("host", "Server URL"), new(TokenKey, "Long-lived access token", true)], Widgets: [new("home-assistant.weather", "weather"), new("home-assistant.forecast", "weather-forecast")],
+        SetupInstructions: "Enter a server URL reachable from izBoard, then paste a long-lived access token or sign in with Home Assistant after saving.");
+
+    // Sign-in is optional: it creates a long-lived token, which can also be pasted.
+    public IReadOnlyCollection<string> AuthorizationCredentialKeys { get; } = [TokenKey];
+    public bool IsAuthorized(IReadOnlyDictionary<string, string> credentials) =>
+        credentials.TryGetValue(TokenKey, out var token) && !string.IsNullOrWhiteSpace(token);
+
+    public Result<(string Url, string State), string> StartAuthorization(ProviderConnection connection, HttpContext httpContext) =>
+        auth.StartConnectionAuth(connection, connections.Credentials(connection).GetValueOrDefault("host") ?? "", httpContext);
+
+    public async Task<UnitResult<string>> CompleteAuthorizationAsync(string? state, string? browserState, string? code, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(state) || state != browserState)
+            return UnitResult.Failure("Home Assistant sign-in expired or the browser does not match. Start again from Connections.");
+        var result = await auth.CompleteConnectionAuthAsync(code, state, cancellationToken);
+        if (result.IsFailure) return UnitResult.Failure(result.Error);
+        var connection = connections.Find(result.Value.ConnectionId, result.Value.Owner);
+        if (connection is null || connection.PluginId != Manifest.Id) return UnitResult.Failure("Connection no longer exists.");
+        var credentials = connections.Credentials(connection);
+        credentials[TokenKey] = result.Value.Token;
+        return connections.Update(connection, credentials)
+            ? UnitResult.Success<string>()
+            : UnitResult.Failure("Connection changed. Start sign-in again.");
+    }
+
+    // Dashboards keep their own host/token settings, and the add-on connects automatically.
+    public string DashboardConnectionName => "Dashboard Home Assistant";
+    public bool HasDashboardConnection(Dashboard dashboard) => deployment.IsAutoConnected || !string.IsNullOrEmpty(dashboard.AccessToken);
+    public string DashboardConnectionVersion(Dashboard dashboard) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes((dashboard.Host ?? "") + "|" + (dashboard.AccessToken ?? ""))));
 
     public string? ValidateCredentials(IReadOnlyDictionary<string, string> credentials) =>
         !credentials.TryGetValue("host", out var host) || !Uri.TryCreate(host, UriKind.Absolute, out var uri)
         || uri.Scheme is not ("http" or "https") || !string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment)
             ? "Enter an absolute HTTP or HTTPS Home Assistant server URL."
-            : !credentials.TryGetValue("token", out var token) || string.IsNullOrWhiteSpace(token) ? "An access token is required." : null;
+            : null;
 
     private static string Scope(ProviderContext context) => context.Connection is null ? context.DashboardId
         : HomeAssistantConnectionService.ConnectionScope(context.DashboardId, context.Connection.Id);

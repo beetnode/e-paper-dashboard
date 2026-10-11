@@ -77,7 +77,7 @@ import { Dashboard } from '../../models/types';
         <span class="app-empty-state-icon"><i class="fa-solid fa-table-cells-large" aria-hidden="true"></i></span>
         <div>
           <h2 class="h5 mb-1">Create your first dashboard</h2>
-          <p class="text-muted mb-0">Choose a display size, then add and arrange widgets in the designer.</p>
+          <p class="text-muted mb-0">Build a custom layout from widgets, or show an existing Home Assistant dashboard.</p>
         </div>
         <a routerLink="/dashboards/create" class="btn btn-primary"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i> Create dashboard</a>
       </div>

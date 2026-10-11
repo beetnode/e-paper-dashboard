@@ -20,8 +20,10 @@ import { DataProviderService, ProviderConnection, ProviderManifest } from '../..
               <p class="text-muted mb-2">{{ pluginName(connection.pluginId) }} · {{ connection.connected ? 'Configured' : 'Sign-in required' }}</p>
               <div class="d-flex flex-wrap gap-2">
                 <button class="btn btn-outline-secondary btn-sm" [disabled]="busy()" (click)="edit(connection)">Edit</button>
-                @if (requiresOAuth(connection.pluginId)) {
-                  <button class="btn btn-primary btn-sm" [disabled]="busy()" (click)="authorize(connection)">{{ connection.connected ? 'Reconnect Google' : 'Connect Google' }}</button>
+                @if (supportsSignIn(connection.pluginId)) {
+                  <button class="btn btn-sm" [ngClass]="connection.connected ? 'btn-outline-primary' : 'btn-primary'" [disabled]="busy()" (click)="authorize(connection)">
+                    {{ connection.connected ? 'Sign in again' : 'Sign in' }} to {{ pluginName(connection.pluginId) }}
+                  </button>
                 }
                 <button class="btn btn-outline-danger btn-sm" [disabled]="busy()" (click)="remove(connection)">Remove</button>
               </div>
@@ -42,16 +44,19 @@ import { DataProviderService, ProviderConnection, ProviderManifest } from '../..
               @for (field of plugin.credentials; track field.key) {
                 <label class="form-label" [for]="field.key">{{ field.label }}</label>
                 <input class="form-control mb-3" [id]="field.key" [name]="field.key" [type]="field.secret ? 'password' : 'text'"
-                  [(ngModel)]="credentials[field.key]" [required]="!editingId || !field.secret" autocomplete="off"
-                  [placeholder]="editingId && field.secret ? 'Leave blank to keep saved value' : ''" />
+                  [(ngModel)]="credentials[field.key]" [required]="isRequired(plugin, field)" autocomplete="off"
+                  [placeholder]="placeholder(plugin, field)" />
               }
+              @if (plugin.setupInstructions) { <p class="small">{{ plugin.setupInstructions }}</p> }
               @if (plugin.requiresOAuth) {
-                <p class="small">Use your own Google Cloud OAuth client (Web application). Enable Calendar and Tasks APIs, add your account as a test user if needed, and register this redirect URI:</p>
-                <code class="small text-break mb-3">{{ callbackUrl }}</code>
-                <p class="small text-muted">Use HTTPS, or localhost for development. After saving, choose Connect Google and allow Calendar and Tasks access. Changing credentials requires reconnecting.</p>
+                <p class="small mb-1">Register this redirect URI with the provider:</p>
+                <code class="d-block small text-break mb-3">{{ callbackUrl(plugin.id) }}</code>
               }
             }
-            <div class="d-flex gap-2"><button class="btn btn-primary" type="submit" [disabled]="busy() || loading()">{{ busy() ? 'Saving…' : 'Save connection' }}</button>
+            <div class="d-flex flex-wrap gap-2"><button class="btn btn-primary" type="submit" [disabled]="busy() || loading()">{{ busy() ? 'Saving…' : 'Save connection' }}</button>
+              @if (selectedPlugin()?.supportsSignIn) {
+                <button class="btn btn-outline-primary" type="button" [disabled]="busy() || loading()" (click)="save(true)">Save and sign in</button>
+              }
               @if (editingId) { <button class="btn btn-outline-secondary" type="button" (click)="reset()">Cancel</button> }
             </div>
           </form>
@@ -72,16 +77,31 @@ export class ProviderConnectionsComponent implements OnInit {
   name = '';
   editingId: string | null = null;
   credentials: Record<string, string> = {};
-  readonly callbackUrl = new URL('api/providers/google/callback', document.baseURI).href;
+  callbackUrl(pluginId: string) { return new URL(`api/providers/${encodeURIComponent(pluginId)}/callback`, document.baseURI).href; }
   ngOnInit() {
-    this.api.plugins().subscribe({ next: plugins => this.plugins.set(plugins), error: e => this.fail(e) });
+    const query = new URLSearchParams(location.search);
+    const connected = query.get('connected');
+    this.api.plugins().subscribe({
+      next: plugins => {
+        this.plugins.set(plugins);
+        if (connected && plugins.some(p => p.id === connected)) this.notice.set(`${this.pluginName(connected)} connected.`);
+      },
+      error: e => this.fail(e),
+    });
     this.load();
-    this.error.set(new URLSearchParams(location.search).get('error') ?? '');
-    if (new URLSearchParams(location.search).get('connected') === 'google') this.notice.set('Google account connected.');
+    this.error.set(query.get('error') ?? '');
   }
   selectedPlugin() { return this.plugins().find(p => p.id === this.pluginId); }
   pluginName(id: string) { return this.plugins().find(p => p.id === id)?.name ?? id; }
-  requiresOAuth(id: string) { return this.plugins().find(p => p.id === id)?.requiresOAuth; }
+  supportsSignIn(id: string) { return !!this.plugins().find(p => p.id === id)?.supportsSignIn; }
+  private fromSignIn(plugin: ProviderManifest, key: string) { return !!plugin.signInCredentialKeys?.includes(key); }
+  isRequired(plugin: ProviderManifest, field: { key: string; secret: boolean }) {
+    return !this.fromSignIn(plugin, field.key) && (!this.editingId || !field.secret);
+  }
+  placeholder(plugin: ProviderManifest, field: { key: string; secret: boolean }) {
+    if (this.editingId && field.secret) return 'Leave blank to keep saved value';
+    return this.fromSignIn(plugin, field.key) ? 'Optional: or sign in after saving' : '';
+  }
   @HostListener('window:focus')
   refreshOnFocus() { if (!this.busy()) this.load(); }
   load() {
@@ -92,18 +112,32 @@ export class ProviderConnectionsComponent implements OnInit {
     this.credentials = { ...connection.credentials }; this.error.set(''); this.notice.set('');
   }
   reset() { this.editingId = null; this.name = ''; this.credentials = {}; }
-  save() {
+  save(signIn = false) {
+    // The sign-in tab must open in the click handler, before any request, or pop-up blockers stop it.
+    const popup = signIn ? this.openSignInWindow(this.pluginId) : null;
+    if (signIn && !popup) return;
     this.busy.set(true); this.error.set(''); this.notice.set('');
     this.api.save(this.editingId, { name: this.name, pluginId: this.pluginId, credentials: this.credentials }).subscribe({
-      next: () => { this.busy.set(false); this.reset(); this.load(); this.notice.set('Connection saved.'); }, error: e => this.fail(e),
+      next: response => {
+        this.busy.set(false); this.reset(); this.load(); this.notice.set('Connection saved.');
+        if (popup && response?.data) this.startSignIn(response.data.id, popup);
+      },
+      error: e => { popup?.close(); this.fail(e); },
     });
   }
   authorize(connection: ProviderConnection) {
+    const popup = this.openSignInWindow(connection.pluginId);
+    if (popup) this.startSignIn(connection.id, popup);
+  }
+  private openSignInWindow(pluginId: string): Window | null {
     const popup = window.open('about:blank', '_blank');
-    if (!popup) { this.error.set('Allow pop-ups to connect your Google account.'); return; }
+    if (!popup) { this.error.set('Allow pop-ups to sign in to ' + this.pluginName(pluginId) + '.'); return null; }
     popup.opener = null;
+    return popup;
+  }
+  private startSignIn(connectionId: string, popup: Window) {
     this.busy.set(true); this.error.set('');
-    this.api.authorize(connection.id).subscribe({
+    this.api.authorize(connectionId).subscribe({
       next: result => { popup.location.href = result.authUrl; this.busy.set(false); },
       error: e => { popup.close(); this.fail(e); },
     });

@@ -3,13 +3,15 @@ using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 using EPaperDashboard.Services;
 using EPaperDashboard.Models;
+using EPaperDashboard.Services.Plugins.HomeAssistant;
 
 namespace EPaperDashboard.Controllers;
 
 [ApiController]
 [Route("api/dashboards")]
 [Authorize]
-public class DashboardApiController(DashboardService dashboardService, UserService userService, IDeploymentStrategy deploymentStrategy) : BaseApiController
+public class DashboardApiController(DashboardService dashboardService, UserService userService, IDeploymentStrategy deploymentStrategy,
+    HomeAssistantDashboardTargetResolver homeAssistantTargets) : BaseApiController
 {
     private readonly DashboardService _dashboardService = dashboardService;
     private readonly UserService _userService = userService;
@@ -95,6 +97,23 @@ public class DashboardApiController(DashboardService dashboardService, UserServi
             dashboard.ScreenHeight = preset.Height;
         }
 
+        if (request.RenderingMode != null)
+        {
+            if (!Enum.TryParse<RenderingMode>(request.RenderingMode, out var renderingMode))
+            {
+                return BadRequest(new { message = "Invalid rendering mode." });
+            }
+            dashboard.RenderingMode = renderingMode;
+        }
+
+        if (request.Path != null) dashboard.Path = request.Path.Trim();
+
+        var connectionError = ApplyHomeAssistantConnection(dashboard, request.HomeAssistantConnectionId);
+        if (connectionError != null)
+        {
+            return BadRequest(new { message = connectionError });
+        }
+
         _dashboardService.AddDashboard(dashboard);
 
         return Ok(DashboardResponseDto.FromDashboard(dashboard, _deploymentStrategy.IsAutoConnected, ResolveEffectiveAiConfigMode(dashboard)));
@@ -134,15 +153,19 @@ public class DashboardApiController(DashboardService dashboardService, UserServi
         
         if (request.Host != null) updatedDashboard.Host = request.Host;
         if (request.Path != null) updatedDashboard.Path = request.Path;
+        var connectionError = ApplyHomeAssistantConnection(updatedDashboard, request.HomeAssistantConnectionId);
+        if (connectionError != null)
+        {
+            return BadRequest(new { message = connectionError });
+        }
         if (request.UpdateTimes != null) updatedDashboard.UpdateTimes = request.UpdateTimes;
         if (request.LayoutConfig != null) updatedDashboard.LayoutConfig = request.LayoutConfig;
         
-        if (request.RenderingMode != null)
+        // The dashboard type is chosen at creation; an update may only repeat it.
+        if (request.RenderingMode != null
+            && (!Enum.TryParse<RenderingMode>(request.RenderingMode, out var renderingMode) || renderingMode != updatedDashboard.RenderingMode))
         {
-            if (Enum.TryParse<RenderingMode>(request.RenderingMode, out var renderingMode))
-            {
-                updatedDashboard.RenderingMode = renderingMode;
-            }
+            return BadRequest(new { message = "The dashboard type cannot be changed after creation." });
         }
 
         if (request.Orientation != null)
@@ -204,6 +227,31 @@ public class DashboardApiController(DashboardService dashboardService, UserServi
         return Ok(new { message = "Dashboard deleted successfully." });
     }
 
+    /// <summary>
+    /// Null leaves the connection unchanged; an empty value switches back to the dashboard's own host/token settings.
+    /// </summary>
+    private string? ApplyHomeAssistantConnection(Dashboard dashboard, string? connectionId)
+    {
+        if (connectionId == null)
+        {
+            return null;
+        }
+
+        if (connectionId.Length == 0)
+        {
+            dashboard.HomeAssistantConnectionId = null;
+            return null;
+        }
+
+        if (homeAssistantTargets.FindConnection(connectionId, CurrentUserId) == null)
+        {
+            return "Home Assistant connection not found.";
+        }
+
+        dashboard.HomeAssistantConnectionId = connectionId;
+        return null;
+    }
+
     private bool HasEffectiveAiConfig(Dashboard dashboard)
     {
         return ResolveEffectiveAiConfigMode(dashboard) != AiConnectionMode.None.ToString();
@@ -226,7 +274,15 @@ public class DashboardApiController(DashboardService dashboardService, UserServi
     }
 }
 
-public record CreateDashboardRequest(string Name, string? Description, string? Orientation, int? ScreenWidth, int? ScreenHeight);
+public record CreateDashboardRequest(
+    string Name,
+    string? Description,
+    string? Orientation,
+    int? ScreenWidth,
+    int? ScreenHeight,
+    string? RenderingMode = null,
+    string? Path = null,
+    string? HomeAssistantConnectionId = null);
 
 public record UpdateDashboardRequest(
     string? Name,
@@ -244,7 +300,8 @@ public record UpdateDashboardRequest(
     AiConfig? AiConfig,
     bool? IsAiEnabled,
     string? AiPrompt,
-    int? AiLeadTimeMinutes
+    int? AiLeadTimeMinutes,
+    string? HomeAssistantConnectionId = null
 );
 
 public record DashboardResponseDto(
@@ -255,6 +312,7 @@ public record DashboardResponseDto(
     bool HasAccessToken,
     string? Host,
     string? Path,
+    string? HomeAssistantConnectionId,
     List<TimeOnly>? UpdateTimes,
     LayoutConfig? LayoutConfig,
     string? RenderingMode,
@@ -278,6 +336,7 @@ public record DashboardResponseDto(
         HasAccessToken: isAutoConnected || !string.IsNullOrWhiteSpace(dashboard.AccessToken),
         Host: dashboard.Host,
         Path: dashboard.Path,
+        HomeAssistantConnectionId: dashboard.HomeAssistantConnectionId,
         UpdateTimes: dashboard.UpdateTimes,
         LayoutConfig: dashboard.LayoutConfig,
         RenderingMode: dashboard.RenderingMode.ToString(),

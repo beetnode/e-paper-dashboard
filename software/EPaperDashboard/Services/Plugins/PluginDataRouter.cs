@@ -11,7 +11,6 @@ public sealed class PluginDataRouter(
     DashboardService dashboards,
     ProviderConnectionStore connections,
     ProviderRegistry registry,
-    IDeploymentStrategy deployment,
     ILogger<PluginDataRouter> logger) : IEntityStateProvider, ICalendarDataProvider, ITodoDataProvider,
     IWeatherForecastProvider, IEntityHistoryProvider, IRssFeedDataProvider
 {
@@ -27,8 +26,7 @@ public sealed class PluginDataRouter(
         var dashboard = Dashboard(dashboardId);
         if (dashboard.IsFailure) return "missing";
         return dashboard.Value.UserId + ":" + connections.CacheVersion(dashboard.Value.UserId) + ":" +
-            Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(
-                (dashboard.Value.Host ?? "") + "|" + (dashboard.Value.AccessToken ?? ""))));
+            (registry.DashboardConnectionPlugin?.DashboardConnectionVersion(dashboard.Value) ?? "");
     }
 
     public async Task<SourceDiscovery> DiscoverAsync(string dashboardId, CancellationToken cancellationToken)
@@ -37,20 +35,21 @@ public sealed class PluginDataRouter(
         if (dashboard.IsFailure) return new([], [dashboard.Error]);
         var contexts = connections.List(dashboard.Value.UserId)
             .Select(c => (Plugin: registry.Find(c.PluginId), Context: new ProviderContext(dashboardId, c))).ToList();
-        if (deployment.IsAutoConnected || !string.IsNullOrEmpty(dashboard.Value.AccessToken))
-            contexts.Insert(0, (registry.Find("home-assistant"), new(dashboardId, null)));
+        var dashboardPlugin = registry.DashboardConnectionPlugin;
+        if (dashboardPlugin is not null && dashboardPlugin.HasDashboardConnection(dashboard.Value))
+            contexts.Insert(0, (dashboardPlugin, new(dashboardId, null)));
         var sources = new List<DataSource>();
         var errors = new List<string>();
         foreach (var (plugin, context) in contexts)
         {
             if (plugin is null) { errors.Add($"{context.Connection?.Name}: plugin is unavailable"); continue; }
             var result = await SafeAsync(() => plugin.DiscoverAsync(context, cancellationToken), cancellationToken);
-            if (result.IsFailure) { errors.Add($"{context.Connection?.Name ?? "Dashboard Home Assistant"}: {result.Error}"); continue; }
+            if (result.IsFailure) { errors.Add($"{ConnectionName(context)}: {result.Error}"); continue; }
             sources.AddRange(result.Value.Select(source => source with
             {
                 EntityId = context.Connection is null ? source.EntityId : SourceReference.Create(context.Connection.Id, source.EntityId),
                 PluginId = plugin.Manifest.Id, ConnectionId = context.Connection?.Id,
-                ConnectionName = context.Connection?.Name ?? "Dashboard Home Assistant"
+                ConnectionName = ConnectionName(context)
             }));
         }
         return new(sources, errors);
@@ -69,11 +68,18 @@ public sealed class PluginDataRouter(
             if (connection is null) return "Source connection is unavailable";
             query = query with { SourceId = sourceId };
         }
-        var plugin = registry.Find(connection?.PluginId ?? "home-assistant");
+        var plugin = Plugin(connection);
         if (plugin is null) return "Source plugin is unavailable";
         if (requiredPluginId is not null && plugin.Manifest.Id != requiredPluginId) return "This widget requires a source from its own plugin";
         return await SafeAsync(() => plugin.FetchAsync(new(dashboardId, connection), query, cancellationToken), cancellationToken);
     }
+
+    // Bare source IDs belong to the dashboard's own connection, served by the dashboard-connection plugin.
+    private IDataProviderPlugin? Plugin(ProviderConnection? connection) =>
+        connection is null ? registry.DashboardConnectionPlugin : registry.Find(connection.PluginId);
+
+    private string ConnectionName(ProviderContext context) =>
+        context.Connection?.Name ?? registry.DashboardConnectionPlugin?.DashboardConnectionName ?? "Dashboard connection";
 
     private async Task<Result<T, string>> SafeAsync<T>(Func<Task<Result<T, string>>> operation, CancellationToken cancellationToken)
     {
@@ -118,7 +124,7 @@ public sealed class PluginDataRouter(
                 connection = connections.Find(group.Key, dashboard.Value.UserId);
                 if (connection is null) return "Source connection is unavailable";
             }
-            var plugin = registry.Find(connection?.PluginId ?? "home-assistant");
+            var plugin = Plugin(connection);
             if (plugin is null) return "Source plugin is unavailable";
             var mapping = new Dictionary<string, string>();
             foreach (var id in group)

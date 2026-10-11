@@ -47,6 +47,20 @@ public sealed class GooglePluginTests : IDisposable
     { access_token = "access", refresh_token = "refresh", expires_in = 3600, scope }));
 
     [Fact]
+    public async Task PluginExposesSignInThroughTheGenericOAuthContract()
+    {
+        new ProviderRegistry([plugin]).Find("google").Should().BeAssignableTo<IOAuthDataProviderPlugin>();
+        plugin.IsAuthorized(credentials).Should().BeFalse();
+        var (_, state) = plugin.StartAuthorization(connection, new Microsoft.AspNetCore.Http.DefaultHttpContext()).Value;
+        Token();
+        (await plugin.CompleteAuthorizationAsync(state, state, "code", default)).IsSuccess.Should().BeTrue();
+        var saved = store.Credentials(store.Find(connection.Id, connection.UserId)!);
+        plugin.IsAuthorized(saved).Should().BeTrue();
+        plugin.AuthorizationCredentialKeys.Should().BeEquivalentTo(saved.Keys.Except(credentials.Keys));
+        (await plugin.CompleteAuthorizationAsync(state, state, "code", default)).IsFailure.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task AuthorizationIsBrowserBoundOneTimeAndUsesTheUsersClientCredentials()
     {
         var (url, state) = oauth.Start(connection);

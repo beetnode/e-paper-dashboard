@@ -1,19 +1,27 @@
 using EPaperDashboard.Guards;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services.Plugins;
-using EPaperDashboard.Services.Plugins.Google;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EPaperDashboard.Controllers;
 
 [ApiController, Authorize, Route("api/providers")]
-public sealed class ProviderConnectionsController(ProviderRegistry registry, ProviderConnectionStore connections, GoogleOAuthService google, Services.UserService users) : BaseApiController
+public sealed class ProviderConnectionsController(ProviderRegistry registry, ProviderConnectionStore connections, Services.UserService users) : BaseApiController
 {
     private bool HasAccount => CurrentUserId != UserId.Empty && (IsHomeAssistantIngress || users.GetUserById(CurrentUserId).HasValue);
 
     [HttpGet]
-    public IActionResult Plugins() => Ok(new { data = registry.Manifests });
+    public IActionResult Plugins() => Ok(new
+    {
+        data = registry.Plugins.Select(plugin => new
+        {
+            plugin.Manifest.Id, plugin.Manifest.Name, plugin.Manifest.Credentials, plugin.Manifest.RequiresOAuth,
+            plugin.Manifest.Widgets, plugin.Manifest.SetupInstructions,
+            SupportsSignIn = plugin is IOAuthDataProviderPlugin,
+            SignInCredentialKeys = (plugin as IOAuthDataProviderPlugin)?.AuthorizationCredentialKeys ?? []
+        })
+    });
 
     [HttpGet("connections")]
     public IActionResult List() => HasAccount ? Ok(new { data = connections.List(CurrentUserId).Select(View) }) : Forbid();
@@ -42,12 +50,14 @@ public sealed class ProviderConnectionsController(ProviderRegistry registry, Pro
         var plugin = registry.Find(connection.PluginId);
         if (plugin is null || request.PluginId != connection.PluginId) return BadRequest(new { message = "The provider cannot be changed." });
         var credentials = connections.Credentials(connection);
-        var changed = false;
+        var changed = new HashSet<string>();
         foreach (var (key, value) in AllowedCredentials(plugin, request.Credentials))
-            if (!string.IsNullOrWhiteSpace(value) && credentials.GetValueOrDefault(key) != value) { credentials[key] = value; changed = true; }
+            if (!string.IsNullOrWhiteSpace(value) && credentials.GetValueOrDefault(key) != value) { credentials[key] = value; changed.Add(key); }
         var error = Validate(plugin, request.Name, credentials);
         if (error is not null) return BadRequest(new { message = error });
-        if (changed) credentials.Remove("refreshToken");
+        // Authorization belongs to the previous settings, unless this update supplies it directly.
+        if (changed.Count > 0 && plugin is IOAuthDataProviderPlugin oauth)
+            foreach (var key in oauth.AuthorizationCredentialKeys.Where(key => !changed.Contains(key))) credentials.Remove(key);
         connection.Name = request.Name.Trim();
         if (!connections.Update(connection, credentials)) return Conflict(new { message = "Connection changed. Reload and try again." });
         return Ok(new { data = View(connection) });
@@ -63,26 +73,34 @@ public sealed class ProviderConnectionsController(ProviderRegistry registry, Pro
     }
 
     [HttpPost("connections/{id}/authorize")]
-    public IActionResult AuthorizeGoogle(string id)
+    public IActionResult Authorize(string id)
     {
         if (!HasAccount) return Forbid();
         var connection = connections.Find(id, CurrentUserId);
         if (connection is null) return NotFound();
-        if (connection.PluginId != "google") return BadRequest(new { message = "This provider does not use Google sign-in." });
-        var (url, state) = google.Start(connection);
-        Response.Cookies.Append(GoogleOAuthService.CookieName, state, new CookieOptions
+        if (registry.Find(connection.PluginId) is not IOAuthDataProviderPlugin plugin)
+            return BadRequest(new { message = "This provider does not use sign-in." });
+        var start = plugin.StartAuthorization(connection, HttpContext);
+        if (start.IsFailure) return BadRequest(new { message = start.Error });
+        var (url, state) = start.Value;
+        Response.Cookies.Append(StateCookie(plugin.Manifest.Id), state, new CookieOptions
         { HttpOnly = true, Secure = Request.IsHttps, SameSite = SameSiteMode.Lax, MaxAge = TimeSpan.FromMinutes(10), Path = "/", IsEssential = true });
         return Ok(new { authUrl = url });
     }
 
-    [AllowAnonymous, HttpGet("google/callback")]
-    public async Task<IActionResult> Callback([FromQuery] string? state, [FromQuery] string? code)
+    [AllowAnonymous, HttpGet("{pluginId}/callback")]
+    public async Task<IActionResult> Callback(string pluginId, [FromQuery] string? state, [FromQuery] string? code)
     {
-        var result = await google.CompleteAsync(state, Request.Cookies[GoogleOAuthService.CookieName], code, HttpContext.RequestAborted);
-        Response.Cookies.Delete(GoogleOAuthService.CookieName, new CookieOptions { Path = "/" });
+        if (registry.Find(pluginId) is not IOAuthDataProviderPlugin plugin) return NotFound();
+        var cookie = StateCookie(plugin.Manifest.Id);
+        var result = await plugin.CompleteAuthorizationAsync(state, Request.Cookies[cookie], code, HttpContext.RequestAborted);
+        Response.Cookies.Delete(cookie, new CookieOptions { Path = "/" });
         if (result.IsFailure) return LocalRedirect("~/connections?error=" + Uri.EscapeDataString(result.Error));
-        return LocalRedirect("~/connections?connected=google");
+        return LocalRedirect("~/connections?connected=" + Uri.EscapeDataString(plugin.Manifest.Id));
     }
+
+    // Binds the one-time authorization state to the browser that started sign-in.
+    internal static string StateCookie(string pluginId) => $"izboard-{pluginId}-oauth";
 
     private object View(ProviderConnection connection)
     {
@@ -91,7 +109,7 @@ public sealed class ProviderConnectionsController(ProviderRegistry registry, Pro
         return new
         {
             connection.Id, connection.Name, connection.PluginId,
-            connected = plugin?.Manifest.RequiresOAuth != true || credentials.ContainsKey("refreshToken"),
+            connected = plugin is not IOAuthDataProviderPlugin oauth || oauth.IsAuthorized(credentials),
             credentials = plugin?.Manifest.Credentials.Where(field => !field.Secret)
                 .ToDictionary(field => field.Key, field => credentials.GetValueOrDefault(field.Key) ?? "")
         };

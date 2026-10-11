@@ -28,7 +28,8 @@ public sealed class ProviderPluginTests : IDisposable
     private readonly LiteDbDashboardRepository dashboards;
     private readonly Dashboard dashboard = new() { Id = DashboardId.New(), UserId = UserId.New() };
     private readonly FakePlugin plugin = new("example");
-    private readonly FakePlugin legacy = new("home-assistant");
+    private readonly FakeDashboardPlugin legacy = new("dashboard-provider");
+    private readonly FakeOAuthPlugin oauthPlugin = new("signin");
     private readonly PluginDataRouter router;
 
     public ProviderPluginTests()
@@ -42,13 +43,13 @@ public sealed class ProviderPluginTests : IDisposable
         dashboards = new(db);
         dashboards.Insert(dashboard);
         new LiteDbUserRepository(db).Insert(new User { Id = dashboard.UserId, Username = "owner" });
-        router = new(new DashboardService(dashboards), connections, new ProviderRegistry([plugin, legacy]),
-            Mock.Of<IDeploymentStrategy>(), NullLogger<PluginDataRouter>.Instance);
+        router = new(new DashboardService(dashboards), connections, new ProviderRegistry([plugin, legacy, oauthPlugin]),
+            NullLogger<PluginDataRouter>.Instance);
     }
 
-    private ProviderConnection Add(UserId? owner = null, string name = "Personal")
+    private ProviderConnection Add(UserId? owner = null, string name = "Personal", string pluginId = "example")
     {
-        var connection = new ProviderConnection { UserId = owner ?? dashboard.UserId, PluginId = "example", Name = name };
+        var connection = new ProviderConnection { UserId = owner ?? dashboard.UserId, PluginId = pluginId, Name = name };
         connections.Create(connection, new() { ["secret"] = "test-private-token" });
         return connection;
     }
@@ -188,7 +189,7 @@ public sealed class ProviderPluginTests : IDisposable
 
     private ProviderConnectionsController Controller()
     {
-        var controller = new ProviderConnectionsController(new ProviderRegistry([plugin, legacy]), connections, null!,
+        var controller = new ProviderConnectionsController(new ProviderRegistry([plugin, legacy, oauthPlugin]), connections,
             new UserService(new LiteDbUserRepository(db), dashboards, repository));
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext
         {
@@ -218,17 +219,136 @@ public sealed class ProviderPluginTests : IDisposable
         var controller = Controller();
         controller.Update(foreign.Id, new("example", "Changed", [])).Should().BeOfType<NotFoundResult>();
         controller.Delete(foreign.Id).Should().BeOfType<NotFoundResult>();
-        controller.AuthorizeGoogle(foreign.Id).Should().BeOfType<NotFoundResult>();
+        controller.Authorize(foreign.Id).Should().BeOfType<NotFoundResult>();
         new LiteDbUserRepository(db).Delete(dashboard.UserId);
         controller.Create(new("example", "No account", [])).Should().BeOfType<ForbidResult>();
         controller.List().Should().BeOfType<ForbidResult>();
     }
 
+    [Fact]
+    public async Task DashboardConnectionIsDiscoveredOnlyWhenThePluginReportsIt()
+    {
+        (await router.DiscoverAsync(dashboard.Id.Value, default)).Sources.Should().BeEmpty();
+        dashboard.AccessToken = "dashboard-token";
+        dashboards.Update(dashboard);
+        var discovery = await router.DiscoverAsync(dashboard.Id.Value, default);
+        var source = discovery.Sources.Should().ContainSingle().Subject;
+        source.EntityId.Should().Be("calendar/primary");
+        source.PluginId.Should().Be("dashboard-provider");
+        source.ConnectionId.Should().BeNull();
+        source.ConnectionName.Should().Be("Dashboard dashboard-provider");
+    }
+
+    [Fact]
+    public void CacheVersionChangesWhenTheDashboardConnectionChanges()
+    {
+        var initial = router.CacheVersion(dashboard.Id.Value);
+        dashboard.AccessToken = "rotated";
+        dashboards.Update(dashboard);
+        router.CacheVersion(dashboard.Id.Value).Should().NotBe(initial);
+    }
+
+    [Fact]
+    public async Task BareSourceIdsFailWithoutADashboardConnectionPlugin()
+    {
+        var sut = new PluginDataRouter(new DashboardService(dashboards), connections, new ProviderRegistry([plugin]), NullLogger<PluginDataRouter>.Instance);
+        (await sut.FetchCalendarEventsAsync(dashboard.Id.Value, "calendar.home")).IsFailure.Should().BeTrue();
+        (await sut.FetchEntityStatesAsync(dashboard.Id.Value, ["sensor.home"])).IsFailure.Should().BeTrue();
+        plugin.Fetches.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void RegistryRejectsAmbiguousDashboardConnectionsAndInconsistentOAuthManifests()
+    {
+        var twoDashboardPlugins = () => new ProviderRegistry([legacy, new FakeDashboardPlugin("other")]);
+        twoDashboardPlugins.Should().Throw<InvalidOperationException>();
+        var oauthWithoutContract = () => new ProviderRegistry([new FakePlugin("plain", requiresOAuth: true)]);
+        oauthWithoutContract.Should().Throw<InvalidOperationException>();
+        new ProviderRegistry([plugin, legacy]).DashboardConnectionPlugin.Should().BeSameAs(legacy);
+    }
+
+    [Fact]
+    public void AuthorizeRejectsProvidersWithoutSignIn()
+    {
+        var connection = Add();
+        Controller().Authorize(connection.Id).Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public void AuthorizeStartsPluginSignInAndBindsStateToTheBrowser()
+    {
+        var connection = Add(pluginId: "signin");
+        var controller = Controller();
+        var result = controller.Authorize(connection.Id).Should().BeOfType<OkObjectResult>().Subject;
+        JsonSerializer.Serialize(result.Value).Should().Contain("https://signin.test/authorize");
+        oauthPlugin.Started.Should().ContainSingle().Which.Id.Should().Be(connection.Id);
+        controller.Response.Headers.SetCookie.ToString().Should().Contain("izboard-signin-oauth=state-1").And.Contain("httponly");
+    }
+
+    [Fact]
+    public async Task CallbackCompletesSignInForTheNamedPluginOnly()
+    {
+        var controller = Controller();
+        controller.ControllerContext.HttpContext.Request.Headers.Cookie = "izboard-signin-oauth=state-1";
+        (await controller.Callback("example", "state-1", "code")).Should().BeOfType<NotFoundResult>();
+        (await controller.Callback("unknown", "state-1", "code")).Should().BeOfType<NotFoundResult>();
+        oauthPlugin.Completions.Should().BeEmpty();
+        var redirect = (await controller.Callback("signin", "state-1", "code")).Should().BeOfType<LocalRedirectResult>().Subject;
+        redirect.Url.Should().Be("~/connections?connected=signin");
+        oauthPlugin.Completions.Should().ContainSingle().Which.Should().Be(("state-1", "state-1", "code"));
+        oauthPlugin.Fail = true;
+        var failure = (await controller.Callback("signin", "state-1", "code")).Should().BeOfType<LocalRedirectResult>().Subject;
+        failure.Url.Should().StartWith("~/connections?error=");
+    }
+
+    [Fact]
+    public void ChangingUserCredentialsDiscardsOnlyAuthorizationCredentials()
+    {
+        var connection = Add(pluginId: "signin");
+        var credentials = connections.Credentials(connection);
+        credentials["token"] = "granted";
+        connections.Update(connection, credentials).Should().BeTrue();
+        var controller = Controller();
+        JsonSerializer.Serialize(((OkObjectResult)controller.List()).Value).Should().Contain("\"connected\":true");
+        controller.Update(connection.Id, new("signin", "Renamed", new() { ["secret"] = "" })).Should().BeOfType<OkObjectResult>();
+        connections.Credentials(connections.Find(connection.Id, dashboard.UserId)!).Should().ContainKey("token");
+        controller.Update(connection.Id, new("signin", "Renamed", new() { ["secret"] = "new-secret" })).Should().BeOfType<OkObjectResult>();
+        var saved = connections.Credentials(connections.Find(connection.Id, dashboard.UserId)!);
+        saved.Should().NotContainKey("token");
+        saved["secret"].Should().Be("new-secret");
+        JsonSerializer.Serialize(((OkObjectResult)controller.List()).Value).Should().Contain("\"connected\":false");
+    }
+
+    [Fact]
+    public void UpdateThatSuppliesAuthorizationCredentialsKeepsThem()
+    {
+        var connection = Add(pluginId: "signin");
+        var controller = Controller();
+        controller.Update(connection.Id, new("signin", "Renamed", new() { ["secret"] = "new-secret", ["token"] = "pasted" }))
+            .Should().BeOfType<OkObjectResult>();
+        var saved = connections.Credentials(connections.Find(connection.Id, dashboard.UserId)!);
+        saved["token"].Should().Be("pasted");
+        saved["secret"].Should().Be("new-secret");
+    }
+
+    [Fact]
+    public void PluginListAdvertisesSignInSupport()
+    {
+        var serialized = JsonSerializer.Serialize(((OkObjectResult)Controller().Plugins()).Value);
+        serialized.Should().Contain("\"Id\":\"signin\"");
+        using var document = JsonDocument.Parse(serialized);
+        var plugins = document.RootElement.GetProperty("data").EnumerateArray().ToDictionary(p => p.GetProperty("Id").GetString()!);
+        plugins["signin"].GetProperty("SupportsSignIn").GetBoolean().Should().BeTrue();
+        plugins["signin"].GetProperty("SignInCredentialKeys").EnumerateArray().Select(k => k.GetString()).Should().Equal("token");
+        plugins["example"].GetProperty("SupportsSignIn").GetBoolean().Should().BeFalse();
+    }
+
     public void Dispose() { db.Dispose(); Directory.Delete(directory, true); }
 
-    private sealed class FakePlugin(string id) : IDataProviderPlugin
+    private class FakePlugin(string id, bool requiresOAuth = false, bool tokenField = false) : IDataProviderPlugin
     {
-        public ProviderManifest Manifest { get; } = new(id, id, [new("secret", "Secret", true)], Widgets: [new(id + ".custom")]);
+        public ProviderManifest Manifest { get; } = new(id, id,
+            tokenField ? [new("secret", "Secret", true), new("token", "Token", true)] : [new("secret", "Secret", true)], requiresOAuth, Widgets: [new(id + ".custom")]);
         public PluginWidgetRequest? GetWidgetDataRequest(EPaperDashboard.Models.Rendering.WidgetConfigEntry widget) => new(widget.Config.GetProperty("source").GetString()!, "custom");
         public List<ProviderContext> Fetches { get; } = [];
         public string? ValidateCredentials(IReadOnlyDictionary<string, string> credentials) => null;
@@ -238,6 +358,32 @@ public sealed class ProviderPluginTests : IDisposable
         {
             Fetches.Add(context);
             return Task.FromResult(Result.Success<SourceData, string>(new() { CalendarEvents = [new() { Summary = context.Connection?.Name ?? "Legacy" }], Custom = JsonSerializer.SerializeToElement(new { name = context.Connection?.Name }) }));
+        }
+    }
+
+    private sealed class FakeDashboardPlugin(string id) : FakePlugin(id), IDashboardConnectionPlugin
+    {
+        public string DashboardConnectionName => "Dashboard " + id;
+        public bool HasDashboardConnection(Dashboard dashboard) => !string.IsNullOrEmpty(dashboard.AccessToken);
+        public string DashboardConnectionVersion(Dashboard dashboard) => dashboard.AccessToken ?? "";
+    }
+
+    private sealed class FakeOAuthPlugin(string id) : FakePlugin(id, requiresOAuth: true, tokenField: true), IOAuthDataProviderPlugin
+    {
+        public List<ProviderConnection> Started { get; } = [];
+        public List<(string?, string?, string?)> Completions { get; } = [];
+        public bool Fail { get; set; }
+        public IReadOnlyCollection<string> AuthorizationCredentialKeys { get; } = ["token"];
+        public bool IsAuthorized(IReadOnlyDictionary<string, string> credentials) => credentials.ContainsKey("token");
+        public Result<(string Url, string State), string> StartAuthorization(ProviderConnection connection, HttpContext httpContext)
+        {
+            Started.Add(connection);
+            return ("https://signin.test/authorize", "state-" + Started.Count);
+        }
+        public Task<UnitResult<string>> CompleteAuthorizationAsync(string? state, string? browserState, string? code, CancellationToken cancellationToken)
+        {
+            Completions.Add((state, browserState, code));
+            return Task.FromResult(Fail ? UnitResult.Failure("Sign-in failed") : UnitResult.Success<string>());
         }
     }
 }

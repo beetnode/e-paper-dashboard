@@ -3,6 +3,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Net.WebSockets;
+using CSharpFunctionalExtensions;
+using EPaperDashboard.Models;
 using EPaperDashboard.Utilities;
 using static EPaperDashboard.Utilities.DeploymentMode;
 
@@ -101,6 +103,77 @@ public class HomeAssistantAuthService(
         }
     }
 
+    /// <summary>
+    /// Starts Home Assistant sign-in for a named connection. The callback stores a long-lived token in the
+    /// connection itself, so no token is passed through the browser.
+    /// </summary>
+    public Result<(string Url, string State), string> StartConnectionAuth(ProviderConnection connection, string host, HttpContext? httpContext)
+    {
+        if (!Uri.TryCreate(host, UriKind.Absolute, out var hostUri))
+            return "Enter the Home Assistant server URL first.";
+        var clientUri = _deploymentStrategy.GetOAuthClientUri(httpContext);
+        if (clientUri == null)
+            return _deploymentStrategy.Mode == DeploymentMode.Addon
+                ? "Could not determine ingress URL from request. Ensure you're accessing the addon through Home Assistant ingress."
+                : "CLIENT_URL is not configured. This is required for Home Assistant sign-in.";
+
+        var hostUrl = hostUri.ToString().TrimEnd('/');
+        var appUrl = clientUri.ToString().TrimEnd('/');
+        // Home Assistant accepts redirect URIs on the client ID's origin. Under ingress that origin is Home Assistant's.
+        var clientId = _deploymentStrategy.Mode == DeploymentMode.Addon ? clientUri.GetLeftPart(UriPartial.Authority) : appUrl;
+        var state = EncodeState(new StateData
+        {
+            Host = hostUrl,
+            ClientId = clientId,
+            ConnectionId = connection.Id,
+            OwnerId = connection.UserId.Value,
+            Timestamp = _timeProvider.GetUtcNow().ToUnixTimeSeconds()
+        });
+        var redirectUri = $"{appUrl}/api/providers/home-assistant/callback";
+        var authUrl = $"{hostUrl}/auth/authorize?client_id={Uri.EscapeDataString(clientId)}&redirect_uri={Uri.EscapeDataString(redirectUri)}&state={Uri.EscapeDataString(state)}";
+        return (authUrl, state);
+    }
+
+    /// <summary>Exchanges the authorization code and creates a long-lived token for the connection named in the signed state.</summary>
+    public async Task<Result<ConnectionAuthorization, string>> CompleteConnectionAuthAsync(string? code, string? state, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(state))
+            return "Home Assistant sign-in was cancelled or expired.";
+        var stateData = DecodeState(state);
+        if (stateData?.ConnectionId is null || stateData.OwnerId is null || stateData.ClientId is null)
+            return "Home Assistant sign-in expired. Start again from Connections.";
+        var age = _timeProvider.GetUtcNow().ToUnixTimeSeconds() - stateData.Timestamp;
+        if (age is > 300 or < 0)
+            return "Home Assistant sign-in expired. Start again from Connections.";
+
+        try
+        {
+            var response = await _httpClientFactory.CreateClient().PostAsync($"{stateData.Host}/auth/token", new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                { "grant_type", "authorization_code" },
+                { "code", code },
+                { "client_id", stateData.ClientId }
+            }), cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Home Assistant token exchange failed: {StatusCode}", response.StatusCode);
+                return "Home Assistant did not accept the sign-in. Try again.";
+            }
+            var token = JsonSerializer.Deserialize<TokenResponse>(await response.Content.ReadAsStringAsync(cancellationToken));
+            if (token?.AccessToken == null)
+                return "Home Assistant returned an invalid token response.";
+            var longLived = await CreateLongLivedTokenViaWebSocket(stateData.Host, token.AccessToken);
+            return new ConnectionAuthorization(stateData.ConnectionId, new UserId(stateData.OwnerId), longLived);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            // Do not return exception text: it can contain server responses.
+            _logger.LogWarning("Home Assistant sign-in failed ({ExceptionType})", ex.GetType().Name);
+            return "Unable to complete Home Assistant sign-in. Ensure the server URL is reachable from izBoard.";
+        }
+    }
+
     public async Task<AuthCallbackResult> HandleCallback(string? code, string? state, string? error, HttpContext? httpContext = null)
     {
         if (!string.IsNullOrWhiteSpace(error))
@@ -115,8 +188,9 @@ public class HomeAssistantAuthService(
         }
 
         var stateData = DecodeState(state);
-        if (stateData == null)
+        if (stateData == null || stateData.ConnectionId != null)
         {
+            // Connection sign-in states complete only at the provider callback, which stores the token server-side.
             return AuthCallbackResult.Failure(null, "Invalid or tampered state parameter");
         }
 
@@ -264,6 +338,8 @@ public class HomeAssistantAuthService(
         public string DashboardId { get; set; } = string.Empty;
         public string Host { get; set; } = string.Empty;
         public string? ClientId { get; set; }
+        public string? ConnectionId { get; set; }
+        public string? OwnerId { get; set; }
         public long Timestamp { get; set; }
     }
 
@@ -315,6 +391,8 @@ public class HomeAssistantAuthService(
 
     
 }
+
+public sealed record ConnectionAuthorization(string ConnectionId, UserId Owner, string Token);
 
 public record AuthStartResult
 {
