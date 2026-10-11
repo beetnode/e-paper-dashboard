@@ -145,7 +145,18 @@ body {
   }
 }
 
-/* Page-level actions: Discard appears only with unsaved changes, so it doubles as the change indicator. */
+/*
+ * Save and Discard appear together only while there are unsaved changes, so they double as the
+ * unsaved-changes indicator. They sit at the end of the title side of a toolbar, or alone on the
+ * right of a page header, where appearing does not push any other control.
+ */
+.app-save-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.375rem;
+}
+
 .app-page-actions {
   display: flex;
   flex-shrink: 0;

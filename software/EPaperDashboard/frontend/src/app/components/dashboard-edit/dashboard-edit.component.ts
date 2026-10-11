@@ -23,8 +23,14 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
   styles: [`
     .action-bar-title {
       display: flex;
+      flex: 1 1 auto;
       align-items: center;
       gap: 0.75rem;
+      min-width: 0;
+    }
+
+    /* The name gives way first when Save and Discard appear on a narrow screen. */
+    .action-bar-title h1 {
       min-width: 0;
     }
 
@@ -60,6 +66,23 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
             </button>
             <h1 class="h4 mb-0 text-truncate" [title]="dashboard()!.name">{{ dashboard()!.name }}</h1>
             <span class="visually-hidden" aria-live="polite">{{ dashboardForm.dirty ? 'Unsaved changes' : '' }}</span>
+            @if (dashboardForm.dirty || isSaving()) {
+              <div class="app-save-actions">
+                <button type="submit" class="btn btn-sm btn-primary" title="Save changes" aria-label="Save changes"
+                  [disabled]="isSaving() || dashboardForm.invalid || !dashboardForm.get('name')?.value?.trim()">
+                  @if (isSaving()) {
+                    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                  } @else {
+                    <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+                  }
+                  <span class="d-none d-sm-inline">Save</span>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" (click)="discardChanges()" [disabled]="isSaving()"
+                  title="Discard unsaved changes" aria-label="Discard unsaved changes">
+                  <i class="fa-solid fa-rotate-left" aria-hidden="true"></i><span class="d-none d-md-inline">Discard</span>
+                </button>
+              </div>
+            }
           </div>
           <div class="app-page-actions flex-nowrap">
             @if (previewModeValue === 'ssr') {
@@ -71,16 +94,6 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
               [disabled]="disablePreviewButton() || dashboardForm.dirty"
               [title]="dashboardForm.dirty ? 'Save your changes before previewing' : 'Preview the device image'" aria-label="Preview">
               <i class="fa-solid fa-eye" aria-hidden="true"></i><span class="d-none d-sm-inline ms-1">Preview</span>
-            </button>
-            <!-- Shown only with unsaved changes, so it doubles as the change indicator. -->
-            @if (dashboardForm.dirty) {
-              <button type="button" class="btn btn-sm btn-outline-secondary" (click)="discardChanges()" [disabled]="isSaving()" title="Discard unsaved changes" aria-label="Discard unsaved changes">
-                <i class="fa-solid fa-rotate-left" aria-hidden="true"></i><span class="d-none d-md-inline ms-1">Discard</span>
-              </button>
-            }
-            <button type="submit" class="btn btn-sm btn-primary" title="Save changes" aria-label="Save changes"
-              [disabled]="!dashboardForm.dirty || isSaving() || dashboardForm.invalid || !dashboardForm.get('name')?.value?.trim()">
-              <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i><span class="d-none d-sm-inline ms-1">Save</span>
             </button>
           </div>
         </div>
