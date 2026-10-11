@@ -7,7 +7,7 @@ public static class Constants
 {
     public const string AppName = "izBoard";
 
-    public const string CompanyName = "izdev.digital";
+    public const string CompanyName = "beetnode";
 
     public static string AppVersion { get; } = GetAppVersion();
 

@@ -43,7 +43,7 @@ izBoard has three components that work together:
 
 ## Getting Started
 
-1. **Deploy the server** using Docker (see [Software README](software/README.md)) or the [Home Assistant Add-on](https://github.com/izdev-digital/hass-add-ons/tree/master/e-paper-dashboard)
+1. **Deploy the server** using Docker (see [Software README](software/README.md)) or the [Home Assistant Add-on](https://github.com/beetnode/hass-add-ons/tree/master/e-paper-dashboard)
 2. **Flash the firmware** to your ESP32 device with an e-paper display (see [Firmware README](firmware/README.md))
 3. **Pair the device** — scan the setup Wi-Fi QR, enter Wi-Fi and server details, then claim the display code from any network that can reach the server
 4. **Connect your data** on the Connections page, such as Home Assistant or Google Calendar & Tasks

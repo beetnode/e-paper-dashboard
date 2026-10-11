@@ -34,7 +34,7 @@ The release workflow automatically:
 ## Usage
 
 ### Download Artifacts
-- **Releases**: [github.com/izdev-digital/e-paper-dashboard/releases](https://github.com/izdev-digital/e-paper-dashboard/releases)
+- **Releases**: [github.com/beetnode/e-paper-dashboard/releases](https://github.com/beetnode/e-paper-dashboard/releases)
 - **Actions runs**: Actions tab → Select workflow run → Artifacts
 
 ### Docker Images
