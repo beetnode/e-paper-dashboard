@@ -3,6 +3,7 @@
  * Output is placed in public/ so Angular includes it as a static asset.
  *
  * Format: { "icon-name": { "path": "M...", "vbW": 512, "vbH": 512 }, ... }
+ * Also writes public/fa-icon-names.json, a sorted list of the same icon names.
  */
 const fs = require('fs');
 const path = require('path');
@@ -39,3 +40,8 @@ for (const file of files) {
 
 fs.writeFileSync(outFile, JSON.stringify(icons), 'utf8');
 console.log(`Generated ${Object.keys(icons).length} FA icon entries → ${outFile}`);
+
+// Names only, for the designer's icon picker (the full file is ~1 MB of path data).
+const namesFile = path.join(__dirname, 'public', 'fa-icon-names.json');
+fs.writeFileSync(namesFile, JSON.stringify(Object.keys(icons).sort()), 'utf8');
+console.log(`Generated icon name list → ${namesFile}`);

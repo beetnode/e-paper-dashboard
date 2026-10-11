@@ -1,0 +1,37 @@
+<div class="icon-picker" (keydown)="onKeydown($event)">
+  <button #trigger type="button" class="form-select icon-picker-trigger" (click)="toggle()"
+    aria-haspopup="dialog" [attr.aria-expanded]="isOpen()" [attr.aria-controls]="panelId"
+    [attr.aria-label]="ariaLabel() + ': ' + (shown() || 'none')">
+    @if (shown()) {
+      <i class="fa-solid fa-{{ shown() }} icon-picker-preview" aria-hidden="true"></i>
+    }
+    <span class="icon-picker-name" [class.text-muted]="!current()">
+      {{ current() || (fallback() ? 'Default (' + fallback() + ')' : 'No icon') }}
+    </span>
+  </button>
+
+  @if (isOpen()) {
+    <div class="icon-picker-panel" [id]="panelId" role="dialog" [attr.aria-label]="ariaLabel()">
+      <input #search type="search" class="form-control" placeholder="Search icons"
+        aria-label="Search icons" [value]="query()" (input)="query.set($any($event.target).value)"
+        (keydown)="onSearchKeydown($event)" />
+      <div class="icon-picker-grid" role="listbox" [attr.aria-label]="ariaLabel()">
+        @for (name of results(); track name) {
+          <button type="button" class="icon-picker-option" role="option" [class.selected]="name === current()"
+            [attr.aria-selected]="name === current()" [title]="name" [attr.aria-label]="name" (click)="choose(name)">
+            <i class="fa-solid fa-{{ name }}" aria-hidden="true"></i>
+          </button>
+        } @empty {
+          <p class="icon-picker-empty">No icons match “{{ query() }}”.</p>
+        }
+      </div>
+      @if (current() && fallback()) {
+        <button type="button" class="btn btn-sm btn-link px-0 mt-1" (click)="choose('')">
+          Use default ({{ fallback() }})
+        </button>
+      } @else if (current()) {
+        <button type="button" class="btn btn-sm btn-link px-0 mt-1" (click)="choose('')">Remove icon</button>
+      }
+    </div>
+  }
+</div>

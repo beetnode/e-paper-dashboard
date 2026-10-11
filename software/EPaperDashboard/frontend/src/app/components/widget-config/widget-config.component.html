@@ -52,12 +52,8 @@
           <i class="fa-solid fa-trash" aria-hidden="true"></i>
         </button>
       </div>
-      <div class="d-flex align-items-center gap-2 mt-1">
-        <i class="fa-solid fa-icons text-muted flex-shrink-0 widget-config-icon" aria-hidden="true"></i>
-        <input type="text" class="form-control flex-grow-1 widget-config-grow"
-          placeholder="Icon (e.g., fa-thermometer)"
-          [(ngModel)]="badge.icon" (ngModelChange)="onPropertyChanged()" />
-      </div>
+      <app-icon-picker class="mt-1" [value]="badge.icon" ariaLabel="Badge icon"
+        (valueChange)="badge.icon = $event || undefined; onPropertyChanged()" />
       <div class="d-flex align-items-center gap-2 mt-1">
         <i class="fa-solid fa-link text-muted flex-shrink-0 widget-config-icon" aria-hidden="true"></i>
         <app-searchable-select class="d-block flex-grow-1 widget-config-grow" size="md"
@@ -155,13 +151,9 @@
         </label>
       </div>
       @if (getDefaultCalendarEventItemIcon(item)) {
-        <div class="d-flex align-items-center gap-2 mt-1">
-          <i class="fa {{ item.icon || getDefaultCalendarEventItemIcon(item) }} text-muted flex-shrink-0 widget-config-icon" aria-hidden="true"></i>
-          <input type="text" class="form-control flex-grow-1 widget-config-grow"
-            placeholder="{{ getDefaultCalendarEventItemIcon(item) }}"
-            [(ngModel)]="item.icon"
-            (ngModelChange)="onPropertyChanged()" />
-        </div>
+        <app-icon-picker class="mt-1" [value]="item.icon" [defaultIcon]="getDefaultCalendarEventItemIcon(item)"
+          [ariaLabel]="getCalendarEventItemLabel(item) + ' icon'"
+          (valueChange)="item.icon = $event || undefined; onPropertyChanged()" />
       }
     </div>
   }
@@ -227,13 +219,9 @@
           {{ getWeatherItemLabel(item) }}
         </label>
       </div>
-      <div class="d-flex align-items-center gap-2 mt-1">
-        <i class="fa {{ item.icon || getDefaultWeatherItemIcon(item) }} text-muted flex-shrink-0 widget-config-icon" aria-hidden="true"></i>
-        <input type="text" class="form-control flex-grow-1 widget-config-grow"
-          placeholder="{{ getDefaultWeatherItemIcon(item) }}"
-          [(ngModel)]="item.icon"
-          (ngModelChange)="onPropertyChanged()" />
-      </div>
+      <app-icon-picker class="mt-1" [value]="item.icon" [defaultIcon]="getDefaultWeatherItemIcon(item)"
+        [ariaLabel]="getWeatherItemLabel(item) + ' icon'"
+        (valueChange)="item.icon = $event || undefined; onPropertyChanged()" />
     </div>
   }
 </div>
@@ -459,25 +447,15 @@
     <div class="d-flex align-items-center gap-2">
       <span class="flex-grow-1 mb-0 widget-config-grow">Pending</span>
     </div>
-    <div class="d-flex align-items-center gap-2 mt-1">
-      <i class="fa {{ todoConfig.pendingIcon || 'fa-circle' }} text-muted flex-shrink-0 widget-config-icon" aria-hidden="true"></i>
-      <input type="text" class="form-control flex-grow-1 widget-config-grow"
-        placeholder="fa-circle"
-        [(ngModel)]="todoConfig.pendingIcon"
-        (ngModelChange)="onPropertyChanged()" />
-    </div>
+    <app-icon-picker class="mt-1" [value]="todoConfig.pendingIcon" defaultIcon="fa-circle" ariaLabel="Pending item icon"
+      (valueChange)="todoConfig.pendingIcon = $event || undefined; onPropertyChanged()" />
   </div>
   <div class="list-group-item px-2 py-2">
     <div class="d-flex align-items-center gap-2">
       <span class="flex-grow-1 mb-0 widget-config-grow">Completed</span>
     </div>
-    <div class="d-flex align-items-center gap-2 mt-1">
-      <i class="fa {{ todoConfig.completedIcon || 'fa-check-circle' }} text-muted flex-shrink-0 widget-config-icon" aria-hidden="true"></i>
-      <input type="text" class="form-control flex-grow-1 widget-config-grow"
-        placeholder="fa-check-circle"
-        [(ngModel)]="todoConfig.completedIcon"
-        (ngModelChange)="onPropertyChanged()" />
-    </div>
+    <app-icon-picker class="mt-1" [value]="todoConfig.completedIcon" defaultIcon="fa-check-circle" ariaLabel="Completed item icon"
+      (valueChange)="todoConfig.completedIcon = $event || undefined; onPropertyChanged()" />
   </div>
 </div>
   </div>

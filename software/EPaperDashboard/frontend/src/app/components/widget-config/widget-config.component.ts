@@ -37,11 +37,12 @@ import { EntitySourceSelectorComponent, groupByConnection } from './entity-sourc
 import { WidgetTitleConfigComponent } from './widget-title-config.component';
 import { SearchableSelectComponent, SelectOption } from '../searchable-select/searchable-select.component';
 import { SourceStatusComponent, SourceStatusEntry } from './source-status.component';
+import { IconPickerComponent } from '../icon-picker/icon-picker.component';
 
 @Component({
   selector: 'app-widget-config',
   standalone: true,
-  imports: [CommonModule, FormsModule, ResolveUrlPipe, EntitySourceSelectorComponent, WidgetTitleConfigComponent, SearchableSelectComponent, SourceStatusComponent],
+  imports: [CommonModule, FormsModule, ResolveUrlPipe, EntitySourceSelectorComponent, WidgetTitleConfigComponent, SearchableSelectComponent, SourceStatusComponent, IconPickerComponent],
   templateUrl: './widget-config.component.html',
   styleUrls: ['./widget-config.component.scss']
 })

@@ -1,0 +1,85 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.icon-picker {
+  position: relative;
+}
+
+/* Looks like a select so it lines up with neighbouring form controls. */
+.icon-picker-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.icon-picker-preview {
+  width: 1.25rem;
+  flex: none;
+  text-align: center;
+}
+
+.icon-picker-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.icon-picker-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  z-index: 1080;
+  min-width: 15rem;
+  padding: 0.5rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--app-radius-sm);
+  background: var(--bs-body-bg);
+  box-shadow: var(--designer-shadow-lg, var(--bs-box-shadow));
+}
+
+.icon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.5rem, 1fr));
+  gap: 0.25rem;
+  max-height: 14rem;
+  margin-top: 0.5rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.icon-picker-option {
+  display: grid;
+  place-items: center;
+  height: 2.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--app-radius-sm);
+  background: transparent;
+  color: var(--bs-body-color);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--bs-tertiary-bg);
+  }
+
+  &.selected {
+    border-color: var(--bs-primary);
+    background: var(--bs-primary-bg-subtle);
+    color: var(--bs-primary-text-emphasis);
+  }
+}
+
+.icon-picker-empty {
+  grid-column: 1 / -1;
+  margin: 0.5rem 0;
+  color: var(--bs-secondary-color);
+  font-size: 0.875rem;
+  text-align: center;
+}
