@@ -6,12 +6,15 @@ let searchableSelectInstance = 0;
 export interface SelectOption {
   value: string;
   label: string;
+  /** Optional heading; consecutive options with the same group are listed under it. */
+  group?: string;
 }
 
 @Component({
   selector: 'app-searchable-select',
   standalone: true,
   imports: [CommonModule],
+  host: { '[class.ss-md]': "size() === 'md'" },
   styles: [`
     :host {
       position: relative;
@@ -51,6 +54,29 @@ export interface SelectOption {
     .ss-trigger-text {
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+
+    /* Full-size variant, matching .form-select in forms. */
+    :host(.ss-md) .ss-trigger {
+      min-height: var(--app-control-min-height, 2.75rem);
+      padding: 0.375rem 0.75rem;
+      font-size: 1rem;
+      border-radius: var(--bs-border-radius);
+    }
+
+    :host(.ss-md) .ss-search,
+    :host(.ss-md) .ss-option {
+      padding: 0.5rem 0.75rem;
+      font-size: 1rem;
+    }
+
+    .ss-group {
+      padding: 0.5rem 0.5rem 0.25rem;
+      color: var(--bs-secondary-color);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
     }
 
     .ss-chevron {
@@ -141,7 +167,7 @@ export interface SelectOption {
     }
   `],
   template: `
-    <button #trigger type="button" class="ss-trigger"
+    <button #trigger type="button" class="ss-trigger" [attr.id]="inputId() || null"
       role="combobox"
       [disabled]="disabled()"
       [attr.aria-label]="ariaLabel()"
@@ -185,6 +211,9 @@ export interface SelectOption {
             </button>
           }
           @for (option of filteredOptions(); track option.value; let i = $index) {
+            @if (option.group && option.group !== filteredOptions()[i - 1]?.group) {
+              <div class="ss-group" role="presentation">{{ option.group }}</div>
+            }
             <button type="button" class="ss-option"
               [id]="optionId(i + (showEmptyOption() ? 1 : 0))"
               role="option"
@@ -219,6 +248,10 @@ export class SearchableSelectComponent implements OnDestroy {
   readonly searchPlaceholder = input<string>('Search…');
   readonly ariaLabel = input<string>('Select an option');
   readonly disabled = input<boolean>(false);
+  /** 'md' matches full-size form controls; 'sm' keeps the compact look used in tables. */
+  readonly size = input<'sm' | 'md'>('sm');
+  /** Id for the trigger so a <label for> can point at it. */
+  readonly inputId = input<string>('');
   readonly selectionChange = output<string>();
 
   readonly isOpen = signal(false);
@@ -236,7 +269,7 @@ export class SearchableSelectComponent implements OnDestroy {
     const term = this.searchTerm().toLowerCase().trim();
     const opts = this.options();
     if (!term) return opts;
-    return opts.filter(o => o.label.toLowerCase().includes(term));
+    return opts.filter(o => o.label.toLowerCase().includes(term) || !!o.group?.toLowerCase().includes(term));
   });
 
   readonly activeValues = computed(() => [

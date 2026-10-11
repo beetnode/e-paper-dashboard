@@ -122,3 +122,16 @@ export function isEntityCompatible(type: WidgetType, entity: DataSource): boolea
   if (definition.capability && !entity.capabilities?.includes(definition.capability)) return false;
   return definition.acceptsEntity?.(entity) ?? true;
 }
+
+/**
+ * True when a widget cannot show anything until a data source is chosen: a source-bound widget
+ * with an empty `entityId`, or a graph without any series source. Optional sources (header
+ * badges) never count as missing.
+ */
+export function widgetNeedsDataSource(widget: Pick<WidgetConfig, 'type' | 'config'>): boolean {
+  const config = (widget.config ?? {}) as { entityId?: string; series?: Array<{ entityId?: string }> };
+  if (getWidgetRenderType(widget.type) === 'graph') {
+    return !(config.series ?? []).some(series => !!series.entityId);
+  }
+  return 'entityId' in config && !config.entityId;
+}

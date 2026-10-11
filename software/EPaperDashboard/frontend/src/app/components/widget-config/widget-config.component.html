@@ -7,6 +7,8 @@
   <div class="inspector-section-body">
   <app-entity-source-selector [value]="widget.config.entityId || ''" [entities]="getFilteredEntities()"
     [loading]="loadingEntities()" (valueChange)="updateEntityId($event)" />
+<app-source-status [statuses]="sourceStatuses" [missing]="sourceMissing" [refreshing]="sourcesRefreshing"
+  (refresh)="refreshSources.emit()" />
   </div>
 </details>
 }
@@ -56,17 +58,10 @@
       </div>
       <div class="d-flex align-items-center gap-2 mt-1">
         <i class="fa-solid fa-link text-muted flex-shrink-0 widget-config-icon" aria-hidden="true"></i>
-        <select class="form-select flex-grow-1 widget-config-grow"
-          [(ngModel)]="badge.entityId" (ngModelChange)="onPropertyChanged()">
-          <option [ngValue]="undefined">No source</option>
-          @for (group of getGroupedEntities(); track group.name) {
-            <optgroup [label]="group.name">
-              @for (entity of group.sources; track trackByEntityId($index, entity)) {
-                <option [ngValue]="entity.entity_id">{{ formatEntityLabel(entity, false) }}</option>
-              }
-            </optgroup>
-          }
-        </select>
+        <app-searchable-select class="d-block flex-grow-1 widget-config-grow" size="md"
+          [options]="sourceOptions()" [value]="badge.entityId || ''" emptyLabel="No source"
+          searchPlaceholder="Search sources…" ariaLabel="Badge data source"
+          (selectionChange)="badge.entityId = $event || undefined; onPropertyChanged()" />
       </div>
     </div>
   }
@@ -130,6 +125,8 @@
   <div class="inspector-section-body">
 <app-entity-source-selector [value]="calendarConfig.entityId" [entities]="getFilteredEntities()"
   [loading]="loadingEntities()" (valueChange)="updateEntityId($event)" />
+<app-source-status [statuses]="sourceStatuses" [missing]="sourceMissing" [refreshing]="sourcesRefreshing"
+  (refresh)="refreshSources.emit()" />
   </div>
 </details>
 <details class="inspector-section" open>
@@ -199,6 +196,8 @@
   <div class="inspector-section-body">
 <app-entity-source-selector [value]="weatherConfig.entityId" [entities]="getFilteredEntities()"
   [loading]="loadingEntities()" (valueChange)="updateEntityId($event)" />
+<app-source-status [statuses]="sourceStatuses" [missing]="sourceMissing" [refreshing]="sourcesRefreshing"
+  (refresh)="refreshSources.emit()" />
   </div>
 </details>
 <details class="inspector-section" open>
@@ -257,6 +256,8 @@
     Daily: High/Low temperatures | Hourly: Temperature for each hour | Weekly: Summary for each day
   </small>
 </div>
+<app-source-status [statuses]="sourceStatuses" [missing]="sourceMissing" [refreshing]="sourcesRefreshing"
+  (refresh)="refreshSources.emit()" />
   </div>
 </details>
 <details class="inspector-section" open>
@@ -327,17 +328,11 @@
           <div class="row g-2">
             <!-- Entity Selection -->
             <div class="col-12">
-              <label class="form-label fw-semibold mb-1">Source</label>
-              <select class="form-select" [(ngModel)]="series.entityId" (ngModelChange)="onPropertyChanged()">
-                <option value="">Select source…</option>
-                @for (group of getGroupedEntities(); track group.name) {
-                  <optgroup [label]="group.name">
-                    @for (ent of group.sources; track trackByEntityId($index, ent)) {
-                      <option [value]="ent.entity_id">{{ formatEntityLabel(ent, false) }}</option>
-                    }
-                  </optgroup>
-                }
-              </select>
+              <label class="form-label fw-semibold mb-1" [for]="'seriesSource-' + idx">Source</label>
+              <app-searchable-select class="d-block" size="md" [inputId]="'seriesSource-' + idx"
+                [options]="sourceOptions()" [value]="series.entityId || ''" emptyLabel="Select source…"
+                searchPlaceholder="Search sources…" [ariaLabel]="'Source for series ' + (idx + 1)"
+                (selectionChange)="series.entityId = $event; onPropertyChanged()" />
             </div>
             
             <!-- Label and Color -->
@@ -365,6 +360,8 @@
 <button type="button" class="btn btn-outline-primary w-100" (click)="addGraphSeries()">
   <i class="fa-solid fa-plus"></i> Add series
 </button>
+<app-source-status [statuses]="sourceStatuses" [missing]="sourceMissing" [refreshing]="sourcesRefreshing"
+  (refresh)="refreshSources.emit()" />
   </div>
 </details>
 <details class="inspector-section" open>
@@ -419,6 +416,8 @@
   <div class="inspector-section-body">
 <app-entity-source-selector [value]="todoConfig.entityId" [entities]="getFilteredEntities()"
   [loading]="loadingEntities()" (valueChange)="updateEntityId($event)" />
+<app-source-status [statuses]="sourceStatuses" [missing]="sourceMissing" [refreshing]="sourcesRefreshing"
+  (refresh)="refreshSources.emit()" />
   </div>
 </details>
 <details class="inspector-section" open>
@@ -480,6 +479,8 @@
   <div class="inspector-section-body">
 <app-entity-source-selector [value]="rssFeedConfig.entityId" [entities]="getFilteredEntities()"
   [loading]="loadingEntities()" (valueChange)="updateEntityId($event)" />
+<app-source-status [statuses]="sourceStatuses" [missing]="sourceMissing" [refreshing]="sourcesRefreshing"
+  (refresh)="refreshSources.emit()" />
   </div>
 </details>
 }
@@ -621,6 +622,8 @@
   </select>
   <small class="form-text text-muted">Choose whether source states, calendars, tasks, weather, and feeds are sent with the prompt.</small>
 </div>
+<app-source-status [statuses]="sourceStatuses" [missing]="sourceMissing" [refreshing]="sourcesRefreshing"
+  (refresh)="refreshSources.emit()" />
   </div>
 </details>
 <details class="inspector-section" open>

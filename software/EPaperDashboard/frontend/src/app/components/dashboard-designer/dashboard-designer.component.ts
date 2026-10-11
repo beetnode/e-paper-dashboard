@@ -47,6 +47,7 @@ import {
   WIDGET_DEFINITIONS,
   getWidgetDefinition,
   getWidgetRenderType,
+  widgetNeedsDataSource,
 } from '../../models/widget-catalog';
 import { rememberRecentWidget } from '../../models/widget-picker';
 import {
@@ -143,7 +144,6 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   pickerPosition = signal({ top: 0, left: 0 });
   hoveredWidgetId = signal<string | null>(null);
   layerMenuWidgetId = signal<string | null>(null);
-  sourceDetailsOpen = signal(false);
   recentWidgetTypes = signal<WidgetType[]>(DashboardDesignerComponent.readRecentWidgets());
   /** Open state of designer-owned inspector sections, kept while switching selection. */
   private readonly sectionOpenState = signal<Record<string, boolean>>({});
@@ -450,7 +450,6 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   }
 
   private selectWidget(widget: WidgetConfig): void {
-    if (this.selectedWidget()?.id !== widget.id) this.sourceDetailsOpen.set(false);
     this.selectedWidget.set(widget);
   }
 
@@ -2016,14 +2015,12 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     if (side === 'left' && deltaX < -80) this.layersDrawerOpen.set(false);
   }
 
-  /** Worst status across the selected widget's sources, for the inspector header chip. */
-  readonly selectedSourceSummary = computed(() => {
-    const sources = this.selectedWidgetSourceStatuses();
-    if (sources.length === 0) return null;
-    const errors = sources.filter(source => source.status.state === 'error').length;
-    const empty = sources.filter(source => source.status.state === 'empty').length;
-    if (errors > 0) return { tone: 'warning', label: errors === 1 ? '1 source issue' : `${errors} source issues` };
-    if (empty > 0) return { tone: 'muted', label: 'No data' };
-    return { tone: 'success', label: 'Data ready' };
+  needsSource(widget: WidgetConfig): boolean {
+    return widgetNeedsDataSource(widget);
+  }
+
+  readonly selectedWidgetNeedsSource = computed(() => {
+    const widget = this.selectedWidget();
+    return !!widget && widgetNeedsDataSource(widget);
   });
 }

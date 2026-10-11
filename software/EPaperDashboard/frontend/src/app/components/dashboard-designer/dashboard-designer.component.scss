@@ -252,6 +252,12 @@
   white-space: nowrap;
 }
 
+.layer-warning {
+  flex: none;
+  color: var(--bs-warning);
+  font-size: var(--designer-text-sm);
+}
+
 .layer-meta {
   flex: none;
   color: var(--bs-secondary-color);
@@ -422,22 +428,6 @@
   margin: 0.375rem 0 0;
   color: var(--bs-secondary-color);
   font-size: var(--designer-text-sm);
-}
-
-/* Data source summary uses .app-status-chip; only the button reset and caret are local. */
-.source-chip {
-  flex: none;
-  border: 0;
-  cursor: pointer;
-}
-
-.source-chip-caret {
-  font-size: 0.6em;
-  transition: transform 0.15s;
-
-  &.open {
-    transform: rotate(180deg);
-  }
 }
 
 .app-empty-state-compact {
@@ -790,21 +780,6 @@
   outline: 3px solid var(--bs-primary);
   outline-offset: -3px;
   z-index: 90;
-}
-
-.source-status-panel {
-  padding: 0.625rem;
-  border: 1px solid var(--bs-border-color);
-  border-radius: var(--app-radius-sm);
-  background: var(--bs-tertiary-bg);
-}
-
-.source-status-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.5rem;
-  padding-block: 0.2rem;
 }
 
 @keyframes longPressRing {

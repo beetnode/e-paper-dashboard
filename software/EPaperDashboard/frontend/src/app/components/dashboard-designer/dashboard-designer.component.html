@@ -403,32 +403,8 @@
       <div class="inspector-title-row">
         <span class="inspector-icon"><i class="fa {{ widgetIcon(widget) }}" aria-hidden="true"></i></span>
         <h2 class="inspector-title" [title]="widgetDisplayName(widget)">{{ widgetDisplayName(widget) }}</h2>
-        @if (selectedSourceSummary(); as summary) {
-          <button type="button" class="app-status-chip source-chip" [ngClass]="'app-status-chip-' + summary.tone"
-            (click)="sourceDetailsOpen.set(!sourceDetailsOpen())" [attr.aria-expanded]="sourceDetailsOpen()"
-            aria-controls="inspectorSourceDetails" title="Data sources">
-            {{ summary.label }}<i class="fa-solid fa-chevron-down source-chip-caret" [class.open]="sourceDetailsOpen()" aria-hidden="true"></i>
-          </button>
-        }
       </div>
     </div>
-    @if (sourceDetailsOpen() && selectedWidgetSourceStatuses().length > 0) {
-      <div id="inspectorSourceDetails" class="source-status-panel mb-2" aria-label="Widget data source status">
-        @for (source of selectedWidgetSourceStatuses(); track source.key) {
-          <div class="source-status-row small">
-            <span class="text-truncate" [title]="source.label">{{ source.label }}</span>
-            <span class="app-status-chip"
-              [ngClass]="source.status.state === 'ready' ? 'app-status-chip-success' : (source.status.state === 'error' ? 'app-status-chip-warning' : 'app-status-chip-muted')"
-              [title]="source.status.error || (source.status.fromCache ? 'Using recently cached data' : '')">
-              {{ source.status.state === 'ready' ? 'Ready' : (source.status.state === 'empty' ? 'No data' : 'Error') }}
-            </span>
-          </div>
-        }
-        <button type="button" class="btn btn-sm btn-link p-0 mt-1" (click)="refreshLivePreview()" [disabled]="renderedCanvasLoading()">
-          Refresh source data
-        </button>
-      </div>
-    }
     <ng-container *ngTemplateOutlet="propertiesContent"></ng-container>
   } @else {
     <div class="inspector-header">
@@ -461,6 +437,9 @@
             (focus)="hoveredWidgetId.set(w.id)" (blur)="hoveredWidgetId.set(null)">
             <i class="fa {{ widgetIcon(w) }} layer-icon" aria-hidden="true"></i>
             <span class="layer-name">{{ widgetDisplayName(w) }}</span>
+            @if (needsSource(w)) {
+              <i class="fa-solid fa-triangle-exclamation layer-warning" title="No data source selected" aria-label="No data source selected"></i>
+            }
             <span class="layer-meta" [title]="'Column ' + (w.position.x + 1) + ', row ' + (w.position.y + 1) + ', ' + w.position.w + ' by ' + w.position.h">
               {{ w.position.w }}×{{ w.position.h }}
             </span>
@@ -727,6 +706,8 @@
   <app-widget-config [widget]="selectedWidget()!" [dashboard]="dashboard()"
     [availableEntities]="availableEntities()" [entitiesLoading]="entitiesLoading()"
     [colorScheme]="layout().colorScheme"
+    [sourceStatuses]="selectedWidgetSourceStatuses()" [sourceMissing]="selectedWidgetNeedsSource()"
+    [sourcesRefreshing]="renderedCanvasLoading()" (refreshSources)="refreshLivePreview()"
     (widgetChanged)="onWidgetConfigChanged($event)"
     [attr.key]="selectedWidget()!.id"></app-widget-config>
   <details class="inspector-section" [open]="isSectionOpen('widget-layout')" (toggle)="onSectionToggle('widget-layout', $event)">
