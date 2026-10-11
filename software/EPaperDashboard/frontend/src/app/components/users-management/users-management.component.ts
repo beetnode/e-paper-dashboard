@@ -10,7 +10,6 @@ import { DialogService } from '../../services/dialog.service';
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   templateUrl: './users-management.component.html',
-  styleUrls: ['./users-management.component.scss']
 })
 export class UsersManagementComponent implements OnInit {
   // Signals
