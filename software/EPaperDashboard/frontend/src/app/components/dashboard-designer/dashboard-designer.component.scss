@@ -258,6 +258,12 @@
   font-size: var(--designer-text-sm);
 }
 
+.layer-rename-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0.25rem 0.25rem 0.25rem 0.5rem;
+}
+
 .layer-meta {
   flex: none;
   color: var(--bs-secondary-color);

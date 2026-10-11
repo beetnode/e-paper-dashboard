@@ -432,18 +432,26 @@
       @for (w of layerWidgets(); track w.id) {
         <li class="layer-row" [class.selected]="selectedWidget()?.id === w.id"
           (mouseenter)="hoveredWidgetId.set(w.id)" (mouseleave)="hoveredWidgetId.set(null)">
-          <button type="button" class="layer-main" (click)="onLayerSelect(w)"
-            [attr.aria-current]="selectedWidget()?.id === w.id ? 'true' : null"
-            (focus)="hoveredWidgetId.set(w.id)" (blur)="hoveredWidgetId.set(null)">
-            <i class="fa {{ widgetIcon(w) }} layer-icon" aria-hidden="true"></i>
-            <span class="layer-name">{{ widgetDisplayName(w) }}</span>
-            @if (needsSource(w)) {
-              <i class="fa-solid fa-triangle-exclamation layer-warning" title="No data source selected" aria-label="No data source selected"></i>
-            }
-            <span class="layer-meta" [title]="'Column ' + (w.position.x + 1) + ', row ' + (w.position.y + 1) + ', ' + w.position.w + ' by ' + w.position.h">
-              {{ w.position.w }}×{{ w.position.h }}
-            </span>
-          </button>
+          @if (renamingWidgetId() === w.id) {
+            <input type="text" class="form-control layer-rename-input" maxlength="200"
+              [value]="w.name ?? widgetDisplayName(w)" aria-label="Layer name"
+              (keydown.enter)="commitRenameLayer(w, $any($event.target).value)"
+              (keydown.escape)="cancelRenameLayer($event)"
+              (blur)="commitRenameLayer(w, $any($event.target).value)" />
+          } @else {
+            <button type="button" class="layer-main" (click)="onLayerSelect(w)"
+              [attr.aria-current]="selectedWidget()?.id === w.id ? 'true' : null"
+              (focus)="hoveredWidgetId.set(w.id)" (blur)="hoveredWidgetId.set(null)">
+              <i class="fa {{ widgetIcon(w) }} layer-icon" aria-hidden="true"></i>
+              <span class="layer-name">{{ widgetDisplayName(w) }}</span>
+              @if (needsSource(w)) {
+                <i class="fa-solid fa-triangle-exclamation layer-warning" title="No data source selected" aria-label="No data source selected"></i>
+              }
+              <span class="layer-meta" [title]="'Column ' + (w.position.x + 1) + ', row ' + (w.position.y + 1) + ', ' + w.position.w + ' by ' + w.position.h">
+                {{ w.position.w }}×{{ w.position.h }}
+              </span>
+            </button>
+          }
           <div class="layer-menu">
             <button type="button" class="layer-menu-btn" (click)="toggleLayerMenu(w, $event)"
               [attr.aria-label]="'Actions for ' + widgetDisplayName(w)" aria-haspopup="menu" [attr.aria-expanded]="layerMenuWidgetId() === w.id">
@@ -451,6 +459,7 @@
             </button>
             @if (layerMenuWidgetId() === w.id) {
               <div class="layer-menu-dropdown" role="menu">
+                <button type="button" role="menuitem" (click)="startRenameLayer(w)"><i class="fa-solid fa-pen" aria-hidden="true"></i>Rename</button>
                 <button type="button" role="menuitem" (click)="duplicateWidget(w)"><i class="fa-solid fa-clone" aria-hidden="true"></i>Duplicate</button>
                 <button type="button" role="menuitem" (click)="moveWidgetLayer(w, 'forward')" [disabled]="!canMoveWidgetLayer(w, 'forward')"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i>Bring forward</button>
                 <button type="button" role="menuitem" (click)="moveWidgetLayer(w, 'backward')" [disabled]="!canMoveWidgetLayer(w, 'backward')"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i>Send backward</button>
@@ -608,7 +617,7 @@
           </select>
         </label>
       </div>
-      <small class="form-text text-muted">Default body text for all widgets; a widget can override it in its Display section.</small>
+      <small class="form-text text-muted">Default body text for all widgets; a widget can override sizes in its Text section.</small>
     </div>
   </details>
   @if (aiEnabled()) {
@@ -733,6 +742,35 @@
     [sourcesRefreshing]="renderedCanvasLoading()" (refreshSources)="refreshLivePreview()"
     (widgetChanged)="onWidgetConfigChanged($event)"
     [attr.key]="selectedWidget()!.id"></app-widget-config>
+  <details class="inspector-section" [open]="isSectionOpen('widget-text')" (toggle)="onSectionToggle('widget-text', $event)">
+    <summary class="inspector-section-summary">
+      Text
+      @if (selectedWidget()!.fontOverrides) {
+        <span class="app-status-chip app-status-chip-warning override-chip" title="Font sizes differ from the dashboard">Custom</span>
+      }
+    </summary>
+    <div class="inspector-section-body">
+      <div class="designer-field-grid">
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Title size</span>
+          <div class="input-group">
+            <input type="number" class="form-control" min="8" max="72" [value]="selectedWidget()!.fontOverrides?.titleFontSize ?? ''"
+              [placeholder]="layout().titleFontSize ?? 16" (change)="updateWidgetFontSize('titleFontSize', $event)" />
+            <span class="input-group-text">px</span>
+          </div>
+        </label>
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Text size</span>
+          <div class="input-group">
+            <input type="number" class="form-control" min="6" max="48" [value]="selectedWidget()!.fontOverrides?.textFontSize ?? ''"
+              [placeholder]="layout().textFontSize ?? 14" (change)="updateWidgetFontSize('textFontSize', $event)" />
+            <span class="input-group-text">px</span>
+          </div>
+        </label>
+      </div>
+      <small class="form-text text-muted">Empty uses the dashboard size shown in the field.</small>
+    </div>
+  </details>
   <details class="inspector-section" [open]="isSectionOpen('widget-layout')" (toggle)="onSectionToggle('widget-layout', $event)">
     <summary class="inspector-section-summary">Layout</summary>
     <div class="inspector-section-body">

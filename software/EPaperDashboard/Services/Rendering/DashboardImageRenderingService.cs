@@ -223,7 +223,10 @@ public sealed class DashboardImageRenderingService
                         co.WidgetTitleTextColor, co.WidgetTextColor, co.IconColor)
                     : null,
                 TitleOverride: w.TitleOverride,
-                ShowTitle: w.ShowTitle))
+                ShowTitle: w.ShowTitle,
+                FontOverrides: w.FontOverrides is { } fo
+                    ? new WidgetFontOverridesConfig(fo.TitleFontSize, fo.TextFontSize)
+                    : null))
             .ToList();
 
         return new LayoutConfig(

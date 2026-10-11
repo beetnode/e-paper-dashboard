@@ -54,6 +54,16 @@ namespace EPaperDashboard.Models
         public WidgetColorOverrides? ColorOverrides { get; set; }
         public string? TitleOverride { get; set; }
         public bool ShowTitle { get; set; } = true;
+        /// <summary>Designer-only layer name; not rendered.</summary>
+        public string? Name { get; set; }
+        /// <summary>Per-widget font sizes that replace the dashboard defaults when set.</summary>
+        public WidgetFontOverrides? FontOverrides { get; set; }
+    }
+
+    public class WidgetFontOverrides
+    {
+        public int? TitleFontSize { get; set; }
+        public int? TextFontSize { get; set; }
     }
 
     public class WidgetPosition

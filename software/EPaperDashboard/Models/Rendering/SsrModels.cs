@@ -53,6 +53,8 @@ public record WidgetColorOverridesConfig(
     string? WidgetTextColor,
     string? IconColor);
 
+public record WidgetFontOverridesConfig(int? TitleFontSize, int? TextFontSize);
+
 public record WidgetConfigEntry(
     string Id,
     string Type,
@@ -60,7 +62,8 @@ public record WidgetConfigEntry(
     JsonElement Config,
     WidgetColorOverridesConfig? ColorOverrides,
     string? TitleOverride = null,
-    bool ShowTitle = true);
+    bool ShowTitle = true,
+    WidgetFontOverridesConfig? FontOverrides = null);
 
 public readonly record struct WeatherForecastDataKey(string EntityId, string ForecastType)
 {
@@ -125,8 +128,10 @@ public readonly record struct WidgetRenderContext(
         TitleColor: ColorUtils.ResolveWidgetColor(widget, layout, c => c.WidgetTitleTextColor, o => o?.WidgetTitleTextColor),
         TextColor: ColorUtils.ResolveWidgetColor(widget, layout, c => c.WidgetTextColor, o => o?.WidgetTextColor),
         IconColor: ColorUtils.ResolveWidgetColor(widget, layout, c => c.IconColor, o => o?.IconColor),
-        TitleFontSize: layout.TitleFontSize > 0 ? layout.TitleFontSize : 16,
-        TextFontSize: layout.TextFontSize > 0 ? layout.TextFontSize : 14,
+        TitleFontSize: widget.FontOverrides?.TitleFontSize is > 0 and var title ? title
+            : layout.TitleFontSize > 0 ? layout.TitleFontSize : 16,
+        TextFontSize: widget.FontOverrides?.TextFontSize is > 0 and var text ? text
+            : layout.TextFontSize > 0 ? layout.TextFontSize : 14,
         TitleFontWeight: layout.TitleFontWeight > 0 ? layout.TitleFontWeight : 700,
         TextFontWeight: layout.TextFontWeight > 0 ? layout.TextFontWeight : 400);
 }

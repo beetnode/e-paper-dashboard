@@ -472,6 +472,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   }
 
   widgetDisplayName(widget: WidgetConfig): string {
+    if (widget.name) return widget.name;
     if (widget.titleOverride) return widget.titleOverride;
     try {
       return getWidgetDefinition(widget.type).label;
@@ -491,6 +492,48 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     this.layerMenuWidgetId.set(this.layerMenuWidgetId() === widget.id ? null : widget.id);
   }
 
+  renamingWidgetId = signal<string | null>(null);
+
+  startRenameLayer(widget: WidgetConfig): void {
+    this.layerMenuWidgetId.set(null);
+    this.renamingWidgetId.set(widget.id);
+    setTimeout(() => document.querySelector<HTMLInputElement>('.layer-rename-input')?.select());
+  }
+
+  /** Saves a layer name; an empty name falls back to the widget title or type. */
+  commitRenameLayer(widget: WidgetConfig, value: string): void {
+    if (this.renamingWidgetId() !== widget.id) return;
+    this.renamingWidgetId.set(null);
+    const name = value.trim().slice(0, 200) || undefined;
+    if (name === widget.name) return;
+    this.replaceWidget({ ...widget, name });
+  }
+
+  cancelRenameLayer(event: Event): void {
+    event.stopPropagation();
+    this.renamingWidgetId.set(null);
+  }
+
+  /** Per-widget font size; an empty field returns to the dashboard default. */
+  updateWidgetFontSize(property: 'titleFontSize' | 'textFontSize', event: Event): void {
+    const widget = this.selectedWidget();
+    if (!widget) return;
+    const input = event.target as HTMLInputElement;
+    const fontOverrides = { ...widget.fontOverrides };
+    if (input.value.trim() === '') {
+      delete fontOverrides[property];
+    } else {
+      const [min, max] = property === 'titleFontSize' ? [8, 72] : [6, 48];
+      fontOverrides[property] = this.readNumberInput(event, min, max, widget.fontOverrides?.[property] ?? min);
+    }
+    this.replaceWidget({ ...widget, fontOverrides: Object.keys(fontOverrides).length ? fontOverrides : undefined });
+  }
+
+  private replaceWidget(updated: WidgetConfig): void {
+    this.layout.update(value => ({ ...value, widgets: value.widgets.map(item => item.id === updated.id ? updated : item) }));
+    if (this.selectedWidget()?.id === updated.id) this.selectedWidget.set(updated);
+  }
+
   duplicateWidget(widget: WidgetConfig): void {
     this.layerMenuWidgetId.set(null);
     const layout = this.layout();
@@ -499,7 +542,12 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       this.toastService.show('No free space of the same size for a copy of this widget', 'error');
       return;
     }
-    const copy: WidgetConfig = { ...structuredClone(widget), id: this.generateId(), position: slot };
+    const copy: WidgetConfig = {
+      ...structuredClone(widget),
+      id: this.generateId(),
+      position: slot,
+      name: widget.name ? `${widget.name} copy` : undefined,
+    };
     this.layout.update(value => ({ ...value, widgets: [...value.widgets, copy] }));
     this.selectWidget(copy);
   }
@@ -1915,7 +1963,9 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       config,
       colorOverrides: widget?.colorOverrides,
       titleOverride: widget?.titleOverride,
-      showTitle: widget?.showTitle !== false
+      showTitle: widget?.showTitle !== false,
+      name: typeof widget?.name === 'string' && widget.name.trim() ? widget.name : undefined,
+      fontOverrides: widget?.fontOverrides ?? undefined,
     } as WidgetConfig;
   }
 
