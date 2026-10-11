@@ -93,7 +93,7 @@ app-dashboard-designer {
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: var(--bs-card-spacer-y, 1rem) var(--bs-card-spacer-x, 1rem);
+    padding: 0.75rem;
 
     &.active {
       display: flex;
@@ -116,20 +116,6 @@ app-dashboard-designer {
     }
   }
 }
-
-.col-md-3 .card>.card-body::-webkit-scrollbar {
-  width: 8px;
-}
-
-.col-md-3 .card>.card-body::-webkit-scrollbar-thumb {
-  background: var(--bs-secondary, #adb5bd);
-  border-radius: 4px;
-}
-
-.col-md-3 .card>.card-body::-webkit-scrollbar-track {
-  background: #f8f9fa;
-}
-
 
 /* ── Mobile overlays (rendered outside .designer-grid-container via @if) ── */
 

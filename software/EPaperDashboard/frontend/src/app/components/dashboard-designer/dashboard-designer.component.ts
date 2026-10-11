@@ -55,6 +55,13 @@ import {
 } from '../../models/designer-viewport';
 
 const CANVAS_ZOOM_STORAGE_KEY = 'designer.canvasZoom';
+/** Below this width the side panel moves into a drawer so the canvas keeps its space. */
+const PANEL_DRAWER_MAX_WIDTH = 992;
+/** Below this width the widget toolbox starts collapsed to icons. */
+const TOOLBOX_COLLAPSE_MAX_WIDTH = 1400;
+
+type LayoutColorProperty = 'canvasBackgroundColor' | 'widgetBackgroundColor' | 'widgetBorderColor'
+  | 'widgetTitleTextColor' | 'widgetTextColor' | 'iconColor';
 
 @Component({
   selector: 'app-dashboard-designer',
@@ -161,6 +168,10 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   private renderPreviewRevision = 0;
   private renderedLayoutSignature = '';
   private forceRefreshOnNextRender = false;
+  private viewportWidth = signal(typeof window !== 'undefined' ? window.innerWidth : 1280);
+  /** Tablet widths: properties and settings open in the drawer instead of a fixed column. */
+  panelAsDrawer = computed(() => !this.isMobile() && this.viewportWidth() < PANEL_DRAWER_MAX_WIDTH);
+  usesDrawer = computed(() => this.isMobile() || this.panelAsDrawer());
   private canvasViewportSize = signal({ width: 0, height: 0 });
   private canvasViewportObserver?: ResizeObserver;
   private readonly canvasViewport = viewChild<ElementRef<HTMLElement>>('canvasViewport');
@@ -188,6 +199,18 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     const current = this.computeCurrentSnapshot();
     return current !== this.savedSnapshot();
   });
+
+  readonly layoutColorFields: ReadonlyArray<{ key: LayoutColorProperty; label: string }> = [
+    { key: 'canvasBackgroundColor', label: 'Canvas background' },
+    { key: 'widgetBackgroundColor', label: 'Widget background' },
+    { key: 'widgetBorderColor', label: 'Widget border' },
+    { key: 'widgetTitleTextColor', label: 'Title text' },
+    { key: 'widgetTextColor', label: 'Text' },
+    { key: 'iconColor', label: 'Icons' },
+  ];
+  readonly widgetColorFields: ReadonlyArray<{ key: keyof WidgetColorOverrides & LayoutColorProperty; label: string }> =
+    this.layoutColorFields.filter((field): field is { key: keyof WidgetColorOverrides & LayoutColorProperty; label: string } =>
+      field.key !== 'canvasBackgroundColor');
 
   // Tab navigation
   tabOrder: Array<'dashboard' | 'widgets' | 'properties'> = ['dashboard', 'widgets', 'properties'];
@@ -250,6 +273,11 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   onWindowResize(): void {
     if (this.resizeTimer) clearTimeout(this.resizeTimer);
     this.resizeTimer = setTimeout(() => {
+      const wasNarrow = this.viewportWidth() < TOOLBOX_COLLAPSE_MAX_WIDTH;
+      this.viewportWidth.set(window.innerWidth);
+      const isNarrow = this.viewportWidth() < TOOLBOX_COLLAPSE_MAX_WIDTH;
+      if (wasNarrow !== isNarrow) this.toolboxCollapsed.set(isNarrow);
+      if (!this.usesDrawer()) this.mobilePropertiesOpen.set(false);
       this.isMobile.set(this.checkIsMobile());
     }, 100);
   }
@@ -272,6 +300,8 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
 
   ngOnInit(): void {
     this.isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
+    this.viewportWidth.set(window.innerWidth);
+    this.toolboxCollapsed.set(window.innerWidth < TOOLBOX_COLLAPSE_MAX_WIDTH);
     this.isMobile.set(this.checkIsMobile());
     this.dashboardId = this.route.snapshot.paramMap.get('id') || '';
     if (this.dashboardId) {
@@ -589,34 +619,6 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     if (!placed) {
       this.toastService.show('No space available on the canvas for a new widget', 'error');
     }
-  }
-
-  // Tab navigation
-  switchTab(direction: 'left' | 'right'): void {
-    const current = this.tabOrder.indexOf(this.activeTab());
-    let newIdx;
-    if (direction === 'left') {
-      newIdx = (current - 1 + this.tabOrder.length) % this.tabOrder.length;
-    } else {
-      newIdx = (current + 1) % this.tabOrder.length;
-    }
-    this.activeTab.set(this.tabOrder[newIdx]);
-    setTimeout(() => {
-      const tabBar = document.querySelector('.custom-tab-bar') as HTMLElement;
-      if (!tabBar) return;
-      const tabBtns = Array.from(tabBar.querySelectorAll('.tab-btn')) as HTMLElement[];
-      const activeBtn = tabBtns[newIdx];
-      if (activeBtn) {
-        activeBtn.focus();
-        const barRect = tabBar.getBoundingClientRect();
-        const btnRect = activeBtn.getBoundingClientRect();
-        if (btnRect.left < barRect.left) {
-          tabBar.scrollBy({ left: btnRect.left - barRect.left - 16, behavior: 'smooth' });
-        } else if (btnRect.right > barRect.right) {
-          tabBar.scrollBy({ left: btnRect.right - barRect.right + 16, behavior: 'smooth' });
-        }
-      }
-    }, 0);
   }
 
   onDesignerTabKeydown(event: KeyboardEvent): void {
@@ -1266,45 +1268,10 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     this.layout.update(layout => ({ ...layout, textFontWeight: this.normalizeFontWeight(weight) }));
   }
 
-  updateCanvasBackgroundColor(color: string): void {
+  updateLayoutColor(property: LayoutColorProperty, color: string): void {
     this.layout.update(layout => ({
       ...layout,
-      colorScheme: { ...layout.colorScheme, canvasBackgroundColor: color }
-    }));
-  }
-
-  updateWidgetBorderColor(color: string): void {
-    this.layout.update(layout => ({
-      ...layout,
-      colorScheme: { ...layout.colorScheme, widgetBorderColor: color }
-    }));
-  }
-
-  updateWidgetTitleTextColor(color: string): void {
-    this.layout.update(layout => ({
-      ...layout,
-      colorScheme: { ...layout.colorScheme, widgetTitleTextColor: color }
-    }));
-  }
-
-  updateWidgetTextColor(color: string): void {
-    this.layout.update(layout => ({
-      ...layout,
-      colorScheme: { ...layout.colorScheme, widgetTextColor: color }
-    }));
-  }
-
-  updateIconColor(color: string): void {
-    this.layout.update(layout => ({
-      ...layout,
-      colorScheme: { ...layout.colorScheme, iconColor: color }
-    }));
-  }
-
-  updateWidgetBackgroundColor(color: string): void {
-    this.layout.update(layout => ({
-      ...layout,
-      colorScheme: { ...layout.colorScheme, widgetBackgroundColor: color }
+      colorScheme: { ...layout.colorScheme, [property]: color }
     }));
   }
 
@@ -1362,18 +1329,13 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   }
 
   // Helper method to check if a specific layout color property is overridden vs. the base scheme
-  isLayoutColorOverridden(prop: 'canvasBackgroundColor' | 'widgetBackgroundColor' | 'widgetBorderColor' | 'widgetTitleTextColor' | 'widgetTextColor' | 'iconColor'): boolean {
+  isLayoutColorOverridden(prop: LayoutColorProperty): boolean {
     return this.layout().colorScheme[prop] !== this.getBaseScheme()[prop];
   }
 
   // Helper method to check if layout has any color overrides vs. the selected base scheme
   hasLayoutColorOverrides(): boolean {
-    return this.isLayoutColorOverridden('canvasBackgroundColor') ||
-      this.isLayoutColorOverridden('widgetBackgroundColor') ||
-      this.isLayoutColorOverridden('widgetBorderColor') ||
-      this.isLayoutColorOverridden('widgetTitleTextColor') ||
-      this.isLayoutColorOverridden('widgetTextColor') ||
-      this.isLayoutColorOverridden('iconColor');
+    return this.layoutColorFields.some(field => this.isLayoutColorOverridden(field.key));
   }
 
   // Helper method to check if a specific widget color override differs from the current scheme
@@ -1395,11 +1357,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   // Helper method to check if widget has any color overrides that actually differ from the current scheme
   hasWidgetColorOverrides(widget: WidgetConfig | null): boolean {
     if (!widget?.colorOverrides) return false;
-    return this.isWidgetColorOverridden(widget, 'widgetBackgroundColor') ||
-      this.isWidgetColorOverridden(widget, 'widgetBorderColor') ||
-      this.isWidgetColorOverridden(widget, 'widgetTitleTextColor') ||
-      this.isWidgetColorOverridden(widget, 'widgetTextColor') ||
-      this.isWidgetColorOverridden(widget, 'iconColor');
+    return this.widgetColorFields.some(field => this.isWidgetColorOverridden(widget, field.key));
   }
 
 
