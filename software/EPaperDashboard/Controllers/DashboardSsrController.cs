@@ -165,7 +165,11 @@ public class DashboardSsrController(
             using var image = render.Image;
 
             await using var stream = new MemoryStream();
-            await image.SaveAsync(stream, new PngEncoder(), HttpContext.RequestAborted);
+            // Previews are short-lived and re-rendered on every edit; favour encode speed over size.
+            await image.SaveAsync(
+                stream,
+                new PngEncoder { CompressionLevel = PngCompressionLevel.BestSpeed },
+                HttpContext.RequestAborted);
 
             var png = stream.ToArray();
             var token = designerPreviewImageStore.Add(

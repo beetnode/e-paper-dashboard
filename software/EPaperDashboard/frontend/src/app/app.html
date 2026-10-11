@@ -1,6 +1,6 @@
-<div class="app-root d-flex flex-column min-vh-100 bg-transition-300">
+<div class="app-root d-flex flex-column min-vh-100 bg-transition-300" [class.app-workspace]="isWorkspace()">
   <header class="bg-transition-300">
-    <nav class="navbar navbar-expand-sm navbar-toggleable-sm border-bottom box-shadow mb-3 bg-transition-300">
+    <nav class="navbar navbar-expand-sm navbar-toggleable-sm border-bottom box-shadow bg-transition-300" [class.mb-3]="!isWorkspace()">
       <div class="container">
         <a class="navbar-brand app-brand" routerLink="/home" aria-label="izBoard home">
           <img class="app-brand-logo" src="icon-tab.svg" alt="">
@@ -225,14 +225,14 @@
   </header>
 
   <div class="app-content flex-grow-1 d-flex flex-column">
-    <main role="main" class="pb-3 flex-grow-1 bg-transition-300">
-      <div class="container">
+    <main role="main" class="flex-grow-1 bg-transition-300" [class.pb-3]="!isWorkspace()">
+      <div [class.container]="!isWorkspace()" [class.app-workspace-content]="isWorkspace()">
         <router-outlet></router-outlet>
       </div>
     </main>
   </div>
 
-  <footer class="border-top footer text-muted mt-auto bg-transition-300 d-none d-sm-block" role="contentinfo"
+  <footer class="border-top footer text-muted mt-auto bg-transition-300 d-none" [class.d-sm-block]="!isWorkspace()" role="contentinfo"
     aria-label="Site footer">
     <div class="container">
       <div class="footer-content d-flex flex-row align-items-center justify-content-between gap-2">

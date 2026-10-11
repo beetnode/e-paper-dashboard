@@ -50,4 +50,22 @@ public class TransientLayoutValidatorTests
 
         TransientLayoutValidator.Validate(layout).Should().Contain("content area");
     }
+
+    [Fact]
+    public void Validate_FontOverrideOutOfRange_ReturnsError()
+    {
+        var layout = ValidLayout();
+        layout.Widgets[0].FontOverrides = new WidgetFontOverrides { TextFontSize = 0 };
+
+        TransientLayoutValidator.Validate(layout).Should().Contain("font sizes");
+    }
+
+    [Fact]
+    public void Validate_FontOverrideWithinRange_ReturnsNoError()
+    {
+        var layout = ValidLayout();
+        layout.Widgets[0].FontOverrides = new WidgetFontOverrides { TitleFontSize = 24 };
+
+        TransientLayoutValidator.Validate(layout).Should().BeNull();
+    }
 }

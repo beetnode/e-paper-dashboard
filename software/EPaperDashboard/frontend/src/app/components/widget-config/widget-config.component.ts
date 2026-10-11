@@ -35,11 +35,14 @@ import { ResolveUrlPipe } from '../../pipes/resolve-url.pipe';
 import { isEntityCompatible, getWidgetRenderType, getWidgetDefinition } from '../../models/widget-catalog';
 import { EntitySourceSelectorComponent, groupByConnection } from './entity-source-selector.component';
 import { WidgetTitleConfigComponent } from './widget-title-config.component';
+import { SearchableSelectComponent, SelectOption } from '../searchable-select/searchable-select.component';
+import { SourceStatusComponent, SourceStatusEntry } from './source-status.component';
+import { IconPickerComponent } from '../icon-picker/icon-picker.component';
 
 @Component({
   selector: 'app-widget-config',
   standalone: true,
-  imports: [CommonModule, FormsModule, ResolveUrlPipe, EntitySourceSelectorComponent, WidgetTitleConfigComponent],
+  imports: [CommonModule, FormsModule, ResolveUrlPipe, EntitySourceSelectorComponent, WidgetTitleConfigComponent, SearchableSelectComponent, SourceStatusComponent, IconPickerComponent],
   templateUrl: './widget-config.component.html',
   styleUrls: ['./widget-config.component.scss']
 })
@@ -65,6 +68,15 @@ export class WidgetConfigComponent implements OnChanges {
 
   getGroupedEntities() {
     return groupByConnection(this.getFilteredEntities());
+  }
+
+  /** Compatible sources for the searchable pickers used by badges and graph series. */
+  sourceOptions(): SelectOption[] {
+    return this.getGroupedEntities().flatMap(group => group.sources.map(entity => ({
+      value: entity.entity_id,
+      label: this.formatEntityLabel(entity, false),
+      group: group.name,
+    })));
   }
 
   formatEntityLabel(entity: any, withConnection = true): string {
@@ -94,6 +106,11 @@ export class WidgetConfigComponent implements OnChanges {
   @Input() entitiesLoading: boolean = false;
   @Input() colorScheme?: ColorScheme;
   @Output() widgetChanged = new EventEmitter<WidgetConfig>();
+  /** Renderer-reported status of this widget's sources, shown in the Data section. */
+  @Input() sourceStatuses: SourceStatusEntry[] = [];
+  @Input() sourceMissing = false;
+  @Input() sourcesRefreshing = false;
+  @Output() refreshSources = new EventEmitter<void>();
 
   entities = signal<any[]>([]);
   loadingEntities = signal(false);
@@ -516,6 +533,22 @@ export class WidgetConfigComponent implements OnChanges {
 
     // Reset input so re-selecting the same file triggers change
     input.value = '';
+  }
+
+  resetImageFraming(): void {
+    const config = this.widget.config as { zoom?: number; offsetX?: number; offsetY?: number };
+    config.zoom = 1;
+    config.offsetX = 0;
+    config.offsetY = 0;
+    this.onPropertyChanged();
+  }
+
+  forecastModeHelp(): string {
+    switch (this.weatherForecastConfig?.forecastMode) {
+      case 'hourly': return 'Temperature for each upcoming hour.';
+      case 'weekly': return 'A summary for each day of the week.';
+      default: return 'High and low temperatures for each day.';
+    }
   }
 
   clearUploadedImage(): void {

@@ -174,6 +174,15 @@ export interface WidgetConfig {
   colorOverrides?: WidgetColorOverrides;
   titleOverride?: string;
   showTitle?: boolean;
+  /** Designer-only layer name; not rendered. */
+  name?: string;
+  /** Per-widget font sizes in px that replace the dashboard defaults. */
+  fontOverrides?: WidgetFontOverrides;
+}
+
+export interface WidgetFontOverrides {
+  titleFontSize?: number;
+  textFontSize?: number;
 }
 
 export interface HeaderConfig {

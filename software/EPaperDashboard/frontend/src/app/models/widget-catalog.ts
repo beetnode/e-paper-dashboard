@@ -13,64 +13,64 @@ import {
 
 const COMMON_WIDGET_DEFINITIONS: readonly WidgetDefinition[] = [
   {
-    type: 'header', capability: 'state', label: 'Header', icon: 'fa-heading', category: 'content',
+    type: 'header', capability: 'state', label: 'Header', description: 'Title bar with optional status badges', icon: 'fa-heading', category: 'content',
     defaultSize: { w: 12, h: 1 }, minSize: { w: 3, h: 1 }, supportsTitle: false,
     createDefaultConfig: () => ({ title: 'New Header', badges: [] }),
   },
   {
-    type: 'markdown', label: 'Markdown', icon: 'fa-align-left', category: 'content',
+    type: 'markdown', label: 'Markdown', description: 'Formatted text, lists and headings', icon: 'fa-align-left', category: 'content',
     defaultSize: { w: 4, h: 2 }, minSize: { w: 2, h: 1 }, supportsTitle: false,
     createDefaultConfig: () => ({ content: '# Markdown Content' }),
   },
   {
-    type: 'calendar', capability: 'calendar', label: 'Calendar', icon: 'fa-calendar', category: 'data',
+    type: 'calendar', capability: 'calendar', label: 'Calendar', description: 'Upcoming events from a calendar', icon: 'fa-calendar', category: 'data',
     defaultSize: { w: 6, h: 3 }, minSize: { w: 3, h: 2 }, supportsTitle: true,
     createDefaultConfig: () => ({
       entityId: '', maxEvents: 7, items: DEFAULT_CALENDAR_EVENT_ITEMS.map(item => ({ ...item })),
     }),
   },
   {
-    type: 'weather', capability: 'weather', label: 'Weather', icon: 'fa-cloud-sun', category: 'data',
+    type: 'weather', capability: 'weather', label: 'Weather', description: 'Current conditions and readings', icon: 'fa-cloud-sun', category: 'data',
     defaultSize: { w: 4, h: 2 }, minSize: { w: 2, h: 1 }, supportsTitle: true,
     createDefaultConfig: () => ({ entityId: '', items: DEFAULT_WEATHER_ITEMS.map(item => ({ ...item })) }),
   },
   {
-    type: 'weather-forecast', capability: 'forecast', label: 'Weather Forecast', previewLabel: 'Forecast', icon: 'fa-cloud-sun-rain', category: 'data',
+    type: 'weather-forecast', capability: 'forecast', label: 'Weather Forecast', description: 'Daily or hourly forecast', previewLabel: 'Forecast', icon: 'fa-cloud-sun-rain', category: 'data',
     defaultSize: { w: 6, h: 3 }, minSize: { w: 2, h: 1 }, supportsTitle: true,
     createDefaultConfig: () => ({ entityId: '', forecastMode: 'daily', visibleFields: [...DEFAULT_FORECAST_FIELDS] }),
   },
   {
-    type: 'graph', capability: 'history', label: 'Graph', icon: 'fa-chart-line', category: 'chart',
+    type: 'graph', capability: 'history', label: 'Graph', description: 'Line or bar chart of sensor history', icon: 'fa-chart-line', category: 'chart',
     defaultSize: { w: 6, h: 3 }, minSize: { w: 3, h: 2 }, supportsTitle: true,
     createDefaultConfig: () => ({ series: [], period: '24h', plotType: 'line', lineWidth: 2 }),
   },
   {
-    type: 'todo', capability: 'todo', label: 'Todo List', previewLabel: 'Tasks', icon: 'fa-list-check', category: 'data',
+    type: 'todo', capability: 'todo', label: 'Todo List', description: 'Open items from a task list', previewLabel: 'Tasks', icon: 'fa-list-check', category: 'data',
     defaultSize: { w: 5, h: 3 }, minSize: { w: 2, h: 2 }, supportsTitle: true,
     createDefaultConfig: () => ({ entityId: '' }),
   },
   {
-    type: 'rss-feed', capability: 'feed', label: 'RSS Feed', icon: 'fa-rss', category: 'data',
+    type: 'rss-feed', capability: 'feed', label: 'RSS Feed', description: 'Latest headlines from a feed', icon: 'fa-rss', category: 'data',
     defaultSize: { w: 4, h: 4 }, minSize: { w: 3, h: 3 }, supportsTitle: true,
     createDefaultConfig: () => ({ entityId: '', title: 'Topic of the day' }),
   },
   {
-    type: 'app-icon', label: 'App Icon', icon: 'fa-rocket', category: 'asset',
+    type: 'app-icon', label: 'App Icon', description: 'Single icon or logo', icon: 'fa-rocket', category: 'asset',
     defaultSize: { w: 2, h: 2 }, minSize: { w: 1, h: 1 }, supportsTitle: false,
     createDefaultConfig: () => ({ size: 48 }),
   },
   {
-    type: 'image', label: 'Image', icon: 'fa-image', category: 'asset',
+    type: 'image', label: 'Image', description: 'Picture from a URL or upload', icon: 'fa-image', category: 'asset',
     defaultSize: { w: 4, h: 3 }, minSize: { w: 2, h: 2 }, supportsTitle: true,
     createDefaultConfig: () => ({ imageUrl: '', fit: 'contain' }),
   },
   {
-    type: 'version', label: 'Version', icon: 'fa-code-branch', category: 'system',
+    type: 'version', label: 'Version', description: 'App version label', icon: 'fa-code-branch', category: 'system',
     defaultSize: { w: 2, h: 1 }, minSize: { w: 1, h: 1 }, supportsTitle: false,
     createDefaultConfig: () => ({}),
   },
   {
-    type: 'ai-content', label: 'AI Content', icon: 'fa-wand-magic-sparkles', category: 'content',
+    type: 'ai-content', label: 'AI Content', description: 'Text generated from your prompt and data', icon: 'fa-wand-magic-sparkles', category: 'content',
     defaultSize: { w: 4, h: 3 }, minSize: { w: 2, h: 2 }, supportsTitle: true,
     createDefaultConfig: () => ({ prompt: '', dataScope: 'dashboard' }),
   },
@@ -121,4 +121,17 @@ export function isEntityCompatible(type: WidgetType, entity: DataSource): boolea
   if (definition.pluginId && entity.pluginId !== definition.pluginId) return false;
   if (definition.capability && !entity.capabilities?.includes(definition.capability)) return false;
   return definition.acceptsEntity?.(entity) ?? true;
+}
+
+/**
+ * True when a widget cannot show anything until a data source is chosen: a source-bound widget
+ * with an empty `entityId`, or a graph without any series source. Optional sources (header
+ * badges) never count as missing.
+ */
+export function widgetNeedsDataSource(widget: Pick<WidgetConfig, 'type' | 'config'>): boolean {
+  const config = (widget.config ?? {}) as { entityId?: string; series?: Array<{ entityId?: string }> };
+  if (getWidgetRenderType(widget.type) === 'graph') {
+    return !(config.series ?? []).some(series => !!series.entityId);
+  }
+  return 'entityId' in config && !config.entityId;
 }

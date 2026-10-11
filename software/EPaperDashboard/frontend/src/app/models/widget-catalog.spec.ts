@@ -1,4 +1,4 @@
-import { buildWidgetDefinitions, createDefaultWidgetConfig, getWidgetDefaultSize, getWidgetDefinition, isEntityCompatible, WIDGET_DEFINITIONS } from './widget-catalog';
+import { buildWidgetDefinitions, createDefaultWidgetConfig, getWidgetDefaultSize, getWidgetDefinition, isEntityCompatible, WIDGET_DEFINITIONS, widgetNeedsDataSource } from './widget-catalog';
 
 describe('widget catalog', () => {
   it('defines every widget type once', () => {
@@ -46,5 +46,22 @@ describe('provider widget registration', () => {
     expect(built.createDefaultConfig()).toEqual(getWidgetDefinition('calendar').createDefaultConfig());
     expect(() => buildWidgetDefinitions(WIDGET_DEFINITIONS, [{ ...variant, renderAs: 'missing' }])).toThrow();
     expect(() => buildWidgetDefinitions(WIDGET_DEFINITIONS, [{ type: 'example.bespoke', label: 'Bespoke', category: 'example', pluginId: 'example' } as any])).toThrow();
+  });
+});
+
+describe('widgetNeedsDataSource', () => {
+  it('flags source-bound widgets without a source', () => {
+    expect(widgetNeedsDataSource({ type: 'weather', config: { entityId: '' } as any })).toBe(true);
+    expect(widgetNeedsDataSource({ type: 'weather', config: { entityId: 'weather.home' } as any })).toBe(false);
+  });
+
+  it('requires at least one graph series with a source', () => {
+    expect(widgetNeedsDataSource({ type: 'graph', config: { series: [] } as any })).toBe(true);
+    expect(widgetNeedsDataSource({ type: 'graph', config: { series: [{ entityId: '' }, { entityId: 'sensor.t' }] } as any })).toBe(false);
+  });
+
+  it('ignores widgets without a required source', () => {
+    expect(widgetNeedsDataSource({ type: 'markdown', config: { content: '' } as any })).toBe(false);
+    expect(widgetNeedsDataSource({ type: 'header', config: { title: 'x', badges: [] } as any })).toBe(false);
   });
 });

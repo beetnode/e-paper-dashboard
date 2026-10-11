@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed, HostListener, effect } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, HostListener, effect, viewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { A11yModule } from '@angular/cdk/a11y';
@@ -19,6 +19,7 @@ import { HasUnsavedChanges } from '../../guards/unsaved-changes.guard';
 import { WidgetConfigComponent } from '../widget-config/widget-config.component';
 import { RenderedPreviewModalComponent } from '../rendered-preview-modal/rendered-preview-modal.component';
 import { WidgetElementOverlayComponent } from '../widget-element-overlay/widget-element-overlay.component';
+import { WidgetPickerComponent, WidgetPickerDragStart } from '../widget-picker/widget-picker.component';
 import {
   applyEditableElementChange,
   EditableElementChange,
@@ -42,16 +43,43 @@ import {
 import {
   createDefaultWidgetConfig,
   getWidgetDefaultSize,
-  WidgetCategory,
   WidgetDefinition,
   WIDGET_DEFINITIONS,
+  getWidgetDefinition,
   getWidgetRenderType,
+  widgetNeedsDataSource,
 } from '../../models/widget-catalog';
+import { rememberRecentWidget } from '../../models/widget-picker';
+import {
+  clampWhole,
+  findFreeSlot,
+  fitPositionToGrid,
+  fitWidgetsToGrid,
+  GRID_LIMITS,
+  moveWidgetInPaintOrder,
+} from '../../models/designer-layers';
+import {
+  CanvasZoom,
+  parseCanvasZoom,
+  resolveCanvasScale,
+  stepCanvasZoom,
+} from '../../models/designer-viewport';
+
+const CANVAS_ZOOM_STORAGE_KEY = 'designer.canvasZoom';
+/** Below this width the side panel moves into a drawer so the canvas keeps its space. */
+const PANEL_DRAWER_MAX_WIDTH = 992;
+/** Below this width the layers panel starts hidden so the canvas keeps its space. */
+const LAYERS_PANEL_MIN_WIDTH = 1400;
+const RECENT_WIDGETS_STORAGE_KEY = 'designer.recentWidgets';
+
+type LayoutColorProperty = 'canvasBackgroundColor' | 'widgetBackgroundColor' | 'widgetBorderColor'
+  | 'widgetTitleTextColor' | 'widgetTextColor' | 'iconColor';
 
 @Component({
   selector: 'app-dashboard-designer',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, A11yModule, WidgetConfigComponent, RenderedPreviewModalComponent, WidgetElementOverlayComponent],
+  imports: [CommonModule, FormsModule, RouterModule, A11yModule, WidgetConfigComponent, RenderedPreviewModalComponent, WidgetElementOverlayComponent, WidgetPickerComponent],
+  host: { '[class.designer-mobile]': 'isMobile()' },
   templateUrl: './dashboard-designer.component.html',
   styleUrls: ['./dashboard-designer.component.scss']
 })
@@ -93,32 +121,12 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   // UI State
   colorSchemes = DEFAULT_COLOR_SCHEMES;
   availableWidgets = WIDGET_DEFINITIONS;
-  readonly widgetCategories: ReadonlyArray<{ type: WidgetCategory; label: string }> = [
-    { type: 'content', label: 'Content' },
-    { type: 'data', label: 'Data' },
-    { type: 'chart', label: 'Charts' },
-    { type: 'asset', label: 'Assets' },
-    { type: 'system', label: 'System' },
-  ];
-
-  get allWidgetCategories(): ReadonlyArray<{ type: WidgetCategory; label: string }> {
-    const builtIn = new Set(this.widgetCategories.map(category => category.type));
-    const extra = new Map(this.availableWidgets.filter(widget => !builtIn.has(widget.category))
-      .map(widget => [widget.category, { type: widget.category, label: widget.categoryLabel ?? widget.category }]));
-    return [...this.widgetCategories, ...extra.values()];
-  }
-
-  widgetsInCategory(category: WidgetCategory): readonly WidgetDefinition[] {
-    return this.availableWidgets.filter(widget => widget.category === category);
-  }
-
   selectedWidget = signal<WidgetConfig | null>(null);
   ghost = signal<{ id: string; position: WidgetPosition } | null>(null);
   isLoading = signal(false);
   loadError = signal('');
   availableEntities = signal<DataSource[]>([]);
   entitiesLoading = signal(false);
-  activeTab = signal<'dashboard' | 'widgets' | 'properties'>('dashboard');
   renderedCanvasImageUrl = signal('');
   renderedCanvasLoading = signal(false);
   renderedCanvasError = signal('');
@@ -126,33 +134,45 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   renderedWidgetGeometry = signal<Record<string, WidgetRenderGeometry>>({});
   renderedSourceStatuses = signal<Record<string, DataSourceStatus>>({});
   elementEditingWidgetId = signal<string | null>(null);
-  toolboxCollapsed = signal(false); // Widget toolbox left panel collapsed
-  colorSchemeCollapsed = signal(false); // Color scheme section expanded by default
-  colorOverridesCollapsed = signal(true); // Layout color overrides collapsed by default
-  layoutCollapsed = signal(false); // Layout section expanded by default
-  fontsCollapsed = signal(true); // Fonts section collapsed by default
-  aiSectionCollapsed = signal(false); // AI section expanded by default when AI enabled
-  widgetColorOverridesCollapsed = signal(true); // Widget color overrides collapsed by default
+  /** Desktop layers column visibility; tablets and phones show layers in a drawer instead. */
+  layersOpen = signal(true);
+  layersDrawerOpen = signal(false);
+  inspectorDrawerOpen = signal(false);
+  pickerOpen = signal(false);
+  /** Where the desktop picker popover is shown: under the toolbar button or beside the layers panel. */
+  pickerAnchor = signal<'toolbar' | 'layers'>('toolbar');
+  pickerPosition = signal({ top: 0, left: 0 });
+  hoveredWidgetId = signal<string | null>(null);
+  layerMenuWidgetId = signal<string | null>(null);
+  recentWidgetTypes = signal<WidgetType[]>(DashboardDesignerComponent.readRecentWidgets());
+  /** Open state of designer-owned inspector sections, kept while switching selection. */
+  private readonly sectionOpenState = signal<Record<string, boolean>>({});
   showPreviewModal = signal(false);
   previewLoading = signal(false);
   previewError = signal('');
   previewImageUrl = signal('');
   // Mobile responsive state
   isMobile = signal(false);
-  mobileWidgetDrawerOpen = signal(false);
-  mobilePropertiesOpen = signal(false);
   mobileOverflowOpen = signal(false);
   mobileSelectionToolbar = signal(false);
   longPressActive = signal(false);
-  mobileDragging = signal(false);
   private mobileBreakpoint = 768;
   private isTouchDevice = false;
   private resizeTimer: any = null;
   private renderPreviewTimer: ReturnType<typeof setTimeout> | null = null;
   private renderPreviewRevision = 0;
-  private renderedLayoutSignature = '';
+  /** Signature of the layout behind the current preview image, and of the last requested render. */
+  private renderedLayoutSignature = signal('');
+  private requestedLayoutSignature = '';
   private forceRefreshOnNextRender = false;
-  private viewportWidth = signal(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  private viewportWidth = signal(typeof window !== 'undefined' ? window.innerWidth : 1280);
+  /** Tablet widths: properties and settings open in the drawer instead of a fixed column. */
+  panelAsDrawer = computed(() => !this.isMobile() && this.viewportWidth() < PANEL_DRAWER_MAX_WIDTH);
+  usesDrawer = computed(() => this.isMobile() || this.panelAsDrawer());
+  private canvasViewportSize = signal({ width: 0, height: 0 });
+  private canvasViewportObserver?: ResizeObserver;
+  private readonly canvasViewport = viewChild<ElementRef<HTMLElement>>('canvasViewport');
+  canvasZoom = signal<CanvasZoom>(DashboardDesignerComponent.readStoredZoom());
   private swipeStartY = 0;
   private swipeStartX = 0;
 
@@ -177,8 +197,35 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     return current !== this.savedSnapshot();
   });
 
-  // Tab navigation
-  tabOrder: Array<'dashboard' | 'widgets' | 'properties'> = ['dashboard', 'widgets', 'properties'];
+  /** Every inspector section is open by default except colors, which are rarely changed. */
+  isSectionOpen(key: string): boolean {
+    return this.sectionOpenState()[key] ?? !key.endsWith('colors');
+  }
+
+  onSectionToggle(key: string, event: Event): void {
+    const open = (event.target as HTMLDetailsElement).open;
+    if (open !== this.isSectionOpen(key)) this.sectionOpenState.update(state => ({ ...state, [key]: open }));
+  }
+
+  /** Merges config values for the selected widget, e.g. layout-editor snap and guides. */
+  updateSelectedWidgetConfig(patch: Record<string, unknown>): void {
+    const widget = this.selectedWidget();
+    if (!widget) return;
+    this.onWidgetConfigChanged({ ...widget, config: { ...widget.config, ...patch } as WidgetConfig['config'] });
+  }
+
+  readonly layoutColorFields: ReadonlyArray<{ key: LayoutColorProperty; label: string }> = [
+    { key: 'canvasBackgroundColor', label: 'Canvas background' },
+    { key: 'widgetBackgroundColor', label: 'Widget background' },
+    { key: 'widgetBorderColor', label: 'Widget border' },
+    { key: 'widgetTitleTextColor', label: 'Title text' },
+    { key: 'widgetTextColor', label: 'Text' },
+    { key: 'iconColor', label: 'Icons' },
+  ];
+  readonly widgetColorFields: ReadonlyArray<{ key: keyof WidgetColorOverrides & LayoutColorProperty; label: string }> =
+    this.layoutColorFields.filter((field): field is { key: keyof WidgetColorOverrides & LayoutColorProperty; label: string } =>
+      field.key !== 'canvasBackgroundColor');
+
 
   // Drag state
   private dragStartPos = { x: 0, y: 0 };
@@ -188,19 +235,36 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   private readonly LONG_PRESS_MS = 300;
   private pointerMoved = false;
 
+  /** Effective canvas scale. On phones the page scrolls vertically, so fit uses width only. */
   canvasScale = computed(() => {
-    if (!this.isMobile()) return 1;
-    const availableWidth = this.viewportWidth() - 16;
-    const canvasWidth = this.layout().width;
-    if (canvasWidth <= availableWidth) return 1;
-    return Math.max(0.2, availableWidth / canvasWidth);
+    const { width, height } = this.canvasViewportSize();
+    const layout = this.layout();
+    return resolveCanvasScale(
+      this.canvasZoom(),
+      { width, height: this.isMobile() ? 0 : height },
+      { width: layout.width, height: layout.height },
+    );
   });
+  canvasZoomLabel = computed(() => `${Math.round(this.canvasScale() * 100)}%`);
 
   constructor() {
     // Scroll lock when mobile overlays are open
     effect(() => {
-      const lock = this.mobileWidgetDrawerOpen() || this.mobilePropertiesOpen();
+      const lock = this.usesDrawer() && (this.pickerOpen() || this.inspectorDrawerOpen() || this.layersDrawerOpen());
       document.body.style.overflow = lock ? 'hidden' : '';
+    });
+
+    // Track the visible canvas area so fit-to-view follows panel, window and orientation changes.
+    effect(onCleanup => {
+      const element = this.canvasViewport()?.nativeElement;
+      if (!element || typeof ResizeObserver === 'undefined') return;
+      const observer = new ResizeObserver(entries => {
+        const box = entries[entries.length - 1].contentRect;
+        this.canvasViewportSize.set({ width: Math.floor(box.width), height: Math.floor(box.height) });
+      });
+      observer.observe(element);
+      this.canvasViewportObserver = observer;
+      onCleanup(() => observer.disconnect());
     });
 
     // The native renderer is the canonical visual source. Layout changes are rendered after a
@@ -221,30 +285,65 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   onWindowResize(): void {
     if (this.resizeTimer) clearTimeout(this.resizeTimer);
     this.resizeTimer = setTimeout(() => {
+      const wasWide = this.viewportWidth() >= LAYERS_PANEL_MIN_WIDTH;
       this.viewportWidth.set(window.innerWidth);
+      const isWide = this.viewportWidth() >= LAYERS_PANEL_MIN_WIDTH;
+      if (wasWide !== isWide) this.layersOpen.set(isWide);
+      // A popover beside the layers panel would be left at a stale position.
+      if (this.pickerAnchor() === 'layers') this.pickerOpen.set(false);
       this.isMobile.set(this.checkIsMobile());
+      if (!this.usesDrawer()) {
+        this.inspectorDrawerOpen.set(false);
+        this.layersDrawerOpen.set(false);
+      }
     }, 100);
   }
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: Event): void {
-    if (!this.mobileOverflowOpen()) return;
     const target = event.target as HTMLElement;
-    if (!target.closest('.mobile-overflow-menu')) {
+    if (this.mobileOverflowOpen() && !target.closest('.mobile-overflow-menu')) {
       this.mobileOverflowOpen.set(false);
+    }
+    if (this.layerMenuWidgetId() && !target.closest('.layer-menu')) {
+      this.layerMenuWidgetId.set(null);
+    }
+    if (this.pickerOpen() && !this.usesDrawer() && !target.closest('.picker-popover, [data-opens-picker]')) {
+      this.pickerOpen.set(false);
     }
   }
 
   @HostListener('document:keydown.escape')
   closeOpenDesignerOverlay(): void {
     if (this.mobileOverflowOpen()) this.mobileOverflowOpen.set(false);
-    else if (this.mobileWidgetDrawerOpen()) this.mobileWidgetDrawerOpen.set(false);
-    else if (this.mobilePropertiesOpen()) this.mobilePropertiesOpen.set(false);
+    else if (this.pickerOpen()) this.pickerOpen.set(false);
+    else if (this.layerMenuWidgetId()) this.layerMenuWidgetId.set(null);
+    else if (this.inspectorDrawerOpen()) this.inspectorDrawerOpen.set(false);
+    else if (this.layersDrawerOpen()) this.layersDrawerOpen.set(false);
+    else if (this.elementEditingWidgetId()) this.elementEditingWidgetId.set(null);
+    else if (this.selectedWidget() && !DashboardDesignerComponent.isEditableTarget(document.activeElement)) {
+      this.clearSelection();
+    }
+  }
+
+  /** `A` opens the widget picker, like the Add widget button. */
+  @HostListener('document:keydown', ['$event'])
+  onDocumentKeydown(event: KeyboardEvent): void {
+    if (event.key.toLowerCase() !== 'a' || event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+    if (DashboardDesignerComponent.isEditableTarget(event.target) || this.isLoading() || !this.dashboard()) return;
+    event.preventDefault();
+    this.openPicker();
+  }
+
+  private static isEditableTarget(target: EventTarget | Element | null): boolean {
+    const element = target as HTMLElement | null;
+    return !!element?.closest?.('input, textarea, select, [contenteditable="true"]');
   }
 
   ngOnInit(): void {
     this.isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
     this.viewportWidth.set(window.innerWidth);
+    this.layersOpen.set(window.innerWidth >= LAYERS_PANEL_MIN_WIDTH);
     this.isMobile.set(this.checkIsMobile());
     this.dashboardId = this.route.snapshot.paramMap.get('id') || '';
     if (this.dashboardId) {
@@ -258,6 +357,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
 
   ngOnDestroy(): void {
     this.renderPreviewSubscription?.unsubscribe();
+    this.canvasViewportObserver?.disconnect();
     if (this.longPressTimer) clearTimeout(this.longPressTimer);
     if (this.resizeTimer) clearTimeout(this.resizeTimer);
     if (this.renderPreviewTimer) clearTimeout(this.renderPreviewTimer);
@@ -349,9 +449,187 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     });
   }
 
-  onWidgetSelect(widget: WidgetConfig): void {
+  private selectWidget(widget: WidgetConfig): void {
     this.selectedWidget.set(widget);
-    this.activeTab.set('properties');
+  }
+
+  /** Returns the inspector to dashboard settings. */
+  clearSelection(): void {
+    this.selectedWidget.set(null);
+    this.elementEditingWidgetId.set(null);
+    this.mobileSelectionToolbar.set(false);
+  }
+
+  /** Layers are listed top-most first, the reverse of paint order. */
+  readonly layerWidgets = computed(() => [...this.layout().widgets].reverse());
+
+  widgetIcon(widget: WidgetConfig): string {
+    try {
+      return getWidgetDefinition(widget.type).icon;
+    } catch {
+      return 'fa-square';
+    }
+  }
+
+  widgetDisplayName(widget: WidgetConfig): string {
+    if (widget.name) return widget.name;
+    if (widget.titleOverride) return widget.titleOverride;
+    try {
+      return getWidgetDefinition(widget.type).label;
+    } catch {
+      return widget.type;
+    }
+  }
+
+  onLayerSelect(widget: WidgetConfig): void {
+    this.selectWidget(widget);
+    if (this.usesDrawer()) this.layersDrawerOpen.set(false);
+    if (this.isMobile()) this.mobileSelectionToolbar.set(true);
+  }
+
+  toggleLayerMenu(widget: WidgetConfig, event: Event): void {
+    event.stopPropagation();
+    this.layerMenuWidgetId.set(this.layerMenuWidgetId() === widget.id ? null : widget.id);
+  }
+
+  renamingWidgetId = signal<string | null>(null);
+
+  startRenameLayer(widget: WidgetConfig): void {
+    this.layerMenuWidgetId.set(null);
+    this.renamingWidgetId.set(widget.id);
+    setTimeout(() => document.querySelector<HTMLInputElement>('.layer-rename-input')?.select());
+  }
+
+  /** Saves a layer name; an empty name falls back to the widget title or type. */
+  commitRenameLayer(widget: WidgetConfig, value: string): void {
+    if (this.renamingWidgetId() !== widget.id) return;
+    this.renamingWidgetId.set(null);
+    const name = value.trim().slice(0, 200) || undefined;
+    if (name === widget.name) return;
+    this.replaceWidget({ ...widget, name });
+  }
+
+  cancelRenameLayer(event: Event): void {
+    event.stopPropagation();
+    this.renamingWidgetId.set(null);
+  }
+
+  /** Per-widget font size; an empty field returns to the dashboard default. */
+  updateWidgetFontSize(property: 'titleFontSize' | 'textFontSize', event: Event): void {
+    const widget = this.selectedWidget();
+    if (!widget) return;
+    const input = event.target as HTMLInputElement;
+    const fontOverrides = { ...widget.fontOverrides };
+    if (input.value.trim() === '') {
+      delete fontOverrides[property];
+    } else {
+      const [min, max] = property === 'titleFontSize' ? [8, 72] : [6, 48];
+      fontOverrides[property] = this.readNumberInput(event, min, max, widget.fontOverrides?.[property] ?? min);
+    }
+    this.replaceWidget({ ...widget, fontOverrides: Object.keys(fontOverrides).length ? fontOverrides : undefined });
+  }
+
+  private replaceWidget(updated: WidgetConfig): void {
+    this.layout.update(value => ({ ...value, widgets: value.widgets.map(item => item.id === updated.id ? updated : item) }));
+    if (this.selectedWidget()?.id === updated.id) this.selectedWidget.set(updated);
+  }
+
+  duplicateWidget(widget: WidgetConfig): void {
+    this.layerMenuWidgetId.set(null);
+    const layout = this.layout();
+    const slot = findFreeSlot(layout.widgets, layout.gridCols, layout.gridRows, widget.position.w, widget.position.h);
+    if (!slot) {
+      this.toastService.show('No free space of the same size for a copy of this widget', 'error');
+      return;
+    }
+    const copy: WidgetConfig = {
+      ...structuredClone(widget),
+      id: this.generateId(),
+      position: slot,
+      name: widget.name ? `${widget.name} copy` : undefined,
+    };
+    this.layout.update(value => ({ ...value, widgets: [...value.widgets, copy] }));
+    this.selectWidget(copy);
+  }
+
+  moveWidgetLayer(widget: WidgetConfig, direction: 'forward' | 'backward'): void {
+    this.layerMenuWidgetId.set(null);
+    this.layout.update(value => {
+      const widgets = moveWidgetInPaintOrder(value.widgets, widget.id, direction);
+      return widgets === value.widgets ? value : { ...value, widgets: [...widgets] };
+    });
+  }
+
+  canMoveWidgetLayer(widget: WidgetConfig, direction: 'forward' | 'backward'): boolean {
+    const widgets = this.layout().widgets;
+    const index = widgets.findIndex(item => item.id === widget.id);
+    return direction === 'forward' ? index < widgets.length - 1 : index > 0;
+  }
+
+  openPicker(): void {
+    this.mobileOverflowOpen.set(false);
+    this.layerMenuWidgetId.set(null);
+    this.pickerAnchor.set('toolbar');
+    this.pickerOpen.set(true);
+  }
+
+  togglePicker(): void {
+    if (this.pickerOpen() && this.pickerAnchor() === 'toolbar') this.pickerOpen.set(false);
+    else this.openPicker();
+  }
+
+  /**
+   * Opens the picker next to the layers panel, aligned with the button that opened it and kept
+   * inside the window. Drawers (tablets, phones) use the bottom sheet instead.
+   */
+  openPickerBesideLayers(event: Event): void {
+    const panel = (event.currentTarget as HTMLElement).closest('.designer-panel-left');
+    if (this.usesDrawer() || !panel) {
+      this.openPicker();
+      return;
+    }
+    const margin = 8;
+    const panelRect = panel.getBoundingClientRect();
+    const triggerRect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const popoverHeight = Math.min(window.innerHeight * 0.7, 544);
+    const top = Math.max(margin, Math.min(triggerRect.top, window.innerHeight - popoverHeight - margin));
+    this.openPicker();
+    this.pickerAnchor.set('layers');
+    this.pickerPosition.set({ top, left: panelRect.right + margin });
+  }
+
+  openInspector(): void {
+    this.mobileSelectionToolbar.set(false);
+    this.layersDrawerOpen.set(false);
+    this.inspectorDrawerOpen.set(true);
+  }
+
+  toggleLayers(): void {
+    if (this.usesDrawer()) {
+      this.inspectorDrawerOpen.set(false);
+      this.layersDrawerOpen.set(!this.layersDrawerOpen());
+    } else {
+      this.layersOpen.set(!this.layersOpen());
+    }
+  }
+
+  private rememberWidgetUse(type: WidgetType): void {
+    const recent = rememberRecentWidget(this.recentWidgetTypes(), type);
+    this.recentWidgetTypes.set(recent);
+    try {
+      localStorage.setItem(RECENT_WIDGETS_STORAGE_KEY, JSON.stringify(recent));
+    } catch {
+      // Recent widgets are a convenience; ignore unavailable storage.
+    }
+  }
+
+  private static readRecentWidgets(): WidgetType[] {
+    try {
+      const value = JSON.parse(localStorage.getItem(RECENT_WIDGETS_STORAGE_KEY) ?? '[]');
+      return Array.isArray(value) ? value.filter((item): item is WidgetType => typeof item === 'string') : [];
+    } catch {
+      return [];
+    }
   }
 
   loadAiGeneratedWidgets(): void {
@@ -406,10 +684,8 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       ...layout,
       widgets: layout.widgets.filter(w => w.id !== widget.id)
     }));
-    if (this.selectedWidget()?.id === widget.id) {
-      this.selectedWidget.set(null);
-      this.elementEditingWidgetId.set(null);
-    }
+    this.layerMenuWidgetId.set(null);
+    if (this.selectedWidget()?.id === widget.id) this.clearSelection();
 
     this.toastService.showWithAction(
       'Widget removed from the layout',
@@ -427,8 +703,12 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     );
   }
 
-  onToolboxWidgetMouseDown(event: MouseEvent | PointerEvent, widget: WidgetDefinition): void {
-    event.preventDefault();
+  /**
+   * Mouse press on a picker item: dragging onto the canvas places the widget there, while a
+   * press without movement places it in the first free slot.
+   */
+  onPickerDragStart({ event, widget }: WidgetPickerDragStart): void {
+    this.pickerOpen.set(false);
     const layout = this.layout();
     const canvas = document.querySelector('.dashboard-canvas') as HTMLElement;
     if (!canvas) return;
@@ -443,14 +723,16 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     preview.innerHTML = `<i class='fa ${widget.icon}'></i> ${widget.label}`;
     document.body.appendChild(preview);
 
-    const movePreview = (e: PointerEvent | MouseEvent) => {
+    const movePreview = (e: PointerEvent) => {
       preview.style.left = e.clientX + 8 + 'px';
       preview.style.top = e.clientY + 8 + 'px';
     };
     movePreview(event);
+    let moved = false;
 
-    const onPointerMove = (e: PointerEvent | MouseEvent) => {
+    const onPointerMove = (e: PointerEvent) => {
       movePreview(e);
+      if (Math.abs(e.clientX - event.clientX) > 4 || Math.abs(e.clientY - event.clientY) > 4) moved = true;
 
       const rect = canvas.getBoundingClientRect();
       if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
@@ -478,15 +760,13 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     };
 
     const onPointerUp = () => {
-      document.removeEventListener('pointermove', onPointerMove);
-      document.removeEventListener('pointerup', onPointerUp);
-      document.removeEventListener('pointercancel', onPointerUp);
-      document.removeEventListener('mousemove', onPointerMove);
-      document.removeEventListener('mouseup', onPointerUp);
       preview.remove();
 
       const g = this.ghost();
-      if (g) {
+      this.ghost.set(null);
+      if (!moved) {
+        this.addWidgetToFirstSlot(widget);
+      } else if (g) {
         const newWidget: WidgetConfig = {
           id: this.generateId(),
           type: widget.type,
@@ -494,127 +774,44 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
           config: createDefaultWidgetConfig(widget.type)
         };
         this.layout.update(l => ({ ...l, widgets: [...l.widgets, newWidget] }));
+        this.selectWidget(newWidget);
+        this.rememberWidgetUse(widget.type);
       }
-      this.ghost.set(null);
     };
 
-    document.addEventListener('pointermove', onPointerMove);
-    document.addEventListener('pointerup', onPointerUp);
-    document.addEventListener('pointercancel', onPointerUp);
-    // Fallback for environments where pointer events aren't fully supported
-    document.addEventListener('mousemove', onPointerMove);
-    document.addEventListener('mouseup', onPointerUp);
+    this.trackPointer(event, onPointerMove, onPointerUp);
   }
 
-  onToolboxWidgetKeyDown(event: KeyboardEvent, widget: WidgetDefinition): void {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    this.addWidgetToFirstSlot(widget);
-  }
-
-  /** Add a widget to the first available grid position (used on mobile). */
+  /** Adds a widget at the first free grid position (picker click, keyboard and touch). */
   addWidgetToFirstSlot(widget: WidgetDefinition): void {
     const layout = this.layout();
-    const cols = layout.gridCols;
-    const rows = layout.gridRows;
-    const { w: defaultW, h: defaultH } = getWidgetDefaultSize(widget.type, cols, rows);
-
-    // Build occupancy grid
-    const occupied = new Set<string>();
-    for (const w of layout.widgets) {
-      for (let dx = 0; dx < w.position.w; dx++) {
-        for (let dy = 0; dy < w.position.h; dy++) {
-          occupied.add(`${w.position.x + dx},${w.position.y + dy}`);
-        }
-      }
-    }
-
-    // Find first position that fits
-    let placed = false;
-    for (let y = 0; y <= rows - defaultH && !placed; y++) {
-      for (let x = 0; x <= cols - defaultW && !placed; x++) {
-        let fits = true;
-        for (let dx = 0; dx < defaultW && fits; dx++) {
-          for (let dy = 0; dy < defaultH && fits; dy++) {
-            if (occupied.has(`${x + dx},${y + dy}`)) fits = false;
-          }
-        }
-        if (fits) {
-          const newWidget: WidgetConfig = {
-            id: this.generateId(),
-            type: widget.type,
-            position: { x, y, w: defaultW, h: defaultH },
-            config: createDefaultWidgetConfig(widget.type)
-          };
-          this.layout.update(l => ({ ...l, widgets: [...l.widgets, newWidget] }));
-          this.selectedWidget.set(newWidget);
-          this.activeTab.set('properties');
-          if (this.isMobile()) {
-            this.mobileWidgetDrawerOpen.set(false);
-            this.mobilePropertiesOpen.set(true);
-          }
-          placed = true;
-        }
-      }
-    }
-
-    if (!placed) {
+    const { w, h } = getWidgetDefaultSize(widget.type, layout.gridCols, layout.gridRows);
+    const position = findFreeSlot(layout.widgets, layout.gridCols, layout.gridRows, w, h);
+    this.pickerOpen.set(false);
+    if (!position) {
       this.toastService.show('No space available on the canvas for a new widget', 'error');
+      return;
     }
+
+    const newWidget: WidgetConfig = {
+      id: this.generateId(),
+      type: widget.type,
+      position,
+      config: createDefaultWidgetConfig(widget.type)
+    };
+    this.layout.update(l => ({ ...l, widgets: [...l.widgets, newWidget] }));
+    this.selectWidget(newWidget);
+    this.rememberWidgetUse(widget.type);
+    // New widgets usually need a data source, so show their settings straight away on small screens.
+    if (this.usesDrawer()) this.openInspector();
   }
 
-  // Tab navigation
-  switchTab(direction: 'left' | 'right'): void {
-    const current = this.tabOrder.indexOf(this.activeTab());
-    let newIdx;
-    if (direction === 'left') {
-      newIdx = (current - 1 + this.tabOrder.length) % this.tabOrder.length;
-    } else {
-      newIdx = (current + 1) % this.tabOrder.length;
-    }
-    this.activeTab.set(this.tabOrder[newIdx]);
-    setTimeout(() => {
-      const tabBar = document.querySelector('.custom-tab-bar') as HTMLElement;
-      if (!tabBar) return;
-      const tabBtns = Array.from(tabBar.querySelectorAll('.tab-btn')) as HTMLElement[];
-      const activeBtn = tabBtns[newIdx];
-      if (activeBtn) {
-        activeBtn.focus();
-        const barRect = tabBar.getBoundingClientRect();
-        const btnRect = activeBtn.getBoundingClientRect();
-        if (btnRect.left < barRect.left) {
-          tabBar.scrollBy({ left: btnRect.left - barRect.left - 16, behavior: 'smooth' });
-        } else if (btnRect.right > barRect.right) {
-          tabBar.scrollBy({ left: btnRect.right - barRect.right + 16, behavior: 'smooth' });
-        }
-      }
-    }, 0);
-  }
-
-  onDesignerTabKeydown(event: KeyboardEvent): void {
-    const current = this.tabOrder.indexOf(this.activeTab());
-    let newIndex = current;
-
-    if (event.key === 'ArrowLeft') newIndex = (current - 1 + this.tabOrder.length) % this.tabOrder.length;
-    else if (event.key === 'ArrowRight') newIndex = (current + 1) % this.tabOrder.length;
-    else if (event.key === 'Home') newIndex = 0;
-    else if (event.key === 'End') newIndex = this.tabOrder.length - 1;
-    else return;
-
-    event.preventDefault();
-    this.activeTab.set(this.tabOrder[newIndex]);
-    const tabList = (event.currentTarget as HTMLElement).closest('[role="tablist"]');
-    const tabs = tabList?.querySelectorAll<HTMLElement>('[role="tab"]');
-    setTimeout(() => tabs?.item(newIndex).focus());
-  }
-
-
-  onWidgetMouseDown(event: MouseEvent | PointerEvent, widget: WidgetConfig): void {
+  onWidgetPointerDown(event: PointerEvent, widget: WidgetConfig): void {
+    if (event.button !== 0) return;
     event.stopPropagation();
     if (this.elementEditingWidgetId() === widget.id) return;
     if (this.elementEditingWidgetId()) this.elementEditingWidgetId.set(null);
-    this.selectedWidget.set(widget);
-    this.activeTab.set('properties');
+    this.selectWidget(widget);
 
     // On mobile, show floating toolbar instead of immediately opening drawer
     if (this.isMobile()) {
@@ -630,8 +827,13 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       }
     }
 
-    // On touch devices, use long-press to initiate drag
-    const isTouch = 'pointerType' in event && (event as PointerEvent).pointerType === 'touch';
+    // On touch, an already selected widget drags immediately (its overlay disables panning);
+    // other widgets need a long press so a swipe across the canvas still scrolls the page.
+    const isTouch = event.pointerType === 'touch';
+    if (isTouch && target.closest('.sel-overlay')) {
+      this.startDrag(event, widget);
+      return;
+    }
     if (isTouch) {
       this.pointerMoved = false;
       this.longPressActive.set(true);
@@ -677,7 +879,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   onWidgetKeyDown(event: KeyboardEvent, widget: WidgetConfig): void {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      this.onWidgetSelect(widget);
+      this.selectWidget(widget);
       return;
     }
 
@@ -710,15 +912,14 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       widgets: value.widgets.map(item => item.id === widget.id ? updated : item),
     }));
     this.selectedWidget.set(updated);
-    this.activeTab.set('properties');
   }
 
-  getSelectedWidgetGeometry(): WidgetRenderGeometry | undefined {
-    if (this.renderedCanvasLoading()
-        || this.renderedLayoutSignature !== JSON.stringify(this.getCompleteRenderLayout())) return undefined;
+  /** Renderer geometry for the selection, only while the preview matches the current layout. */
+  readonly selectedWidgetGeometry = computed<WidgetRenderGeometry | undefined>(() => {
+    if (this.renderedCanvasLoading() || this.renderedLayoutSignature() !== this.renderLayoutSignature()) return undefined;
     const selected = this.selectedWidget();
     return selected ? this.renderedWidgetGeometry()[selected.id] : undefined;
-  }
+  });
 
   selectedWidgetSupportsElementEditing(): boolean {
     const selected = this.selectedWidget();
@@ -732,7 +933,9 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     if (source) return source.connectionName ? `${source.connectionName} · ${source.friendlyName || sourceId}` : source.friendlyName || sourceId;
     return sourceId.startsWith('source:') ? 'Unavailable source' : sourceId;
   }
-  selectedWidgetSourceStatuses(): Array<{ key: string; label: string; status: DataSourceStatus }> {
+  readonly selectedWidgetSourceStatuses = computed(() => this.buildSelectedWidgetSourceStatuses());
+
+  private buildSelectedWidgetSourceStatuses(): Array<{ key: string; label: string; status: DataSourceStatus }> {
     const widget = this.selectedWidget();
     if (!widget) return [];
     const config = widget.config as any;
@@ -808,9 +1011,32 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     this.selectedWidget.set(updated);
   }
 
-  private startDrag(event: MouseEvent | PointerEvent, widget: WidgetConfig): void {
+  /**
+   * Follows the pointer that started a gesture until it is released or cancelled. While the
+   * gesture runs, touch scrolling is suppressed so the browser does not pan instead of dragging.
+   */
+  private trackPointer(start: PointerEvent, onMove: (event: PointerEvent) => void, onEnd: () => void): void {
+    const pointerId = start.pointerId;
+    const blockScroll = (event: TouchEvent) => event.preventDefault();
+    const move = (event: PointerEvent) => {
+      if (event.pointerId === pointerId) onMove(event);
+    };
+    const end = (event: PointerEvent) => {
+      if (event.pointerId !== pointerId) return;
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', end);
+      document.removeEventListener('pointercancel', end);
+      document.removeEventListener('touchmove', blockScroll);
+      onEnd();
+    };
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', end);
+    document.addEventListener('pointercancel', end);
+    document.addEventListener('touchmove', blockScroll, { passive: false });
+  }
+
+  private startDrag(event: PointerEvent, widget: WidgetConfig): void {
     let isDragging = true;
-    this.mobileDragging.set(true);
     this.dragStartPos = { x: event.clientX, y: event.clientY };
     this.dragStartWidget = { ...widget.position };
 
@@ -830,7 +1056,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
 
     this.ghost.set({ id: widget.id, position: { ...widget.position } });
 
-    const onPointerMove = (e: PointerEvent | MouseEvent) => {
+    const onPointerMove = (e: PointerEvent) => {
       if (!isDragging) return;
 
       const deltaX = e.clientX - this.dragStartPos.x;
@@ -845,7 +1071,6 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
 
     const onPointerUp = () => {
       isDragging = false;
-      this.mobileDragging.set(false);
       const g = this.ghost();
       if (g) {
         this.layout.update(l => ({
@@ -856,24 +1081,14 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
         if (updated) this.selectedWidget.set(updated);
       }
       this.ghost.set(null);
-      document.removeEventListener('pointermove', onPointerMove);
-      document.removeEventListener('pointerup', onPointerUp);
-      document.removeEventListener('pointercancel', onPointerUp);
-      document.removeEventListener('mousemove', onPointerMove);
-      document.removeEventListener('mouseup', onPointerUp);
     };
 
-    document.addEventListener('pointermove', onPointerMove);
-    document.addEventListener('pointerup', onPointerUp);
-    document.addEventListener('pointercancel', onPointerUp);
-    document.addEventListener('mousemove', onPointerMove);
-    document.addEventListener('mouseup', onPointerUp);
+    this.trackPointer(event, onPointerMove, onPointerUp);
   }
 
-  private startResize(event: MouseEvent | PointerEvent, widget: WidgetConfig, direction: 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'): void {
+  private startResize(event: PointerEvent, widget: WidgetConfig, direction: 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'): void {
     event.stopPropagation();
     let isResizing = true;
-    this.mobileDragging.set(true);
     this.dragStartPos = { x: event.clientX, y: event.clientY };
     this.dragStartWidget = { ...widget.position };
     const canvas = document.querySelector('.dashboard-canvas') as HTMLElement;
@@ -892,7 +1107,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
 
     this.ghost.set({ id: widget.id, position: { ...widget.position } });
 
-    const onPointerMove = (e: PointerEvent | MouseEvent) => {
+    const onPointerMove = (e: PointerEvent) => {
       if (!isResizing) return;
       const deltaX = e.clientX - this.dragStartPos.x;
       const deltaY = e.clientY - this.dragStartPos.y;
@@ -953,7 +1168,6 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
 
     const onPointerUp = () => {
       isResizing = false;
-      this.mobileDragging.set(false);
       const g = this.ghost();
       if (g) {
         this.layout.update(l => ({
@@ -964,18 +1178,9 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
         if (updated) this.selectedWidget.set(updated);
       }
       this.ghost.set(null);
-      document.removeEventListener('pointermove', onPointerMove);
-      document.removeEventListener('pointerup', onPointerUp);
-      document.removeEventListener('pointercancel', onPointerUp);
-      document.removeEventListener('mousemove', onPointerMove);
-      document.removeEventListener('mouseup', onPointerUp);
     };
 
-    document.addEventListener('pointermove', onPointerMove);
-    document.addEventListener('pointerup', onPointerUp);
-    document.addEventListener('pointercancel', onPointerUp);
-    document.addEventListener('mousemove', onPointerMove);
-    document.addEventListener('mouseup', onPointerUp);
+    this.trackPointer(event, onPointerMove, onPointerUp);
   }
 
 
@@ -1027,8 +1232,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     this.aiEnabled.set(snapshot.aiEnabled);
     this.aiPrompt.set(snapshot.aiPrompt);
     this.aiLeadTimeMinutes.set(snapshot.aiLeadTimeMinutes);
-    this.selectedWidget.set(null);
-    this.elementEditingWidgetId.set(null);
+    this.clearSelection();
   }
 
   private computeCurrentSnapshot(): string {
@@ -1169,19 +1373,23 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   }
 
   setOrientation(newOrientation: DashboardOrientation): void {
-    if (newOrientation === this.orientation()) return;
+    const previousOrientation = this.orientation();
+    if (newOrientation === previousOrientation) return;
     this.orientation.set(newOrientation);
 
     const size = this.sizePresets[this.selectedSizeIndex] ?? DEFAULT_DASHBOARD_SIZE;
     const isPortrait = newOrientation === 'Portrait';
-
-    this.layout.update(l => ({
-      ...l,
+    const previous = this.layout();
+    this.layout.set({
+      ...previous,
       width: isPortrait ? size.height : size.width,
       height: isPortrait ? size.width : size.height,
-      gridCols: l.gridRows,
-      gridRows: l.gridCols,
-    }));
+    });
+    // Rotating swaps the grid; widgets are fitted into it like any other grid change.
+    this.applyGridSize(previous.gridRows, previous.gridCols, () => {
+      this.orientation.set(previousOrientation);
+      this.layout.set(previous);
+    });
   }
 
   onSizeChange(): void {
@@ -1194,38 +1402,101 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     }));
   }
 
-  updateLayoutGridCols(gridCols: number): void {
-    this.layout.update(layout => ({ ...layout, gridCols }));
+  /**
+   * Number inputs commit on change (blur, Enter, spinner) rather than per keystroke, so typing
+   * "16" never applies an intermediate 1. The clamped value is written back to the field.
+   */
+  private readNumberInput(event: Event, min: number, max: number, fallback: number): number {
+    const input = event.target as HTMLInputElement;
+    const value = clampWhole(input.value, min, max, fallback);
+    input.value = String(value);
+    return value;
   }
 
-  updateLayoutGridRows(gridRows: number): void {
-    this.layout.update(layout => ({ ...layout, gridRows }));
+  updateLayoutGridCols(event: Event): void {
+    const layout = this.layout();
+    this.applyGridSize(this.readNumberInput(event, GRID_LIMITS.min, GRID_LIMITS.max, layout.gridCols), layout.gridRows);
   }
 
-  updateCanvasPadding(padding: number): void {
-    this.layout.update(layout => ({ ...layout, canvasPadding: padding }));
+  updateLayoutGridRows(event: Event): void {
+    const layout = this.layout();
+    this.applyGridSize(layout.gridCols, this.readNumberInput(event, GRID_LIMITS.min, GRID_LIMITS.max, layout.gridRows));
   }
 
-  updateWidgetGap(gap: number): void {
-    this.layout.update(layout => ({ ...layout, widgetGap: gap }));
+  /** Changes the grid and fits widgets back inside it, offering undo when any had to move. */
+  private applyGridSize(gridCols: number, gridRows: number, undo?: () => void): void {
+    const previous = this.layout();
+    if (gridCols === previous.gridCols && gridRows === previous.gridRows) return;
+    const fitted = fitWidgetsToGrid(previous.widgets, gridCols, gridRows);
+    this.layout.set({ ...previous, gridCols, gridRows, widgets: fitted.widgets });
+    this.refreshSelectedWidget();
+    if (fitted.changed === 0) return;
+    this.toastService.showWithAction(
+      fitted.changed === 1 ? '1 widget was moved or resized to fit the grid' : `${fitted.changed} widgets were moved or resized to fit the grid`,
+      'Undo',
+      () => {
+        if (undo) undo();
+        else this.layout.set(previous);
+        this.refreshSelectedWidget();
+      },
+      'info',
+      6000,
+    );
   }
 
-  updateWidgetBorder(border: number): void {
-    this.layout.update(layout => ({ ...layout, widgetBorder: border }));
+  /** Re-reads the selected widget from the layout after a bulk change. */
+  private refreshSelectedWidget(): void {
+    const selected = this.selectedWidget();
+    if (!selected) return;
+    const current = this.layout().widgets.find(widget => widget.id === selected.id) ?? null;
+    if (current !== selected) this.selectedWidget.set(current);
   }
 
-  updateWidgetPadding(padding: number): void {
-    this.layout.update(layout => ({ ...layout, widgetPadding: padding }));
+  /** Position and size fields in the inspector; columns and rows are shown 1-based. */
+  updateSelectedWidgetPosition(field: 'x' | 'y' | 'w' | 'h', event: Event): void {
+    const widget = this.selectedWidget();
+    if (!widget) return;
+    const layout = this.layout();
+    const isColumnAxis = field === 'x' || field === 'w';
+    const limit = isColumnAxis ? layout.gridCols : layout.gridRows;
+    const oneBased = field === 'x' || field === 'y';
+    const current = widget.position[field] + (oneBased ? 1 : 0);
+    const value = this.readNumberInput(event, 1, limit, current) - (oneBased ? 1 : 0);
+    const position = fitPositionToGrid({ ...widget.position, [field]: value }, layout.gridCols, layout.gridRows);
+    (event.target as HTMLInputElement).value = String(position[field] + (oneBased ? 1 : 0));
+    const updated = { ...widget, position };
+    this.layout.update(value => ({ ...value, widgets: value.widgets.map(item => item.id === widget.id ? updated : item) }));
+    this.selectedWidget.set(updated);
   }
 
-  updateTitleFontSize(fontSize: number | string): void {
-    const size = typeof fontSize === 'string' ? parseInt(fontSize, 10) : fontSize;
-    this.layout.update(layout => ({ ...layout, titleFontSize: size }));
+  updateCanvasPadding(event: Event): void {
+    const canvasPadding = this.readNumberInput(event, 0, 128, this.layout().canvasPadding ?? 0);
+    this.layout.update(layout => ({ ...layout, canvasPadding }));
   }
 
-  updateTextFontSize(fontSize: number | string): void {
-    const size = typeof fontSize === 'string' ? parseInt(fontSize, 10) : fontSize;
-    this.layout.update(layout => ({ ...layout, textFontSize: size }));
+  updateWidgetGap(event: Event): void {
+    const widgetGap = this.readNumberInput(event, 0, 64, this.layout().widgetGap ?? 0);
+    this.layout.update(layout => ({ ...layout, widgetGap }));
+  }
+
+  updateWidgetBorder(event: Event): void {
+    const widgetBorder = this.readNumberInput(event, 0, 20, this.layout().widgetBorder ?? 0);
+    this.layout.update(layout => ({ ...layout, widgetBorder }));
+  }
+
+  updateWidgetPadding(event: Event): void {
+    const widgetPadding = this.readNumberInput(event, 0, 32, this.layout().widgetPadding ?? 0);
+    this.layout.update(layout => ({ ...layout, widgetPadding }));
+  }
+
+  updateTitleFontSize(event: Event): void {
+    const titleFontSize = this.readNumberInput(event, 8, 72, this.layout().titleFontSize ?? 16);
+    this.layout.update(layout => ({ ...layout, titleFontSize }));
+  }
+
+  updateTextFontSize(event: Event): void {
+    const textFontSize = this.readNumberInput(event, 6, 48, this.layout().textFontSize ?? 14);
+    this.layout.update(layout => ({ ...layout, textFontSize }));
   }
 
   updateTitleFontWeight(fontWeight: number | string): void {
@@ -1238,45 +1509,10 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     this.layout.update(layout => ({ ...layout, textFontWeight: this.normalizeFontWeight(weight) }));
   }
 
-  updateCanvasBackgroundColor(color: string): void {
+  updateLayoutColor(property: LayoutColorProperty, color: string): void {
     this.layout.update(layout => ({
       ...layout,
-      colorScheme: { ...layout.colorScheme, canvasBackgroundColor: color }
-    }));
-  }
-
-  updateWidgetBorderColor(color: string): void {
-    this.layout.update(layout => ({
-      ...layout,
-      colorScheme: { ...layout.colorScheme, widgetBorderColor: color }
-    }));
-  }
-
-  updateWidgetTitleTextColor(color: string): void {
-    this.layout.update(layout => ({
-      ...layout,
-      colorScheme: { ...layout.colorScheme, widgetTitleTextColor: color }
-    }));
-  }
-
-  updateWidgetTextColor(color: string): void {
-    this.layout.update(layout => ({
-      ...layout,
-      colorScheme: { ...layout.colorScheme, widgetTextColor: color }
-    }));
-  }
-
-  updateIconColor(color: string): void {
-    this.layout.update(layout => ({
-      ...layout,
-      colorScheme: { ...layout.colorScheme, iconColor: color }
-    }));
-  }
-
-  updateWidgetBackgroundColor(color: string): void {
-    this.layout.update(layout => ({
-      ...layout,
-      colorScheme: { ...layout.colorScheme, widgetBackgroundColor: color }
+      colorScheme: { ...layout.colorScheme, [property]: color }
     }));
   }
 
@@ -1334,18 +1570,13 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   }
 
   // Helper method to check if a specific layout color property is overridden vs. the base scheme
-  isLayoutColorOverridden(prop: 'canvasBackgroundColor' | 'widgetBackgroundColor' | 'widgetBorderColor' | 'widgetTitleTextColor' | 'widgetTextColor' | 'iconColor'): boolean {
+  isLayoutColorOverridden(prop: LayoutColorProperty): boolean {
     return this.layout().colorScheme[prop] !== this.getBaseScheme()[prop];
   }
 
   // Helper method to check if layout has any color overrides vs. the selected base scheme
   hasLayoutColorOverrides(): boolean {
-    return this.isLayoutColorOverridden('canvasBackgroundColor') ||
-      this.isLayoutColorOverridden('widgetBackgroundColor') ||
-      this.isLayoutColorOverridden('widgetBorderColor') ||
-      this.isLayoutColorOverridden('widgetTitleTextColor') ||
-      this.isLayoutColorOverridden('widgetTextColor') ||
-      this.isLayoutColorOverridden('iconColor');
+    return this.layoutColorFields.some(field => this.isLayoutColorOverridden(field.key));
   }
 
   // Helper method to check if a specific widget color override differs from the current scheme
@@ -1367,11 +1598,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   // Helper method to check if widget has any color overrides that actually differ from the current scheme
   hasWidgetColorOverrides(widget: WidgetConfig | null): boolean {
     if (!widget?.colorOverrides) return false;
-    return this.isWidgetColorOverridden(widget, 'widgetBackgroundColor') ||
-      this.isWidgetColorOverridden(widget, 'widgetBorderColor') ||
-      this.isWidgetColorOverridden(widget, 'widgetTitleTextColor') ||
-      this.isWidgetColorOverridden(widget, 'widgetTextColor') ||
-      this.isWidgetColorOverridden(widget, 'iconColor');
+    return this.widgetColorFields.some(field => this.isWidgetColorOverridden(widget, field.key));
   }
 
 
@@ -1410,10 +1637,14 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   }
 
   private renderRenderedCanvas(): void {
-    const revision = ++this.renderPreviewRevision;
     const refreshData = this.forceRefreshOnNextRender;
-    const renderLayout = this.getCompleteRenderLayout();
-    const renderLayoutSignature = JSON.stringify(renderLayout);
+    const renderLayout = this.renderLayout();
+    const renderLayoutSignature = this.renderLayoutSignature();
+    // Selecting, saving or no-op drags re-emit an identical layout; the preview already shows it.
+    if (!refreshData && renderLayoutSignature === this.requestedLayoutSignature) return;
+
+    const revision = ++this.renderPreviewRevision;
+    this.requestedLayoutSignature = renderLayoutSignature;
     this.forceRefreshOnNextRender = false;
 
     this.renderPreviewSubscription?.unsubscribe();
@@ -1426,7 +1657,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
           if (preview.revision !== this.renderPreviewRevision) return;
 
           this.renderedCanvasImageUrl.set(this.renderPreviewService.toImageUrl(preview));
-          this.renderedLayoutSignature = renderLayoutSignature;
+          this.renderedLayoutSignature.set(renderLayoutSignature);
           this.renderedCanvasAt.set(preview.renderedAt);
           this.renderedWidgetGeometry.set(Object.fromEntries(
             preview.widgets.map(widget => [widget.id, widget]),
@@ -1442,17 +1673,33 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
 
           this.renderedCanvasLoading.set(false);
           this.renderedCanvasError.set(message);
+          this.requestedLayoutSignature = '';
         },
       });
   }
 
-  private getCompleteRenderLayout(): DashboardLayout {
+  /** Complete transient layout sent to the renderer, including generated widgets. */
+  private readonly renderLayout = computed<DashboardLayout>(() => {
     const layout = this.layout();
     const generatedWidgets = this.aiEnabled() ? this.aiGeneratedWidgets() : [];
     return generatedWidgets.length === 0
       ? layout
       : { ...layout, widgets: [...layout.widgets, ...generatedWidgets] };
-  }
+  });
+  private readonly renderLayoutSignature = computed(() => JSON.stringify(this.renderLayout()));
+
+  // Template styles are memoised so change detection during drags does not rebuild them.
+  readonly canvasStyle = computed(() => this.buildCanvasStyle());
+  readonly canvasScaleStyle = computed(() => this.buildCanvasScaleStyle());
+  readonly gridOverlayStyle = computed(() => this.buildGridOverlayStyle());
+  readonly selectionOverlayStyle = computed(() => this.buildSelectionOverlayStyle());
+  readonly widgetStyles = computed(() => {
+    const styles: Record<string, Record<string, unknown>> = {};
+    for (const widget of [...this.layout().widgets, ...this.aiGeneratedWidgets()]) {
+      styles[widget.id] = this.buildWidgetStyle(widget);
+    }
+    return styles;
+  });
 
   private async getRenderErrorMessage(error: any): Promise<string> {
     if (error?.error instanceof Blob) {
@@ -1472,7 +1719,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       || 'Failed to render dashboard preview';
   }
 
-  getCanvasStyle(): any {
+  private buildCanvasStyle(): any {
     const layout = this.layout();
     return {
       width: `${layout.width}px`,
@@ -1491,19 +1738,20 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       '--widget-border': `${layout.widgetBorder ?? 3}px`,
       position: 'relative',
       boxSizing: 'border-box',
+      transform: this.canvasScale() === 1 ? 'none' : `scale(${this.canvasScale()})`,
+      transformOrigin: '0 0',
     };
   }
 
-  getGridOverlayStyle(): any {
+  private buildGridOverlayStyle(): any {
     const layout = this.layout();
     const padding = layout.canvasPadding ?? 0;
     const gap = layout.widgetGap ?? 0;
     const cols = Math.max(1, layout.gridCols);
     const rows = Math.max(1, layout.gridRows);
-    const canvasEl = document.querySelector('.dashboard-canvas') as HTMLElement | null;
-    const rect = canvasEl ? canvasEl.getBoundingClientRect() : null;
-    const totalWidth = rect ? rect.width : layout.width;
-    const totalHeight = rect ? rect.height : layout.height;
+    // The overlay lives inside the scaled canvas, so it is laid out in unscaled device pixels.
+    const totalWidth = layout.width;
+    const totalHeight = layout.height;
 
     const innerWidth = Math.max(0, totalWidth - padding * 2 - gap * (cols - 1));
     const innerHeight = Math.max(0, totalHeight - padding * 2 - gap * (rows - 1));
@@ -1530,7 +1778,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     };
   }
 
-  getWidgetStyle(widget: WidgetConfig): any {
+  private buildWidgetStyle(widget: WidgetConfig): any {
     const layout = this.layout();
     const borderColor = widget.colorOverrides?.widgetBorderColor || layout.colorScheme.widgetBorderColor || layout.colorScheme.foreground;
     const backgroundColor = widget.colorOverrides?.widgetBackgroundColor || layout.colorScheme.widgetBackgroundColor || layout.colorScheme.background;
@@ -1549,19 +1797,35 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     };
   }
 
-  getSelectionOverlayStyle(): any {
+  private buildSelectionOverlayStyle(): any {
     const widget = this.selectedWidget();
     if (!widget) return { display: 'none' };
+    const editingElements = this.elementEditingWidgetId() === widget.id;
+    return {
+      ...this.widgetRect(widget),
+      pointerEvents: editingElements ? 'none' : 'auto',
+      zIndex: 100,
+    };
+  }
+
+  /** Outline for the widget hovered in the layers list. */
+  readonly hoverOverlayStyle = computed(() => {
+    const id = this.hoveredWidgetId();
+    const widget = id && id !== this.selectedWidget()?.id ? this.layout().widgets.find(item => item.id === id) : undefined;
+    return widget ? { ...this.widgetRect(widget), pointerEvents: 'none', zIndex: 95 } : null;
+  });
+
+  /** Widget rectangle in unscaled canvas pixels, preferring renderer-resolved bounds. */
+  private widgetRect(widget: WidgetConfig): Record<string, string> {
     const layout = this.layout();
     const padding = layout.canvasPadding ?? 0;
     const gap     = layout.widgetGap ?? 0;
     const cols    = layout.gridCols;
     const rows    = layout.gridRows;
 
-    // Use actual inner dimensions (clientWidth excludes the canvas CSS border)
-    const canvasEl = document.querySelector('.dashboard-canvas') as HTMLElement | null;
-    const totalW = canvasEl ? canvasEl.clientWidth  : layout.width;
-    const totalH = canvasEl ? canvasEl.clientHeight : layout.height;
+    // Laid out in unscaled device pixels inside the (possibly scaled) canvas.
+    const totalW = layout.width;
+    const totalH = layout.height;
 
     const cellW = (totalW - 2 * padding - gap * (cols - 1)) / cols;
     const cellH = (totalH - 2 * padding - gap * (rows - 1)) / rows;
@@ -1577,7 +1841,6 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     const top    = resolvedBounds?.y ?? padding + p.y * (cellH + gap);
     const width  = resolvedBounds?.width ?? p.w * cellW + (p.w - 1) * gap;
     const height = resolvedBounds?.height ?? p.h * cellH + (p.h - 1) * gap;
-    const editingElements = this.elementEditingWidgetId() === widget.id;
 
     return {
       position: 'absolute',
@@ -1586,8 +1849,6 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       width:  `${width}px`,
       height: `${height}px`,
       boxSizing: 'border-box',
-      pointerEvents: editingElements ? 'none' : 'auto',
-      zIndex: 100,
     };
   }
 
@@ -1702,7 +1963,9 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       config,
       colorOverrides: widget?.colorOverrides,
       titleOverride: widget?.titleOverride,
-      showTitle: widget?.showTitle !== false
+      showTitle: widget?.showTitle !== false,
+      name: typeof widget?.name === 'string' && widget.name.trim() ? widget.name : undefined,
+      fontOverrides: widget?.fontOverrides ?? undefined,
     } as WidgetConfig;
   }
 
@@ -1729,19 +1992,35 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
 
 
 
-  getCanvasScaleStyle(): any {
+  /** The wrapper occupies the scaled footprint so scrolling and centring see the visual size. */
+  private buildCanvasScaleStyle(): any {
     const scale = this.canvasScale();
-    if (scale >= 1) return {};
-    const w = this.layout().width;
-    const h = this.layout().height;
+    const layout = this.layout();
     return {
-      transform: `scale(${scale})`,
-      'transform-origin': 'top left',
-      width: `${w}px`,
-      height: `${h}px`,
-      'margin-right': `-${w * (1 - scale)}px`,
-      'margin-bottom': `-${h * (1 - scale)}px`,
+      width: `${Math.round(layout.width * scale)}px`,
+      height: `${Math.round(layout.height * scale)}px`,
     };
+  }
+
+  zoomCanvas(direction: 1 | -1): void {
+    this.setCanvasZoom(stepCanvasZoom(this.canvasScale(), direction));
+  }
+
+  setCanvasZoom(zoom: CanvasZoom): void {
+    this.canvasZoom.set(zoom);
+    try {
+      localStorage.setItem(CANVAS_ZOOM_STORAGE_KEY, String(zoom));
+    } catch {
+      // Storage may be unavailable (private mode); zoom still applies for this session.
+    }
+  }
+
+  private static readStoredZoom(): CanvasZoom {
+    try {
+      return parseCanvasZoom(localStorage.getItem(CANVAS_ZOOM_STORAGE_KEY));
+    } catch {
+      return 'fit';
+    }
   }
 
   /** Touch-primary devices use a wider breakpoint (1024) so landscape phones still get mobile UI. */
@@ -1756,18 +2035,11 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     return width < this.mobileBreakpoint;
   }
 
-  openMobileProperties(): void {
-    this.mobileSelectionToolbar.set(false);
-    this.mobilePropertiesOpen.set(true);
-    this.activeTab.set('properties');
-  }
 
-  onCanvasMouseDown(event: MouseEvent): void {
+  onCanvasPointerDown(event: PointerEvent): void {
     const target = event.target as HTMLElement;
     if (target.classList.contains('dashboard-canvas') || target.classList.contains('grid-overlay')) {
-      this.selectedWidget.set(null);
-      this.elementEditingWidgetId.set(null);
-      this.mobileSelectionToolbar.set(false);
+      this.clearSelection();
     }
   }
 
@@ -1778,7 +2050,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   onBottomSheetTouchEnd(event: TouchEvent): void {
     const deltaY = event.changedTouches[0].clientY - this.swipeStartY;
     if (deltaY > 80) {
-      this.mobileWidgetDrawerOpen.set(false);
+      this.pickerOpen.set(false);
     }
   }
 
@@ -1786,10 +2058,19 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     this.swipeStartX = event.touches[0].clientX;
   }
 
-  onDrawerTouchEnd(event: TouchEvent): void {
+  /** Swiping a drawer back towards its edge closes it. */
+  onDrawerTouchEnd(event: TouchEvent, side: 'left' | 'right'): void {
     const deltaX = event.changedTouches[0].clientX - this.swipeStartX;
-    if (deltaX > 80) {
-      this.mobilePropertiesOpen.set(false);
-    }
+    if (side === 'right' && deltaX > 80) this.inspectorDrawerOpen.set(false);
+    if (side === 'left' && deltaX < -80) this.layersDrawerOpen.set(false);
   }
+
+  needsSource(widget: WidgetConfig): boolean {
+    return widgetNeedsDataSource(widget);
+  }
+
+  readonly selectedWidgetNeedsSource = computed(() => {
+    const widget = this.selectedWidget();
+    return !!widget && widgetNeedsDataSource(widget);
+  });
 }

@@ -1,5 +1,5 @@
-import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { SearchableSelectComponent, SelectOption } from '../searchable-select/searchable-select.component';
 
 export interface EntitySourceOption {
   entity_id: string;
@@ -29,10 +29,10 @@ export function groupByConnection<T extends { connectionName?: string }>(sources
 @Component({
   selector: 'app-entity-source-selector',
   standalone: true,
-  imports: [FormsModule],
+  imports: [SearchableSelectComponent],
   template: `
     <div class="mb-3">
-      <label class="form-label fw-semibold small" for="entitySourceSelect">Data source</label>
+      <label class="form-label fw-semibold" for="entitySourceSelect">Data source</label>
       @if (loading) {
         <div class="text-muted small" role="status"><i class="fa fa-spinner fa-spin me-1" aria-hidden="true"></i>Loading sources…</div>
       } @else if (entities.length === 0) {
@@ -40,31 +40,17 @@ export function groupByConnection<T extends { connectionName?: string }>(sources
           <i class="fa fa-exclamation-triangle"></i> No compatible sources available. Add a connection from Connections.
         </div>
       } @else {
-        @if (entities.length > 8) {
-          <input class="form-control form-control-sm mb-2" type="search" placeholder="Filter sources…" aria-label="Filter available data sources"
-            [ngModel]="query()" (ngModelChange)="query.set($event)" />
-        }
-        <select id="entitySourceSelect" class="form-select" [ngModel]="value" (ngModelChange)="valueChange.emit($event)">
-          <option value="">Select source…</option>
-          @for (group of groupedEntities(); track group.name) {
-            <optgroup [label]="group.name">
-              @for (entity of group.sources; track entity.entity_id) {
-                <option [value]="entity.entity_id">{{ formatEntity(entity, false) }}</option>
-              }
-            </optgroup>
-          }
-        </select>
+        <app-searchable-select class="d-block" size="md" inputId="entitySourceSelect"
+          [options]="options()" [value]="value" emptyLabel="Select source…"
+          searchPlaceholder="Search sources…" ariaLabel="Data source"
+          (selectionChange)="valueChange.emit($event)" />
         @if (selectedEntity(); as selected) {
-          <div class="d-flex align-items-center flex-wrap gap-2 mt-2 small">
-            <span class="app-status-chip app-status-chip-success"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Available</span>
-            @if (selected.state != null && selected.state !== '') {
-              <span class="text-muted">Current value: <strong class="text-body">{{ selected.state }}{{ selected.unit_of_measurement ? ' ' + selected.unit_of_measurement : '' }}</strong></span>
-            }
-          </div>
+          @if (selected.state != null && selected.state !== '') {
+            <div class="mt-2 small text-muted">Current value: <strong class="text-body">{{ selected.state }}{{ selected.unit_of_measurement ? ' ' + selected.unit_of_measurement : '' }}</strong></div>
+          }
         }
       }
     </div>
-    <hr class="my-2" />
   `,
 })
 export class EntitySourceSelectorComponent {
@@ -73,20 +59,17 @@ export class EntitySourceSelectorComponent {
   @Input() loading = false;
   @Output() valueChange = new EventEmitter<string>();
 
-  readonly query = signal('');
-
   selectedEntity(): EntitySourceOption | undefined {
     return this.entities.find(entity => entity.entity_id === this.value);
   }
 
-  filteredEntities(): EntitySourceOption[] {
-    const query = this.query().trim().toLowerCase();
-    if (!query) return this.entities;
-    return this.entities.filter(entity => this.formatEntity(entity).toLowerCase().includes(query));
-  }
-
-  groupedEntities(): SourceGroup<EntitySourceOption>[] {
-    return groupByConnection(this.filteredEntities());
+  /** Options grouped by connection for the searchable picker. */
+  options(): SelectOption[] {
+    return groupByConnection(this.entities).flatMap(group => group.sources.map(entity => ({
+      value: entity.entity_id,
+      label: this.formatEntity(entity, false),
+      group: group.name,
+    })));
   }
 
   formatEntity(entity: EntitySourceOption, withConnection = true): string {

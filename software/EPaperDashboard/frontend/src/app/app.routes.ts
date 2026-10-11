@@ -42,6 +42,7 @@ export const routes: Routes = [
   },
   {
     path: 'dashboards/:id/designer',
+    data: { workspace: true },
     canActivate: [authGuard],
     canDeactivate: [unsavedChangesGuard],
     loadComponent: () => import('./components/dashboard-designer/dashboard-designer.component').then(m => m.DashboardDesignerComponent)

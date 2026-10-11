@@ -5,85 +5,114 @@
     <button type="button" class="btn btn-link btn-sm" (click)="loadAvailableEntities()">Retry sources</button>
   </div>
 }
-<div class="container-fluid py-2">
+<div class="designer-root">
   @if (dashboard()) {
-  <div class="row">
-    <div class="col-12">
-      <div class="designer-toolbar d-flex justify-content-between align-items-center mb-2">
-        <div class="d-flex align-items-center gap-3">
-          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="goBack()" aria-label="Back to dashboard settings">
-            <i class="fa fa-arrow-left" aria-hidden="true"></i>@if (!isMobile()) {<span> Back</span>}
-          </button>
-          <div class="designer-title">
-            <h1 class="h4 mb-0">Dashboard designer@if (!isMobile()) {<span> · {{ dashboard()?.name }}</span>}</h1>
-            <span class="small" [ngClass]="isDirty() ? 'text-warning' : 'text-muted'">{{ isDirty() ? 'Unsaved changes' : 'All changes saved' }}</span>
-          </div>
-        </div>
-        <!-- Desktop actions -->
-        @if (!isMobile()) {
-        <div class="d-flex align-items-center gap-2">
-          <div class="ai-toggle-pill" [class.active]="aiEnabled()" [title]="aiConfigMode() === 'None' ? 'Configure an AI provider in AI Config or dashboard settings first' : ''">
-            <div class="form-check form-switch mb-0">
-              <input class="form-check-input" type="checkbox" id="aiEnabledHeader" role="switch"
-                [checked]="aiEnabled()"
-                [disabled]="aiConfigMode() === 'None'"
-                (change)="onAiEnabledChange($any($event.target).checked)" />
-              <label class="form-check-label" for="aiEnabledHeader">
-                <i class="fa fa-wand-magic-sparkles me-1"></i>AI
-              </label>
-            </div>
-          </div>
-          <button type="button" class="btn btn-sm btn-success" (click)="previewServerSideRendered()" title="Render the current layout, including unsaved changes">
-            <i class="fa fa-external-link-alt me-1" aria-hidden="true"></i>Device output
-          </button>
-          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="discardChanges()" [disabled]="!isDirty()">
-            <i class="fa fa-rotate-left me-1" aria-hidden="true"></i>Discard
-          </button>
-          <button type="button" class="btn btn-sm btn-primary" (click)="saveDashboard()" [disabled]="!isDirty()">
-            <i class="fa fa-save me-1" aria-hidden="true"></i>Save layout
-          </button>
-        </div>
-        }
-        <!-- Mobile actions -->
-        @if (isMobile()) {
-        <div class="mobile-header-actions">
-          <div class="ai-toggle-pill ai-toggle-pill-mobile" [class.active]="aiEnabled()" [title]="aiConfigMode() === 'None' ? 'AI not configured' : (aiEnabled() ? 'AI enabled' : 'AI disabled')">
-            <div class="form-check form-switch mb-0">
-              <input class="form-check-input" type="checkbox" id="aiEnabledMobile" role="switch"
-                [checked]="aiEnabled()"
-                [disabled]="aiConfigMode() === 'None'"
-                (change)="onAiEnabledChange($any($event.target).checked)" />
-              <label class="form-check-label" for="aiEnabledMobile">
-                <i class="fa fa-wand-magic-sparkles"></i>
-              </label>
-            </div>
-          </div>
-          <button type="button" class="btn btn-sm btn-outline-secondary app-icon-button" (click)="discardChanges()" [disabled]="!isDirty()" aria-label="Discard layout changes">
-            <i class="fa fa-rotate-left" aria-hidden="true"></i>
-          </button>
-          <button type="button" class="btn btn-sm btn-primary app-icon-button" (click)="saveDashboard()" [disabled]="!isDirty()" aria-label="Save layout">
-            <i class="fa fa-save" aria-hidden="true"></i>
-          </button>
-          <div class="mobile-overflow-menu">
-            <button type="button" class="btn btn-sm btn-outline-secondary app-icon-button" (click)="mobileOverflowOpen.set(!mobileOverflowOpen())"
-              aria-label="More designer actions" [attr.aria-expanded]="mobileOverflowOpen()">
-              <i class="fa fa-ellipsis-vertical" aria-hidden="true"></i>
-            </button>
-            @if (mobileOverflowOpen()) {
-              <div class="overflow-dropdown">
-                <button type="button" (click)="mobilePropertiesOpen.set(true); mobileOverflowOpen.set(false)">
-                  <i class="fa fa-sliders" aria-hidden="true"></i> Settings and properties
-                </button>
-                <button type="button" (click)="previewServerSideRendered(); mobileOverflowOpen.set(false)">
-                  <i class="fa fa-external-link-alt" aria-hidden="true"></i> Device output
-                </button>
-              </div>
-            }
-          </div>
+  <div class="app-action-bar designer-action-bar">
+    <div class="designer-toolbar-start">
+      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="goBack()" aria-label="Back to dashboard settings" title="Back to dashboard settings">
+        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i><span class="d-none d-lg-inline"> Back</span>
+      </button>
+      <div class="designer-title">
+        <h1 class="h4 mb-0 text-truncate" [title]="dashboard()?.name ?? ''">@if (isMobile()) {Designer} @else {<span>{{ dashboard()?.name }}</span>}</h1>
+        <span class="visually-hidden" aria-live="polite">{{ isDirty() ? 'Unsaved changes' : '' }}</span>
+      </div>
+      @if (!isMobile()) {
+      <button type="button" class="btn btn-sm btn-outline-secondary" [class.active]="usesDrawer() ? layersDrawerOpen() : layersOpen()"
+        (click)="toggleLayers()" [attr.aria-pressed]="usesDrawer() ? layersDrawerOpen() : layersOpen()" title="Layers" aria-label="Show layers">
+        <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+      </button>
+      <div class="add-widget-anchor">
+        <button type="button" data-opens-picker class="btn btn-sm btn-outline-primary add-widget-button" (click)="togglePicker()"
+          aria-haspopup="dialog" [attr.aria-expanded]="pickerOpen()" title="Add widget (A)">
+          <i class="fa-solid fa-plus" aria-hidden="true"></i><span class="d-none d-xl-inline ms-1">Add widget</span>
+        </button>
+        @if (pickerOpen() && !usesDrawer() && pickerAnchor() === 'toolbar') {
+        <div class="picker-popover" role="dialog" aria-label="Add widget" cdkTrapFocus>
+          <app-widget-picker [definitions]="availableWidgets" [recentTypes]="recentWidgetTypes()"
+            (pick)="addWidgetToFirstSlot($event)" (dragStart)="onPickerDragStart($event)" />
         </div>
         }
       </div>
+      }
     </div>
+    <!-- Desktop and tablet actions -->
+    @if (!isMobile()) {
+    <div class="designer-toolbar-actions">
+      <ng-container *ngTemplateOutlet="canvasTools"></ng-container>
+      <span class="toolbar-divider" aria-hidden="true"></span>
+      <div class="ai-toggle-pill" [class.active]="aiEnabled()" [title]="aiConfigMode() === 'None' ? 'Configure an AI provider in AI Config or dashboard settings first' : 'AI generated widgets'">
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" id="aiEnabledHeader" role="switch"
+            [checked]="aiEnabled()"
+            [disabled]="aiConfigMode() === 'None'"
+            (change)="onAiEnabledChange($any($event.target).checked)" />
+          <label class="form-check-label" for="aiEnabledHeader">
+            <i class="fa-solid fa-wand-magic-sparkles me-1"></i>AI
+          </label>
+        </div>
+      </div>
+      @if (panelAsDrawer()) {
+      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openInspector()" title="Inspector" aria-label="Open inspector">
+        <i class="fa-solid fa-sliders" aria-hidden="true"></i><span class="d-none d-xl-inline ms-1">Inspector</span>
+      </button>
+      }
+      <button type="button" class="btn btn-sm btn-success" (click)="previewServerSideRendered()" title="Preview the device image, including unsaved changes" aria-label="Preview">
+        <i class="fa-solid fa-eye" aria-hidden="true"></i><span class="d-none d-xl-inline ms-1">Preview</span>
+      </button>
+      <!-- Shown only with unsaved changes, so it doubles as the change indicator. -->
+      @if (isDirty()) {
+      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="discardChanges()" title="Discard unsaved changes" aria-label="Discard unsaved changes">
+        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i><span class="d-none d-xl-inline ms-1">Discard</span>
+      </button>
+      }
+      <button type="button" class="btn btn-sm btn-primary" (click)="saveDashboard()" [disabled]="!isDirty()" title="Save layout" aria-label="Save layout">
+        <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i><span class="d-none d-xl-inline ms-1">Save</span>
+      </button>
+    </div>
+    }
+    <!-- Mobile actions -->
+    @if (isMobile()) {
+    <div class="mobile-header-actions">
+      <div class="ai-toggle-pill ai-toggle-pill-mobile" [class.active]="aiEnabled()" [title]="aiConfigMode() === 'None' ? 'AI not configured' : (aiEnabled() ? 'AI enabled' : 'AI disabled')">
+        <div class="form-check form-switch mb-0">
+          <input class="form-check-input" type="checkbox" id="aiEnabledMobile" role="switch"
+            [checked]="aiEnabled()"
+            [disabled]="aiConfigMode() === 'None'"
+            (change)="onAiEnabledChange($any($event.target).checked)" />
+          <label class="form-check-label" for="aiEnabledMobile">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+          </label>
+        </div>
+      </div>
+      @if (isDirty()) {
+      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="discardChanges()" aria-label="Discard unsaved changes">
+        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+      </button>
+      }
+      <button type="button" class="btn btn-sm btn-primary" (click)="saveDashboard()" [disabled]="!isDirty()" aria-label="Save layout">
+        <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+      </button>
+      <div class="mobile-overflow-menu">
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="mobileOverflowOpen.set(!mobileOverflowOpen())"
+          aria-label="More designer actions" [attr.aria-expanded]="mobileOverflowOpen()">
+          <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
+        </button>
+        @if (mobileOverflowOpen()) {
+          <div class="overflow-dropdown">
+            <button type="button" (click)="refreshLivePreview(); mobileOverflowOpen.set(false)" [disabled]="renderedCanvasLoading()">
+              <i class="fa-solid fa-rotate-right" aria-hidden="true"></i> Refresh preview
+            </button>
+            <button type="button" (click)="setCanvasZoom(canvasZoom() === 'fit' ? 1 : 'fit'); mobileOverflowOpen.set(false)">
+              <i class="fa-solid fa-expand" aria-hidden="true"></i> {{ canvasZoom() === 'fit' ? 'Actual size' : 'Fit to screen' }}
+            </button>
+            <button type="button" (click)="previewServerSideRendered(); mobileOverflowOpen.set(false)">
+              <i class="fa-solid fa-eye" aria-hidden="true"></i> Preview
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+    }
   </div>
   }
 
@@ -108,101 +137,73 @@
   }
 
   @if (!isLoading() && dashboard()) {
-  <div class="designer-grid-container" [class.toolbox-collapsed]="toolboxCollapsed()" [class.mobile-dragging]="mobileDragging()" [class.mobile-layout]="isMobile()">
-    <!-- Left Panel - Widget Toolbar -->
+  <div class="designer-grid-container" [class.layers-hidden]="!layersOpen()" [class.panel-drawer]="panelAsDrawer()" [class.mobile-layout]="isMobile()">
+    <!-- Left Panel - Layers -->
+    @if (layersOpen() && !usesDrawer()) {
     <div class="designer-panel-left">
       <div class="card">
-        <div class="card-header d-flex align-items-center" [class.justify-content-between]="!toolboxCollapsed()" [class.justify-content-center]="toolboxCollapsed()">
-          @if (!toolboxCollapsed()) {
-            <h5 class="mb-0">Widgets</h5>
-          }
-          <button class="toolbox-collapse-btn" (click)="toolboxCollapsed.set(!toolboxCollapsed())"
-            [attr.aria-label]="toolboxCollapsed() ? 'Expand widget toolbox' : 'Collapse widget toolbox'"
-            [attr.aria-expanded]="!toolboxCollapsed()"
-            [title]="toolboxCollapsed() ? 'Expand widget toolbox' : 'Collapse widget toolbox'">
-            <i class="fa fa-bars"></i>
+        <div class="card-header panel-header">
+          <h2 class="panel-title">Layers <span class="tab-count">{{ layout().widgets.length }}</span></h2>
+          <button type="button" class="panel-icon-btn" (click)="layersOpen.set(false)" aria-label="Hide layers" title="Hide layers">
+            <i class="fa-solid fa-angles-left" aria-hidden="true"></i>
           </button>
         </div>
-        <div class="card-body p-2">
-          <div class="widget-list">
-            @for (category of allWidgetCategories; track category.type) {
-              @if (!toolboxCollapsed()) {
-                <div class="designer-menu-label text-uppercase text-muted fw-semibold px-2 pt-2">
-                  {{ category.label }}
-                </div>
-              }
-              @for (widget of widgetsInCategory(category.type); track widget.type) {
-              <button type="button" class="widget-item toolbox-drag-item" [class.icon-only]="toolboxCollapsed()"
-                (mousedown)="onToolboxWidgetMouseDown($event, widget)"
-                (keydown)="onToolboxWidgetKeyDown($event, widget)"
-                [attr.aria-label]="'Add ' + widget.label + ' widget'" [title]="toolboxCollapsed() ? widget.label : 'Drag to canvas or press Enter to add'">
-                <i class="fa {{ widget.icon }}"></i>
-                @if (!toolboxCollapsed()) {
-                  <span>{{ widget.label }}</span>
-                }
-              </button>
-              }
-            }
-          </div>
+        <div class="card-body layers-body">
+          <ng-container *ngTemplateOutlet="layersContent"></ng-container>
         </div>
       </div>
     </div>
+    }
 
     <!-- Center - Canvas -->
     <div class="designer-panel-center">
       <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <h5 class="mb-0">Canvas</h5>
-          <button class="btn btn-sm btn-outline-secondary app-icon-button" (click)="refreshLivePreview()" [disabled]="renderedCanvasLoading()" aria-label="Refresh device preview and source data">
-            @if (renderedCanvasLoading()) {
-            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-            } @else {
-            <i class="fa fa-sync"></i>
+        <div class="card-body canvas-card-body">
+          <div class="canvas-wrapper" #canvasViewport>
+            <div class="canvas-scale-wrapper" [ngStyle]="canvasScaleStyle()">
+            @if (renderedCanvasLoading() && !renderedCanvasImageUrl()) {
+              <div class="rendered-canvas-status rendered-canvas-status-loading">
+                <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                Rendering preview…
+              </div>
             }
-          </button>
-        </div>
-        <div class="card-body overflow-auto">
-          <div class="canvas-wrapper">
-            <div class="canvas-scale-wrapper" [ngStyle]="getCanvasScaleStyle()">
-            <div class="dashboard-canvas" [class.backend-preview-active]="!!renderedCanvasImageUrl()" [ngStyle]="getCanvasStyle()" (mousedown)="onCanvasMouseDown($event)">
+            @if (renderedCanvasLoading() && renderedCanvasImageUrl()) {
+              <div class="rendered-canvas-status rendered-canvas-status-updating">
+                <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                Updating…
+              </div>
+            }
+            @if (renderedCanvasError()) {
+              <div class="rendered-canvas-status rendered-canvas-status-error" role="status" [title]="renderedCanvasError() + ' — showing the last available view'">
+                <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                Preview unavailable
+              </div>
+            }
+            <div class="dashboard-canvas" [class.backend-preview-active]="!!renderedCanvasImageUrl()" [ngStyle]="canvasStyle()" (pointerdown)="onCanvasPointerDown($event)">
               @if (renderedCanvasImageUrl()) {
                 <img class="rendered-canvas-image" [src]="renderedCanvasImageUrl()"
                   alt="Backend-rendered dashboard preview" draggable="false" />
               }
-              @if (renderedCanvasLoading() && !renderedCanvasImageUrl()) {
-                <div class="rendered-canvas-status rendered-canvas-status-loading">
-                  <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-                  Rendering preview…
-                </div>
-              }
-              @if (renderedCanvasLoading() && renderedCanvasImageUrl()) {
-                <div class="rendered-canvas-status rendered-canvas-status-updating">
-                  <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-                  Updating…
-                </div>
-              }
-              @if (renderedCanvasError()) {
-                <div class="rendered-canvas-status rendered-canvas-status-error" [title]="renderedCanvasError()">
-                  <i class="fa fa-triangle-exclamation"></i>
-                  Preview unavailable — showing the last available view
-                </div>
-              }
-              <div class="grid-overlay" [ngStyle]="getGridOverlayStyle()"></div>
+              <div class="grid-overlay" [ngStyle]="gridOverlayStyle()"></div>
               @for (widget of layout().widgets; track widget.id) {
-              <div class="widget-container" [ngStyle]="getWidgetStyle(widget)"
-                role="button" tabindex="0" [attr.aria-label]="widget.type + ' widget. Use arrow keys to move.'"
+              <div class="widget-container" [ngStyle]="widgetStyles()[widget.id]"
+                role="button" tabindex="0" [attr.aria-label]="widgetDisplayName(widget) + ' widget. Use arrow keys to move, Shift and arrows to resize.'"
                 [attr.aria-pressed]="selectedWidget()?.id === widget.id"
-                (mousedown)="onWidgetMouseDown($event, widget)"
+                (pointerdown)="onWidgetPointerDown($event, widget)"
                 (keydown)="onWidgetKeyDown($event, widget)">
-                <span class="widget-shell-label">{{ widget.type }}</span>
+                <span class="widget-shell-label">{{ widgetDisplayName(widget) }}</span>
               </div>
               }
 
               <!-- AI-generated widgets (read-only overlay) -->
               @for (widget of aiGeneratedWidgets(); track widget.id) {
-              <div class="widget-container ai-widget" [ngStyle]="getWidgetStyle(widget)">
-                <span class="widget-shell-label">{{ widget.type }}</span>
+              <div class="widget-container ai-widget" [ngStyle]="widgetStyles()[widget.id]">
+                <span class="widget-shell-label">{{ widgetDisplayName(widget) }}</span>
               </div>
+              }
+
+              @if (hoverOverlayStyle(); as hoverStyle) {
+                <div class="hover-overlay" [ngStyle]="hoverStyle"></div>
               }
 
               <!-- Selection overlay: lives on the canvas, never inside a grid cell -->
@@ -210,8 +211,8 @@
                 <div class="sel-overlay"
                      [class.long-press-active]="longPressActive()"
                      [class.element-editing]="elementEditingWidgetId() === selectedWidget()!.id"
-                     [ngStyle]="getSelectionOverlayStyle()"
-                     (mousedown)="onWidgetMouseDown($event, selectedWidget()!)">
+                     [ngStyle]="selectionOverlayStyle()"
+                     (pointerdown)="onWidgetPointerDown($event, selectedWidget()!)">
 
                   @if (elementEditingWidgetId() !== selectedWidget()!.id) {
                     <div class="resize-handle resize-n" data-direction="n"></div>
@@ -227,19 +228,19 @@
                   @if (selectedWidgetSupportsElementEditing()) {
                       <button class="widget-edit-toggle-btn"
                         [class.active]="elementEditingWidgetId() === selectedWidget()!.id"
-                        [disabled]="renderedCanvasLoading() || !getSelectedWidgetGeometry()"
-                        (mousedown)="$event.stopPropagation()"
+                        [disabled]="renderedCanvasLoading() || !selectedWidgetGeometry()"
+                        (pointerdown)="$event.stopPropagation()"
                         (click)="toggleElementEditing(selectedWidget()!)"
                         [title]="elementEditingWidgetId() === selectedWidget()!.id ? 'Finish editing widget elements' : 'Edit widget elements'">
                         @if (elementEditingWidgetId() === selectedWidget()!.id) {
-                          <i class="fa fa-check"></i> Done
+                          <i class="fa-solid fa-check"></i> Done
                         } @else {
-                          <i class="fa fa-arrows-up-down-left-right"></i> Edit Layout
+                          <i class="fa-solid fa-arrows-up-down-left-right" aria-hidden="true"></i> Edit layout
                         }
                       </button>
                   }
 
-                  @if (getSelectedWidgetGeometry(); as geometry) {
+                  @if (selectedWidgetGeometry(); as geometry) {
                     @if (elementEditingWidgetId() === selectedWidget()!.id) {
                       @if (geometry.elements.length > 0) {
                         <app-widget-element-overlay [geometry]="geometry"
@@ -256,10 +257,10 @@
                   <!-- Delete widget button -->
                   @if (elementEditingWidgetId() !== selectedWidget()!.id) {
                     <button type="button" class="widget-delete-btn"
-                      (mousedown)="$event.stopPropagation()"
+                      (pointerdown)="$event.stopPropagation()"
                       (click)="deleteWidget(selectedWidget()!)"
                       aria-label="Delete selected widget">
-                      <i class="fa fa-trash" aria-hidden="true"></i>
+                      <i class="fa-solid fa-trash" aria-hidden="true"></i>
                     </button>
                   }
                 </div>
@@ -275,48 +276,11 @@
       </div>
     </div>
 
-    <!-- Right Panel - Widget Properties -->
+    <!-- Right Panel - Inspector: dashboard settings, or the selected widget -->
     <div class="designer-panel-right">
       <div class="card">
-        <div class="card-header">
-          <div class="custom-tab-bar-scroll">
-            <button class="tab-switch-btn left" (click)="switchTab('left')" type="button" aria-label="Previous tab">
-              <i class="fa fa-chevron-left" aria-hidden="true"></i>
-            </button>
-            <div class="custom-tab-bar" #tabBar role="tablist" aria-label="Designer panels">
-              <button id="designerDashboardTab" type="button" class="tab-btn" [class.active]="activeTab() === 'dashboard'"
-                role="tab" [attr.aria-selected]="activeTab() === 'dashboard'" [attr.tabindex]="activeTab() === 'dashboard' ? 0 : -1"
-                aria-controls="designerDashboardPanel" (keydown)="onDesignerTabKeydown($event)"
-                (click)="activeTab.set('dashboard')">Dashboard settings</button>
-              <button id="designerWidgetsTab" type="button" class="tab-btn" [class.active]="activeTab() === 'widgets'"
-                role="tab" [attr.aria-selected]="activeTab() === 'widgets'" [attr.tabindex]="activeTab() === 'widgets' ? 0 : -1"
-                aria-controls="designerWidgetsPanel" (keydown)="onDesignerTabKeydown($event)"
-                (click)="activeTab.set('widgets')">Widgets ({{ layout().widgets.length }})</button>
-              <button id="designerPropertiesTab" type="button" class="tab-btn" [class.active]="activeTab() === 'properties'"
-                role="tab" [attr.aria-selected]="activeTab() === 'properties'" [attr.tabindex]="activeTab() === 'properties' ? 0 : -1"
-                aria-controls="designerPropertiesPanel" (keydown)="onDesignerTabKeydown($event)"
-                (click)="activeTab.set('properties')">Properties</button>
-            </div>
-            <button class="tab-switch-btn right" (click)="switchTab('right')" type="button" aria-label="Next tab">
-              <i class="fa fa-chevron-right" aria-hidden="true"></i>
-            </button>
-          </div>
-        </div>
-        <div class="card-body">
-          <!-- Dashboard Settings Tab -->
-          <div id="designerDashboardPanel" class="tab-pane" [class.active]="activeTab() === 'dashboard'" role="tabpanel" aria-labelledby="designerDashboardTab">
-            <ng-container *ngTemplateOutlet="dashboardSettingsContent"></ng-container>
-          </div>
-
-          <!-- Properties Tab -->
-          <div id="designerPropertiesPanel" class="tab-pane" [class.active]="activeTab() === 'properties'" role="tabpanel" aria-labelledby="designerPropertiesTab">
-            <ng-container *ngTemplateOutlet="propertiesContent"></ng-container>
-          </div>
-
-          <!-- Widgets List Tab -->
-          <div id="designerWidgetsPanel" class="widgets-list-pane" [class.active]="activeTab() === 'widgets'" role="tabpanel" aria-labelledby="designerWidgetsTab">
-            <ng-container *ngTemplateOutlet="widgetsListContent"></ng-container>
-          </div>
+        <div class="card-body inspector-body">
+          <ng-container *ngTemplateOutlet="inspectorContent"></ng-container>
         </div>
       </div>
     </div>
@@ -327,7 +291,7 @@
 
 <!-- Rendered Preview Modal -->
 <app-rendered-preview-modal
-  title="Device output"
+  title="Preview"
   [isOpen]="showPreviewModal"
   [isLoading]="previewLoading"
   [error]="previewError"
@@ -336,346 +300,334 @@
   (reload)="openRenderedPreview()">
 </app-rendered-preview-modal>
 
-<!-- Mobile FAB (Add Widget) -->
-@if (isMobile() && !isLoading()) {
-  <button type="button" class="mobile-fab" (click)="mobileWidgetDrawerOpen.set(true)" aria-label="Add widget">
-    <i class="fa fa-plus" aria-hidden="true"></i>
-  </button>
+<!-- Widget picker beside the layers panel (desktop) -->
+@if (pickerOpen() && !usesDrawer() && pickerAnchor() === 'layers') {
+  <div class="picker-popover picker-popover-beside" role="dialog" aria-label="Add widget" cdkTrapFocus
+    [style.top.px]="pickerPosition().top" [style.left.px]="pickerPosition().left">
+    <app-widget-picker [definitions]="availableWidgets" [recentTypes]="recentWidgetTypes()"
+      (pick)="addWidgetToFirstSlot($event)" (dragStart)="onPickerDragStart($event)" />
+  </div>
 }
 
-<!-- Mobile Selection Toolbar -->
+<!-- Phone bottom bar -->
+@if (isMobile() && !isLoading() && dashboard()) {
+  <nav class="mobile-bottom-bar" aria-label="Designer">
+    <button type="button" [class.active]="layersDrawerOpen()" (click)="toggleLayers()">
+      <i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>Layers</span>
+    </button>
+    <button type="button" data-opens-picker class="bottom-bar-primary" (click)="openPicker()">
+      <i class="fa-solid fa-plus" aria-hidden="true"></i><span>Add</span>
+    </button>
+    <button type="button" [class.active]="inspectorDrawerOpen()" (click)="openInspector()">
+      <i class="fa-solid fa-sliders" aria-hidden="true"></i><span>Inspector</span>
+    </button>
+  </nav>
+}
+
+<!-- Phone selection toolbar -->
 @if (isMobile() && mobileSelectionToolbar() && selectedWidget()) {
   <div class="mobile-selection-toolbar" role="toolbar" aria-label="Widget actions">
-    <button type="button" class="toolbar-btn" (click)="openMobileProperties()">
-      <i class="fa fa-sliders" aria-hidden="true"></i> Properties
+    <button type="button" class="toolbar-btn" (click)="openInspector()">
+      <i class="fa-solid fa-sliders" aria-hidden="true"></i> Edit
     </button>
     @if (selectedWidgetSupportsElementEditing()) {
-      <button type="button" class="toolbar-btn" (click)="toggleElementEditing(selectedWidget()!)" [disabled]="renderedCanvasLoading() || !getSelectedWidgetGeometry()">
-        <i class="fa fa-arrows-up-down-left-right" aria-hidden="true"></i> {{ elementEditingWidgetId() === selectedWidget()!.id ? 'Done' : 'Edit layout' }}
+      <button type="button" class="toolbar-btn" (click)="toggleElementEditing(selectedWidget()!)" [disabled]="renderedCanvasLoading() || !selectedWidgetGeometry()">
+        <i class="fa-solid fa-arrows-up-down-left-right" aria-hidden="true"></i> {{ elementEditingWidgetId() === selectedWidget()!.id ? 'Done' : 'Edit layout' }}
       </button>
     }
     <button type="button" class="toolbar-btn toolbar-btn-danger" (click)="deleteWidget(selectedWidget()!); mobileSelectionToolbar.set(false)">
-      <i class="fa fa-trash" aria-hidden="true"></i> Delete
+      <i class="fa-solid fa-trash" aria-hidden="true"></i> Delete
     </button>
-    <button type="button" class="toolbar-btn" (click)="selectedWidget.set(null); mobileSelectionToolbar.set(false)" aria-label="Deselect widget">
-      <i class="fa fa-xmark" aria-hidden="true"></i>
+    <button type="button" class="toolbar-btn" (click)="clearSelection()" aria-label="Deselect widget">
+      <i class="fa-solid fa-xmark" aria-hidden="true"></i>
     </button>
   </div>
 }
 
-<!-- Mobile Bottom Sheet (Widget Picker) -->
-@if (isMobile() && mobileWidgetDrawerOpen()) {
-  <div class="mobile-bottom-sheet-backdrop" (click)="mobileWidgetDrawerOpen.set(false)"></div>
-  <div class="mobile-bottom-sheet" role="dialog" aria-modal="true" aria-label="Add widget"
-       cdkTrapFocus [cdkTrapFocusAutoCapture]="true"
-       (touchstart)="onBottomSheetTouchStart($event)" (touchend)="onBottomSheetTouchEnd($event)">
+<!-- Widget picker sheet (tablets and phones) -->
+@if (usesDrawer() && pickerOpen()) {
+  <div class="mobile-bottom-sheet-backdrop" (click)="pickerOpen.set(false)"></div>
+  <div class="mobile-bottom-sheet picker-sheet" role="dialog" aria-modal="true" aria-label="Add widget"
+       cdkTrapFocus (touchstart)="onBottomSheetTouchStart($event)" (touchend)="onBottomSheetTouchEnd($event)">
     <div class="bottom-sheet-handle"></div>
     <div class="bottom-sheet-header">
       <h2 class="h5 mb-0">Add widget</h2>
-      <button type="button" class="btn-close-sheet" (click)="mobileWidgetDrawerOpen.set(false)" aria-label="Close widget picker">
-        <i class="fa fa-xmark" aria-hidden="true"></i>
+      <button type="button" class="btn-close-sheet" (click)="pickerOpen.set(false)" aria-label="Close widget picker">
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
       </button>
     </div>
-    <div class="bottom-sheet-body">
-      @for (category of allWidgetCategories; track category.type) {
-        <div class="widget-category-label w-100 text-uppercase text-muted fw-semibold mt-2">{{ category.label }}</div>
-        @for (widget of widgetsInCategory(category.type); track widget.type) {
-          <button type="button" class="widget-grid-item" (click)="addWidgetToFirstSlot(widget)">
-            <i class="fa {{ widget.icon }}" aria-hidden="true"></i>
-            <span>{{ widget.label }}</span>
-          </button>
-        }
-      }
-    </div>
+    <app-widget-picker [definitions]="availableWidgets" [recentTypes]="recentWidgetTypes()" [allowDrag]="false"
+      (pick)="addWidgetToFirstSlot($event)" />
   </div>
 }
 
-<!-- Mobile Right Drawer (Properties / Settings) -->
-@if (isMobile() && mobilePropertiesOpen()) {
-  <div class="mobile-drawer-backdrop" (click)="mobilePropertiesOpen.set(false)"></div>
-  <div class="mobile-drawer" role="dialog" aria-modal="true" aria-label="Dashboard settings"
+<!-- Layers drawer (tablets and phones) -->
+@if (usesDrawer() && layersDrawerOpen()) {
+  <div class="mobile-drawer-backdrop" (click)="layersDrawerOpen.set(false)"></div>
+  <div class="mobile-drawer drawer-left" role="dialog" aria-modal="true" aria-label="Layers"
        cdkTrapFocus [cdkTrapFocusAutoCapture]="true"
-       (touchstart)="onDrawerTouchStart($event)" (touchend)="onDrawerTouchEnd($event)">
+       (touchstart)="onDrawerTouchStart($event)" (touchend)="onDrawerTouchEnd($event, 'left')">
     <div class="drawer-header">
-      <h2 class="h5 mb-0">
-        @if (activeTab() === 'dashboard') { Dashboard settings }
-        @else if (activeTab() === 'widgets') { Widgets ({{ layout().widgets.length }}) }
-        @else { Widget properties }
-      </h2>
-      <button type="button" class="btn-close-drawer" (click)="mobilePropertiesOpen.set(false)" aria-label="Close settings">
-        <i class="fa fa-xmark" aria-hidden="true"></i>
+      <h2 class="h5 mb-0">Layers <span class="tab-count">{{ layout().widgets.length }}</span></h2>
+      <button type="button" class="btn-close-drawer" (click)="layersDrawerOpen.set(false)" aria-label="Close layers">
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
       </button>
     </div>
-    <div class="drawer-tabs" role="tablist" aria-label="Designer panels">
-      <button type="button" class="drawer-tab-btn" [class.active]="activeTab() === 'dashboard'"
-        (click)="activeTab.set('dashboard')" (keydown)="onDesignerTabKeydown($event)" role="tab"
-        [attr.aria-selected]="activeTab() === 'dashboard'" [attr.tabindex]="activeTab() === 'dashboard' ? 0 : -1">
-        <i class="fa fa-cog" aria-hidden="true"></i> Settings
-      </button>
-      <button type="button" class="drawer-tab-btn" [class.active]="activeTab() === 'widgets'"
-        (click)="activeTab.set('widgets')" (keydown)="onDesignerTabKeydown($event)" role="tab"
-        [attr.aria-selected]="activeTab() === 'widgets'" [attr.tabindex]="activeTab() === 'widgets' ? 0 : -1">
-        <i class="fa fa-layer-group" aria-hidden="true"></i> Widgets
-      </button>
-      <button type="button" class="drawer-tab-btn" [class.active]="activeTab() === 'properties'"
-        (click)="activeTab.set('properties')" (keydown)="onDesignerTabKeydown($event)" role="tab"
-        [attr.aria-selected]="activeTab() === 'properties'" [attr.tabindex]="activeTab() === 'properties' ? 0 : -1">
-        <i class="fa fa-sliders" aria-hidden="true"></i> Properties
-      </button>
-    </div>
-    <div class="drawer-body">
-      @if (activeTab() === 'dashboard') {
-        <ng-container *ngTemplateOutlet="dashboardSettingsContent"></ng-container>
-      }
-      @if (activeTab() === 'properties') {
-        <ng-container *ngTemplateOutlet="propertiesContent"></ng-container>
-      }
-      @if (activeTab() === 'widgets') {
-        <ng-container *ngTemplateOutlet="widgetsListContent"></ng-container>
-      }
+    <div class="drawer-body layers-body">
+      <ng-container *ngTemplateOutlet="layersContent"></ng-container>
     </div>
   </div>
 }
 
-<!-- ═══ Shared tab content templates ═══ -->
+<!-- Inspector drawer (tablets and phones) -->
+@if (usesDrawer() && inspectorDrawerOpen()) {
+  <div class="mobile-drawer-backdrop" (click)="inspectorDrawerOpen.set(false)"></div>
+  <div class="mobile-drawer" role="dialog" aria-modal="true" aria-label="Inspector"
+       cdkTrapFocus [cdkTrapFocusAutoCapture]="true"
+       (touchstart)="onDrawerTouchStart($event)" (touchend)="onDrawerTouchEnd($event, 'right')">
+    <div class="drawer-header">
+      <h2 class="visually-hidden">Inspector</h2>
+      <button type="button" class="btn-close-drawer" (click)="inspectorDrawerOpen.set(false)" aria-label="Close inspector">
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="drawer-body inspector-body">
+      <ng-container *ngTemplateOutlet="inspectorContent"></ng-container>
+    </div>
+  </div>
+}
+
+<!-- ═══ Shared panel templates ═══ -->
+
+<ng-template #inspectorContent>
+  @if (selectedWidget(); as widget) {
+    <div class="inspector-header">
+      <button type="button" class="inspector-back" (click)="clearSelection()" title="Back to dashboard settings (Esc)">
+        <i class="fa-solid fa-chevron-left" aria-hidden="true"></i> Dashboard
+      </button>
+      <div class="inspector-title-row">
+        <span class="inspector-icon"><i class="fa {{ widgetIcon(widget) }}" aria-hidden="true"></i></span>
+        <h2 class="inspector-title" [title]="widgetDisplayName(widget)">{{ widgetDisplayName(widget) }}</h2>
+      </div>
+    </div>
+    <ng-container *ngTemplateOutlet="propertiesContent"></ng-container>
+  } @else {
+    <div class="inspector-header">
+      <div class="inspector-title-row">
+        <span class="inspector-icon"><i class="fa-solid fa-display" aria-hidden="true"></i></span>
+        <h2 class="inspector-title">Dashboard</h2>
+      </div>
+    </div>
+    <ng-container *ngTemplateOutlet="dashboardSettingsContent"></ng-container>
+  }
+</ng-template>
+
+<ng-template #layersContent>
+  @if (layout().widgets.length === 0) {
+    <div class="app-empty-state app-empty-state-compact">
+      <span class="app-empty-state-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>
+      <p class="mb-0">No widgets yet.</p>
+      <button type="button" data-opens-picker class="btn btn-primary" (click)="openPickerBesideLayers($event)">
+        <i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add widget
+      </button>
+    </div>
+  } @else {
+    <ul class="layers-list" aria-label="Widgets, top-most first">
+      @for (w of layerWidgets(); track w.id) {
+        <li class="layer-row" [class.selected]="selectedWidget()?.id === w.id"
+          (mouseenter)="hoveredWidgetId.set(w.id)" (mouseleave)="hoveredWidgetId.set(null)">
+          @if (renamingWidgetId() === w.id) {
+            <input type="text" class="form-control layer-rename-input" maxlength="200"
+              [value]="w.name ?? widgetDisplayName(w)" aria-label="Layer name"
+              (keydown.enter)="commitRenameLayer(w, $any($event.target).value)"
+              (keydown.escape)="cancelRenameLayer($event)"
+              (blur)="commitRenameLayer(w, $any($event.target).value)" />
+          } @else {
+            <button type="button" class="layer-main" (click)="onLayerSelect(w)"
+              [attr.aria-current]="selectedWidget()?.id === w.id ? 'true' : null"
+              (focus)="hoveredWidgetId.set(w.id)" (blur)="hoveredWidgetId.set(null)">
+              <i class="fa {{ widgetIcon(w) }} layer-icon" aria-hidden="true"></i>
+              <span class="layer-name">{{ widgetDisplayName(w) }}</span>
+              @if (needsSource(w)) {
+                <i class="fa-solid fa-triangle-exclamation layer-warning" title="No data source selected" aria-label="No data source selected"></i>
+              }
+            </button>
+          }
+          <div class="layer-menu">
+            <button type="button" class="layer-menu-btn" (click)="toggleLayerMenu(w, $event)"
+              [attr.aria-label]="'Actions for ' + widgetDisplayName(w)" aria-haspopup="menu" [attr.aria-expanded]="layerMenuWidgetId() === w.id">
+              <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+            </button>
+            @if (layerMenuWidgetId() === w.id) {
+              <div class="layer-menu-dropdown" role="menu">
+                <button type="button" role="menuitem" (click)="startRenameLayer(w)"><i class="fa-solid fa-pen" aria-hidden="true"></i>Rename</button>
+                <button type="button" role="menuitem" (click)="duplicateWidget(w)"><i class="fa-solid fa-clone" aria-hidden="true"></i>Duplicate</button>
+                <button type="button" role="menuitem" (click)="moveWidgetLayer(w, 'forward')" [disabled]="!canMoveWidgetLayer(w, 'forward')"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i>Bring forward</button>
+                <button type="button" role="menuitem" (click)="moveWidgetLayer(w, 'backward')" [disabled]="!canMoveWidgetLayer(w, 'backward')"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i>Send backward</button>
+                <button type="button" role="menuitem" class="text-danger" (click)="deleteWidget(w)"><i class="fa-solid fa-trash" aria-hidden="true"></i>Delete</button>
+              </div>
+            }
+          </div>
+        </li>
+      }
+    </ul>
+    <button type="button" data-opens-picker class="layers-add" (click)="openPickerBesideLayers($event)">
+      <i class="fa-solid fa-plus" aria-hidden="true"></i> Add widget
+    </button>
+  }
+</ng-template>
+
+<ng-template #canvasTools>
+  <div class="canvas-tools" role="toolbar" aria-label="Canvas view">
+    <div class="btn-group btn-group-sm" role="group" aria-label="Zoom">
+      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="zoomCanvas(-1)" aria-label="Zoom out" title="Zoom out">
+        <i class="fa-solid fa-minus" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-secondary canvas-zoom-value" (click)="setCanvasZoom(canvasZoom() === 'fit' ? 1 : 'fit')"
+        [attr.aria-label]="canvasZoom() === 'fit' ? 'Zoom to actual size' : 'Fit canvas to view'"
+        [title]="canvasZoom() === 'fit' ? 'Fitted to view — click for actual size' : 'Click to fit to view'">
+        @if (canvasZoom() === 'fit') {<i class="fa-solid fa-expand me-1" aria-hidden="true"></i>}{{ canvasZoomLabel() }}
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="zoomCanvas(1)" aria-label="Zoom in" title="Zoom in">
+        <i class="fa-solid fa-plus" aria-hidden="true"></i>
+      </button>
+    </div>
+    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="refreshLivePreview()" [disabled]="renderedCanvasLoading()" aria-label="Refresh device preview and source data" title="Refresh preview and source data">
+      <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
+    </button>
+  </div>
+</ng-template>
 
 <ng-template #dashboardSettingsContent>
-  <div class="collapsible-section" [class.collapsed]="colorSchemeCollapsed()">
-    <div class="collapsible-header">
-      <button type="button" class="collapsible-trigger" (click)="colorSchemeCollapsed.set(!colorSchemeCollapsed())"
-        [attr.aria-expanded]="!colorSchemeCollapsed()" aria-controls="colorSchemePanel">
-        <span class="section-title">Color scheme</span>
-        <i class="fa" [ngClass]="colorSchemeCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
-      </button>
-      <div class="collapsible-actions">
-        <button type="button" class="btn btn-sm btn-outline-danger" (click)="resetAllColorOverrides()"
-          title="Reset all color overrides (layout + widgets) to the selected scheme defaults">
-          <i class="fa fa-undo" aria-hidden="true"></i> Reset all
-        </button>
-      </div>
-    </div>
-    @if (!colorSchemeCollapsed()) {
-    <div id="colorSchemePanel" class="collapsible-body">
-      <select class="form-select" [ngModel]="layout().colorScheme"
-        [compareWith]="compareColorSchemes"
-        (ngModelChange)="updateColorScheme($event)">
-        @for (scheme of colorSchemes; track scheme.name) {
-        <option [ngValue]="scheme">{{ scheme.name }}</option>
-        }
-      </select>
-    </div>
-    }
-  </div>
-  <div class="collapsible-section" [class.collapsed]="colorOverridesCollapsed()">
-    <div class="collapsible-header">
-      <button type="button" class="collapsible-trigger" (click)="colorOverridesCollapsed.set(!colorOverridesCollapsed())"
-        [attr.aria-expanded]="!colorOverridesCollapsed()" aria-controls="layoutColorOverridesPanel">
-        <span class="d-flex align-items-center">
-          <span class="section-title">Color overrides</span>
-        @if (hasLayoutColorOverrides()) {
-          <span class="badge bg-warning text-dark ms-2 override-badge" title="Some colors are overridden">Custom</span>
-        }
-        </span>
-        <i class="fa" [ngClass]="colorOverridesCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
-      </button>
-      <div class="collapsible-actions">
-        @if (hasLayoutColorOverrides()) {
-        <button type="button" class="btn btn-sm btn-outline-secondary app-icon-button" (click)="resetLayoutColorOverrides()"
-          title="Reset layout colors to scheme defaults" aria-label="Reset layout colors to scheme defaults">
-          <i class="fa fa-undo" aria-hidden="true"></i>
-        </button>
-        }
-      </div>
-    </div>
-    @if (!colorOverridesCollapsed()) {
-    <div id="layoutColorOverridesPanel" class="collapsible-body">
-      <div class="mb-2">
-        <label class="form-label small">Canvas Background @if (isLayoutColorOverridden('canvasBackgroundColor')) { <span class="badge bg-warning text-dark" title="Overridden">Custom</span> }</label>
-        <select class="form-select form-select-sm" [ngModel]="layout().colorScheme.canvasBackgroundColor"
-          (ngModelChange)="updateCanvasBackgroundColor($event)">
-          @for (color of layout().colorScheme.palette; track color) {
-          <option [value]="color">{{ getColorName(color) }}</option>
-          }
-        </select>
-      </div>
-      <div class="mb-2">
-        <label class="form-label small">Widget Background @if (isLayoutColorOverridden('widgetBackgroundColor')) { <span class="badge bg-warning text-dark" title="Overridden">Custom</span> }</label>
-        <select class="form-select form-select-sm" [ngModel]="layout().colorScheme.widgetBackgroundColor"
-          (ngModelChange)="updateWidgetBackgroundColor($event)">
-          @for (color of layout().colorScheme.palette; track color) {
-          <option [value]="color">{{ getColorName(color) }}</option>
-          }
-        </select>
-      </div>
-      <div class="mb-2">
-        <label class="form-label small">Widget Border Color @if (isLayoutColorOverridden('widgetBorderColor')) { <span class="badge bg-warning text-dark" title="Overridden">Custom</span> }</label>
-        <select class="form-select form-select-sm" [ngModel]="layout().colorScheme.widgetBorderColor"
-          (ngModelChange)="updateWidgetBorderColor($event)">
-          @for (color of layout().colorScheme.palette; track color) {
-          <option [value]="color">{{ getColorName(color) }}</option>
-          }
-        </select>
-      </div>
-      <div class="mb-2">
-        <label class="form-label small">Widget Title Text Color @if (isLayoutColorOverridden('widgetTitleTextColor')) { <span class="badge bg-warning text-dark" title="Overridden">Custom</span> }</label>
-        <select class="form-select form-select-sm" [ngModel]="layout().colorScheme.widgetTitleTextColor"
-          (ngModelChange)="updateWidgetTitleTextColor($event)">
-          @for (color of layout().colorScheme.palette; track color) {
-          <option [value]="color">{{ getColorName(color) }}</option>
-          }
-        </select>
-      </div>
-      <div class="mb-2">
-        <label class="form-label small">Widget Text Color @if (isLayoutColorOverridden('widgetTextColor')) { <span class="badge bg-warning text-dark" title="Overridden">Custom</span> }</label>
-        <select class="form-select form-select-sm" [ngModel]="layout().colorScheme.widgetTextColor"
-          (ngModelChange)="updateWidgetTextColor($event)">
-          @for (color of layout().colorScheme.palette; track color) {
-          <option [value]="color">{{ getColorName(color) }}</option>
-          }
-        </select>
-      </div>
-      <div class="mb-2">
-        <label class="form-label small">Icon Color @if (isLayoutColorOverridden('iconColor')) { <span class="badge bg-warning text-dark" title="Overridden">Custom</span> }</label>
-        <select class="form-select form-select-sm" [ngModel]="layout().colorScheme.iconColor"
-          (ngModelChange)="updateIconColor($event)">
-          @for (color of layout().colorScheme.palette; track color) {
-          <option [value]="color">{{ getColorName(color) }}</option>
-          }
-        </select>
-      </div>
-    </div>
-    }
-  </div>
-  <div class="collapsible-section" [class.collapsed]="layoutCollapsed()">
-    <button type="button" class="collapsible-header collapsible-trigger" (click)="layoutCollapsed.set(!layoutCollapsed())"
-      [attr.aria-expanded]="!layoutCollapsed()" aria-controls="layoutPanel">
-      <span class="section-title">Layout</span>
-      <i class="fa" [ngClass]="layoutCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
-    </button>
-    @if (!layoutCollapsed()) {
-    <div id="layoutPanel" class="collapsible-body">
-      <div class="mb-2">
-        <label class="form-label small">Orientation</label>
-        <div class="btn-group d-flex" role="group">
-          <button type="button" class="btn btn-sm flex-grow-1"
+  <details class="inspector-section" [open]="isSectionOpen('dashboard-screen')" (toggle)="onSectionToggle('dashboard-screen', $event)">
+    <summary class="inspector-section-summary">Screen</summary>
+    <div class="inspector-section-body">
+      <div class="mb-3">
+        <span class="form-label fw-semibold d-block" id="orientationLabel">Orientation</span>
+        <div class="btn-group d-flex" role="group" aria-labelledby="orientationLabel">
+          <button type="button" class="btn flex-grow-1" [attr.aria-pressed]="orientation() === 'Landscape'"
             [class.btn-secondary]="orientation() === 'Landscape'"
             [class.btn-outline-secondary]="orientation() !== 'Landscape'"
             (click)="setOrientation('Landscape')">
-            <i class="fa-solid fa-display"></i> Landscape
+            <i class="fa-solid fa-display" aria-hidden="true"></i> Landscape
           </button>
-          <button type="button" class="btn btn-sm flex-grow-1"
+          <button type="button" class="btn flex-grow-1" [attr.aria-pressed]="orientation() === 'Portrait'"
             [class.btn-secondary]="orientation() === 'Portrait'"
             [class.btn-outline-secondary]="orientation() !== 'Portrait'"
             (click)="setOrientation('Portrait')">
-            <i class="fa-solid fa-mobile-screen"></i> Portrait
+            <i class="fa-solid fa-mobile-screen" aria-hidden="true"></i> Portrait
           </button>
         </div>
       </div>
-      <div class="mb-2">
-        <label class="form-label small">Screen Size</label>
-        <select class="form-select form-select-sm" [(ngModel)]="selectedSizeIndex" (ngModelChange)="onSizeChange()">
+      <div>
+        <label class="form-label fw-semibold" for="dashboardScreenSize">Screen size</label>
+        <select id="dashboardScreenSize" class="form-select" [(ngModel)]="selectedSizeIndex" (ngModelChange)="onSizeChange()">
           @for (size of sizePresets; track size.label; let i = $index) {
             <option [ngValue]="i">{{ size.label }}</option>
           }
         </select>
       </div>
-      <div class="mb-2">
-        <label class="form-label small">Grid Columns</label>
-        <input type="number" class="form-control form-control-sm" [ngModel]="layout().gridCols"
-          (ngModelChange)="updateLayoutGridCols($event)" />
-      </div>
-      <div class="mb-2">
-        <label class="form-label small">Grid Rows</label>
-        <input type="number" class="form-control form-control-sm" [ngModel]="layout().gridRows"
-          (ngModelChange)="updateLayoutGridRows($event)" />
-      </div>
-      <div class="mb-2">
-        <label class="form-label small">Canvas Padding</label>
-        <input type="number" class="form-control form-control-sm" [ngModel]="layout().canvasPadding"
-          (ngModelChange)="updateCanvasPadding($event)" min="0" max="128" />
-      </div>
-      <div class="mb-2">
-        <label class="form-label small">Widget Gap</label>
-        <input type="number" class="form-control form-control-sm" [ngModel]="layout().widgetGap"
-          (ngModelChange)="updateWidgetGap($event)" min="0" max="64" />
-      </div>
-      <div class="mb-2">
-        <label class="form-label small">Widget Border (px)</label>
-        <input type="number" class="form-control form-control-sm" [ngModel]="layout().widgetBorder"
-          (ngModelChange)="updateWidgetBorder($event)" min="0" max="20" />
-      </div>
-      <div class="mb-2">
-        <label class="form-label small">Widget Padding (px)</label>
-        <input type="number" class="form-control form-control-sm" [ngModel]="layout().widgetPadding"
-          (ngModelChange)="updateWidgetPadding($event)" min="0" max="32" />
+    </div>
+  </details>
+  <details class="inspector-section" [open]="isSectionOpen('dashboard-grid')" (toggle)="onSectionToggle('dashboard-grid', $event)">
+    <summary class="inspector-section-summary">Grid</summary>
+    <div class="inspector-section-body">
+      <div class="designer-field-grid">
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Columns</span>
+          <input type="number" class="form-control" [value]="layout().gridCols" (change)="updateLayoutGridCols($event)" min="1" max="100" />
+        </label>
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Rows</span>
+          <input type="number" class="form-control" [value]="layout().gridRows" (change)="updateLayoutGridRows($event)" min="1" max="100" />
+        </label>
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Gap</span>
+          <div class="input-group">
+            <input type="number" class="form-control" [value]="layout().widgetGap" (change)="updateWidgetGap($event)" min="0" max="64" />
+            <span class="input-group-text">px</span>
+          </div>
+        </label>
+        <label class="designer-field">
+          <span class="form-label fw-semibold" title="Space between the screen edge and the grid">Margin</span>
+          <div class="input-group">
+            <input type="number" class="form-control" [value]="layout().canvasPadding" (change)="updateCanvasPadding($event)" min="0" max="128" />
+            <span class="input-group-text">px</span>
+          </div>
+        </label>
       </div>
     </div>
-    }
-  </div>
-  <div class="collapsible-section" [class.collapsed]="fontsCollapsed()">
-    <button type="button" class="collapsible-header collapsible-trigger" (click)="fontsCollapsed.set(!fontsCollapsed())"
-      [attr.aria-expanded]="!fontsCollapsed()" aria-controls="typographyPanel">
-      <span class="section-title">Typography</span>
-      <i class="fa" [ngClass]="fontsCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
-    </button>
-    @if (!fontsCollapsed()) {
-    <div id="typographyPanel" class="collapsible-body">
-      <div class="mb-2">
-        <label class="form-label small">Widget Title Font Size (px)</label>
-        <input type="number" class="form-control form-control-sm" [ngModel]="layout().titleFontSize"
-          (ngModelChange)="updateTitleFontSize($event)" min="8" max="72" placeholder="16" />
-      </div>
-      <div class="mb-2">
-        <label class="form-label small">Widget Title Font Weight</label>
-        <select class="form-select form-select-sm" [ngModel]="layout().titleFontWeight || 700"
-          (ngModelChange)="updateTitleFontWeight($event)">
-          <option [value]="400">Regular (400)</option>
-          <option [value]="700">Bold (700)</option>
-        </select>
-      </div>
-      <div class="mb-2">
-        <label class="form-label small">Widget Text Font Size (px)</label>
-        <input type="number" class="form-control form-control-sm" [ngModel]="layout().textFontSize"
-          (ngModelChange)="updateTextFontSize($event)" min="6" max="48" placeholder="14" />
-      </div>
-      <div class="mb-2">
-        <label class="form-label small">Widget Text Font Weight</label>
-        <select class="form-select form-select-sm" [ngModel]="layout().textFontWeight || 400"
-          (ngModelChange)="updateTextFontWeight($event)">
-          <option [value]="400">Regular (400)</option>
-          <option [value]="700">Bold (700)</option>
-        </select>
+  </details>
+  <details class="inspector-section" [open]="isSectionOpen('dashboard-frame')" (toggle)="onSectionToggle('dashboard-frame', $event)">
+    <summary class="inspector-section-summary">Widget frame</summary>
+    <div class="inspector-section-body">
+      <div class="designer-field-grid">
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Border</span>
+          <div class="input-group">
+            <input type="number" class="form-control" [value]="layout().widgetBorder" (change)="updateWidgetBorder($event)" min="0" max="20" />
+            <span class="input-group-text">px</span>
+          </div>
+        </label>
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Padding</span>
+          <div class="input-group">
+            <input type="number" class="form-control" [value]="layout().widgetPadding" (change)="updateWidgetPadding($event)" min="0" max="32" />
+            <span class="input-group-text">px</span>
+          </div>
+        </label>
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Title size</span>
+          <div class="input-group">
+            <input type="number" class="form-control" [value]="layout().titleFontSize" (change)="updateTitleFontSize($event)" min="8" max="72" placeholder="16" />
+            <span class="input-group-text">px</span>
+          </div>
+        </label>
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Title weight</span>
+          <select class="form-select" [ngModel]="layout().titleFontWeight || 700" (ngModelChange)="updateTitleFontWeight($event)">
+            <option [value]="400">Regular</option>
+            <option [value]="700">Bold</option>
+          </select>
+        </label>
       </div>
     </div>
-    }
-  </div>
-
-  <!-- AI Section -->
+  </details>
+  <details class="inspector-section" [open]="isSectionOpen('dashboard-text')" (toggle)="onSectionToggle('dashboard-text', $event)">
+    <summary class="inspector-section-summary">Text</summary>
+    <div class="inspector-section-body">
+      <div class="designer-field-grid">
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Size</span>
+          <div class="input-group">
+            <input type="number" class="form-control" [value]="layout().textFontSize" (change)="updateTextFontSize($event)" min="6" max="48" placeholder="14" />
+            <span class="input-group-text">px</span>
+          </div>
+        </label>
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Weight</span>
+          <select class="form-select" [ngModel]="layout().textFontWeight || 400" (ngModelChange)="updateTextFontWeight($event)">
+            <option [value]="400">Regular</option>
+            <option [value]="700">Bold</option>
+          </select>
+        </label>
+      </div>
+    </div>
+  </details>
   @if (aiEnabled()) {
-  <div class="collapsible-section mt-2">
-    <button type="button" class="collapsible-header collapsible-trigger" (click)="aiSectionCollapsed.set(!aiSectionCollapsed())"
-      [attr.aria-expanded]="!aiSectionCollapsed()" aria-controls="aiGenerationPanel">
-      <span><i class="fa fa-wand-magic-sparkles me-2" aria-hidden="true"></i>AI generation</span>
-      <i class="fa" [class.fa-chevron-down]="aiSectionCollapsed()" [class.fa-chevron-up]="!aiSectionCollapsed()" aria-hidden="true"></i>
-    </button>
-    @if (!aiSectionCollapsed()) {
-    <div id="aiGenerationPanel" class="collapsible-body">
-      @if (aiConfigMode() === 'None') {
-        <div class="alert alert-warning py-2 small mb-3">
-          <i class="fa fa-triangle-exclamation me-1"></i>
-          AI provider not configured. <a routerLink="/ai/config">Set up global AI provider</a> or <a [routerLink]="['/dashboards', dashboardId, 'edit']">use a Home Assistant agent</a>
-        </div>
-      }
+  <details class="inspector-section" [open]="isSectionOpen('dashboard-ai')" (toggle)="onSectionToggle('dashboard-ai', $event)">
+    <summary class="inspector-section-summary">AI generation</summary>
+    <div class="inspector-section-body">
       <div class="mb-3">
-        <label class="form-label fw-semibold small">Prompt</label>
-        <textarea class="form-control form-control-sm" rows="4"
+        <label class="form-label fw-semibold">Prompt</label>
+        <textarea class="form-control" rows="4"
           [value]="aiPrompt()"
           (input)="onAiPromptChange($any($event.target).value)"
           placeholder="e.g. 'Show today's weather, calendar events, and a motivational quote'"></textarea>
       </div>
       <div class="mb-3">
-        <label class="form-label fw-semibold small">Pre-generation Lead Time</label>
-        <div class="input-group input-group-sm">
+        <label class="form-label fw-semibold">Lead time</label>
+        <div class="input-group">
           <input type="number" class="form-control"
             [value]="aiLeadTimeMinutes()"
             (input)="onAiLeadTimeChange($any($event.target).value)"
@@ -687,25 +639,25 @@
         }
       </div>
       <div class="mb-3">
-        <button class="btn btn-sm btn-primary w-100" (click)="generateAiContent()" [disabled]="isGeneratingAi() || aiConfigMode() === 'None' || !aiPrompt() || isDirty()"
+        <button class="btn btn-primary w-100" (click)="generateAiContent()" [disabled]="isGeneratingAi() || aiConfigMode() === 'None' || !aiPrompt() || isDirty()"
           [title]="isDirty() ? 'Save your changes before generating' : ''">
           @if (isGeneratingAi()) {
             <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
             Generating…
           } @else {
-            <i class="fa fa-wand-magic-sparkles me-1"></i>Generate
+            <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Generate
           }
         </button>
       </div>
       @if (aiLastError()) {
         <div class="alert alert-danger py-1 small mb-2">
-          <i class="fa fa-circle-exclamation me-1"></i>
+          <i class="fa-solid fa-circle-exclamation me-1"></i>
           {{ aiLastError() }}
         </div>
       }
       @if (aiLastGenerated()) {
         <div class="alert alert-info py-1 small mb-2">
-          <i class="fa fa-clock me-1"></i>
+          <i class="fa-solid fa-clock me-1"></i>
           Last generated: {{ aiLastGenerated() }}
         </div>
       }
@@ -725,179 +677,160 @@
         </div>
       }
     </div>
-    }
-  </div>
+  </details>
   }
+  <details class="inspector-section" [open]="isSectionOpen('dashboard-colors')" (toggle)="onSectionToggle('dashboard-colors', $event)">
+    <summary class="inspector-section-summary">Colors
+      @if (hasLayoutColorOverrides()) {
+        <span class="app-status-chip app-status-chip-warning override-chip" title="Some colors differ from the scheme">Custom</span>
+      }
+    </summary>
+    <div class="inspector-section-body">
+      <label class="form-label fw-semibold" for="dashboardColorScheme">Color scheme</label>
+      <select id="dashboardColorScheme" class="form-select mb-3" [ngModel]="layout().colorScheme"
+        [compareWith]="compareColorSchemes"
+        (ngModelChange)="updateColorScheme($event)">
+        @for (scheme of colorSchemes; track scheme.name) {
+        <option [ngValue]="scheme">{{ scheme.name }}</option>
+        }
+      </select>
+      @for (field of layoutColorFields; track field.key) {
+      <div class="color-row">
+        <span class="color-row-label">{{ field.label }}@if (isLayoutColorOverridden(field.key)) {<span class="override-dot" title="Differs from the scheme"></span>}</span>
+        <div class="swatch-group" role="radiogroup" [attr.aria-label]="field.label">
+          @for (color of layout().colorScheme.palette; track color) {
+          <button type="button" class="swatch" role="radio" [style.background-color]="color"
+            [class.selected]="layout().colorScheme[field.key] === color" [attr.aria-checked]="layout().colorScheme[field.key] === color"
+            [attr.aria-label]="field.label + ': ' + getColorName(color)" [title]="getColorName(color)"
+            (click)="updateLayoutColor(field.key, color)"></button>
+          }
+        </div>
+      </div>
+      }
+      <div class="inspector-section-actions">
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetLayoutColorOverrides()" [disabled]="!hasLayoutColorOverrides()"
+          title="Reset dashboard colors to the scheme defaults">
+          <i class="fa-solid fa-rotate-left me-1" aria-hidden="true"></i>Reset colors
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-danger" (click)="resetAllColorOverrides()"
+          title="Reset dashboard and widget colors to the scheme defaults">
+          <i class="fa-solid fa-rotate-left me-1" aria-hidden="true"></i>Reset all, including widgets
+        </button>
+      </div>
+    </div>
+  </details>
 </ng-template>
 
 <ng-template #propertiesContent>
-  @if (!selectedWidget()) {
-  <div class="app-empty-state py-4">
-    <span class="app-empty-state-icon"><i class="fa-solid fa-arrow-pointer" aria-hidden="true"></i></span>
-    <div><strong>Select a widget</strong><p class="small text-muted mb-0">Choose a widget on the canvas to edit its content and appearance.</p></div>
-  </div>
-  }
   @if (selectedWidget()) {
-  <h6>{{ selectedWidget()!.type | titlecase }}</h6>
-  @if (selectedWidgetSupportsElementEditing()) {
-    <button type="button" class="btn btn-sm w-100 mb-2"
-      [ngClass]="elementEditingWidgetId() === selectedWidget()!.id ? 'btn-success' : 'btn-outline-primary'"
-      [disabled]="renderedCanvasLoading() || !getSelectedWidgetGeometry()"
-      (click)="toggleElementEditing(selectedWidget()!)">
-      <i class="fa-solid me-1" [ngClass]="elementEditingWidgetId() === selectedWidget()!.id ? 'fa-check' : 'fa-arrows-up-down-left-right'" aria-hidden="true"></i>
-      {{ elementEditingWidgetId() === selectedWidget()!.id ? 'Finish editing layout' : 'Edit widget layout' }}
-    </button>
-    @if (renderedCanvasLoading()) {
-      <p class="small text-muted mb-2" role="status">Updating the preview before layout editing…</p>
-    }
-  }
-  @if (selectedWidgetSourceStatuses().length > 0) {
-    <div class="source-status-panel mb-2" aria-label="Widget data source status">
-      <div class="small fw-semibold mb-1">Data sources</div>
-      @for (source of selectedWidgetSourceStatuses(); track source.key) {
-        <div class="source-status-row small">
-          <span class="text-truncate" [title]="source.label">{{ source.label }}</span>
-          <span class="app-status-chip"
-            [ngClass]="source.status.state === 'ready' ? 'app-status-chip-success' : (source.status.state === 'error' ? 'app-status-chip-warning' : 'app-status-chip-muted')"
-            [title]="source.status.error || (source.status.fromCache ? 'Using recently cached data' : '')">
-            {{ source.status.state === 'ready' ? 'Ready' : (source.status.state === 'empty' ? 'No data' : 'Error') }}
-          </span>
-        </div>
-      }
-      <button type="button" class="btn btn-sm btn-link p-0 mt-1" (click)="refreshLivePreview()" [disabled]="renderedCanvasLoading()">
-        Refresh source data
-      </button>
-    </div>
-  }
-  <hr />
-  <div class="collapsible-section" [class.collapsed]="widgetColorOverridesCollapsed()">
-    <button type="button" class="collapsible-header collapsible-trigger" (click)="widgetColorOverridesCollapsed.set(!widgetColorOverridesCollapsed())"
-      [attr.aria-expanded]="!widgetColorOverridesCollapsed()" aria-controls="widgetColorOverridesPanel">
-      <span class="d-flex align-items-center">
-        <span class="section-title">Color overrides</span>
-        @if (hasWidgetColorOverrides(selectedWidget())) {
-        <span class="badge bg-warning text-dark ms-2 override-badge" title="Some colors are overridden">Custom</span>
-        }
-      </span>
-      <i class="fa" [ngClass]="widgetColorOverridesCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
-    </button>
-    @if (!widgetColorOverridesCollapsed()) {
-    <div id="widgetColorOverridesPanel" class="collapsible-body">
-      <div class="mb-2">
-        <label class="form-label small">Widget Background Color @if (isWidgetColorOverridden(selectedWidget(), 'widgetBackgroundColor')) { <span class="badge bg-warning text-dark" title="Overridden">Custom</span> }</label>
-        <div class="input-group">
-          <select class="form-select form-select-sm"
-            [ngModel]="selectedWidget()!.colorOverrides?.widgetBackgroundColor || ''"
-            (ngModelChange)="updateWidgetColorOverride(selectedWidget()!, 'widgetBackgroundColor', $event)">
-            <option value="">Default ({{ layout().colorScheme.widgetBackgroundColor }})</option>
-            @for (color of layout().colorScheme.palette; track color) {
-            <option [value]="color">{{ getColorName(color) }}</option>
-            }
-          </select>
-          <button class="btn btn-sm btn-outline-secondary"
-            (click)="clearWidgetColorOverride(selectedWidget()!, 'widgetBackgroundColor')"
-            title="Clear override">×</button>
-        </div>
-      </div>
-      <div class="mb-2">
-        <label class="form-label small">Widget Border Color @if (isWidgetColorOverridden(selectedWidget(), 'widgetBorderColor')) { <span class="badge bg-warning text-dark" title="Overridden">Custom</span> }</label>
-        <div class="input-group">
-          <select class="form-select form-select-sm"
-            [ngModel]="selectedWidget()!.colorOverrides?.widgetBorderColor || ''"
-            (ngModelChange)="updateWidgetColorOverride(selectedWidget()!, 'widgetBorderColor', $event)">
-            <option value="">Default ({{ layout().colorScheme.widgetBorderColor }})</option>
-            @for (color of layout().colorScheme.palette; track color) {
-            <option [value]="color">{{ getColorName(color) }}</option>
-            }
-          </select>
-          <button class="btn btn-sm btn-outline-secondary"
-            (click)="clearWidgetColorOverride(selectedWidget()!, 'widgetBorderColor')"
-            title="Clear override">×</button>
-        </div>
-      </div>
-      <div class="mb-2">
-        <label class="form-label small">Widget Title Text Color @if (isWidgetColorOverridden(selectedWidget(), 'widgetTitleTextColor')) { <span class="badge bg-warning text-dark" title="Overridden">Custom</span> }</label>
-        <div class="input-group">
-          <select class="form-select form-select-sm"
-            [ngModel]="selectedWidget()!.colorOverrides?.widgetTitleTextColor || ''"
-            (ngModelChange)="updateWidgetColorOverride(selectedWidget()!, 'widgetTitleTextColor', $event)">
-            <option value="">Default ({{ layout().colorScheme.widgetTitleTextColor }})</option>
-            @for (color of layout().colorScheme.palette; track color) {
-            <option [value]="color">{{ getColorName(color) }}</option>
-            }
-          </select>
-          <button class="btn btn-sm btn-outline-secondary"
-            (click)="clearWidgetColorOverride(selectedWidget()!, 'widgetTitleTextColor')"
-            title="Clear override">×</button>
-        </div>
-      </div>
-      <div class="mb-2">
-        <label class="form-label small">Widget Text Color @if (isWidgetColorOverridden(selectedWidget(), 'widgetTextColor')) { <span class="badge bg-warning text-dark" title="Overridden">Custom</span> }</label>
-        <div class="input-group">
-          <select class="form-select form-select-sm"
-            [ngModel]="selectedWidget()!.colorOverrides?.widgetTextColor || ''"
-            (ngModelChange)="updateWidgetColorOverride(selectedWidget()!, 'widgetTextColor', $event)">
-            <option value="">Default ({{ layout().colorScheme.widgetTextColor }})</option>
-            @for (color of layout().colorScheme.palette; track color) {
-            <option [value]="color">{{ getColorName(color) }}</option>
-            }
-          </select>
-          <button class="btn btn-sm btn-outline-secondary"
-            (click)="clearWidgetColorOverride(selectedWidget()!, 'widgetTextColor')"
-            title="Clear override">×</button>
-        </div>
-      </div>
-      <div class="mb-2">
-        <label class="form-label small">Icon Color @if (isWidgetColorOverridden(selectedWidget(), 'iconColor')) { <span class="badge bg-warning text-dark" title="Overridden">Custom</span> }</label>
-        <div class="input-group">
-          <select class="form-select form-select-sm"
-            [ngModel]="selectedWidget()!.colorOverrides?.iconColor || ''"
-            (ngModelChange)="updateWidgetColorOverride(selectedWidget()!, 'iconColor', $event)">
-            <option value="">Default ({{ layout().colorScheme.iconColor }})</option>
-            @for (color of layout().colorScheme.palette; track color) {
-            <option [value]="color">{{ getColorName(color) }}</option>
-            }
-          </select>
-          <button class="btn btn-sm btn-outline-secondary"
-            (click)="clearWidgetColorOverride(selectedWidget()!, 'iconColor')"
-            title="Clear override">×</button>
-        </div>
-      </div>
-    </div>
-    }
-  </div>
   <app-widget-config [widget]="selectedWidget()!" [dashboard]="dashboard()"
     [availableEntities]="availableEntities()" [entitiesLoading]="entitiesLoading()"
     [colorScheme]="layout().colorScheme"
+    [sourceStatuses]="selectedWidgetSourceStatuses()" [sourceMissing]="selectedWidgetNeedsSource()"
+    [sourcesRefreshing]="renderedCanvasLoading()" (refreshSources)="refreshLivePreview()"
     (widgetChanged)="onWidgetConfigChanged($event)"
     [attr.key]="selectedWidget()!.id"></app-widget-config>
-  }
-</ng-template>
-
-<ng-template #widgetsListContent>
-  @if (layout().widgets.length === 0) {
-  <div class="text-muted text-center py-4">
-    <p>No widgets added yet.</p>
-    <small>Drag widgets from the toolbar or click to add them.</small>
-  </div>
-  } @else {
-  @for (w of layout().widgets; track w.id) {
-  <div class="widget-item" [class.active]="selectedWidget()?.id === w.id"
-    role="button" tabindex="0" [attr.aria-pressed]="selectedWidget()?.id === w.id"
-    (click)="onWidgetSelect(w)" (keydown.enter)="onWidgetSelect(w)" (keydown.space)="$event.preventDefault(); onWidgetSelect(w)">
-    <div class="widget-item-info">
-      <div class="fw-bold text-truncate">{{ w.type | titlecase }}</div>
-      <small class="text-muted text-truncate d-block">ID: {{ w.id }}</small>
-      <div class="small mt-1 d-flex gap-1 flex-wrap">
-        <span class="badge bg-secondary">{{ w.position.x }},{{ w.position.y }}</span>
-        <span class="badge bg-secondary">{{ w.position.w }}×{{ w.position.h }}</span>
+  <details class="inspector-section" [open]="isSectionOpen('widget-text')" (toggle)="onSectionToggle('widget-text', $event)">
+    <summary class="inspector-section-summary">
+      Text
+      @if (selectedWidget()!.fontOverrides) {
+        <span class="app-status-chip app-status-chip-warning override-chip" title="Font sizes differ from the dashboard">Custom</span>
+      }
+    </summary>
+    <div class="inspector-section-body">
+      <div class="designer-field-grid">
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Title size</span>
+          <div class="input-group">
+            <input type="number" class="form-control" min="8" max="72" [value]="selectedWidget()!.fontOverrides?.titleFontSize ?? ''"
+              [placeholder]="layout().titleFontSize ?? 16" (change)="updateWidgetFontSize('titleFontSize', $event)" />
+            <span class="input-group-text">px</span>
+          </div>
+        </label>
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Text size</span>
+          <div class="input-group">
+            <input type="number" class="form-control" min="6" max="48" [value]="selectedWidget()!.fontOverrides?.textFontSize ?? ''"
+              [placeholder]="layout().textFontSize ?? 14" (change)="updateWidgetFontSize('textFontSize', $event)" />
+            <span class="input-group-text">px</span>
+          </div>
+        </label>
       </div>
+      <small class="form-text text-muted">Empty uses the dashboard size shown in the field.</small>
     </div>
-    <button class="btn btn-sm btn-danger btn-delete"
-      (click)="deleteWidget(w); $event.stopPropagation()" [attr.aria-label]="'Delete ' + w.type + ' widget'">
-      <i class="fa fa-trash"></i>
-    </button>
-  </div>
-  }
+  </details>
+  <details class="inspector-section" [open]="isSectionOpen('widget-layout')" (toggle)="onSectionToggle('widget-layout', $event)">
+    <summary class="inspector-section-summary">Layout</summary>
+    <div class="inspector-section-body">
+      <div class="designer-field-grid mb-3" role="group" aria-label="Position and size in grid cells">
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Column</span>
+          <input type="number" class="form-control" min="1" [max]="layout().gridCols" [value]="selectedWidget()!.position.x + 1"
+            (change)="updateSelectedWidgetPosition('x', $event)" />
+        </label>
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Row</span>
+          <input type="number" class="form-control" min="1" [max]="layout().gridRows" [value]="selectedWidget()!.position.y + 1"
+            (change)="updateSelectedWidgetPosition('y', $event)" />
+        </label>
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Width</span>
+          <input type="number" class="form-control" min="1" [max]="layout().gridCols" [value]="selectedWidget()!.position.w"
+            (change)="updateSelectedWidgetPosition('w', $event)" />
+        </label>
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Height</span>
+          <input type="number" class="form-control" min="1" [max]="layout().gridRows" [value]="selectedWidget()!.position.h"
+            (change)="updateSelectedWidgetPosition('h', $event)" />
+        </label>
+      </div>
+      @if (selectedWidgetSupportsElementEditing()) {
+      <div class="designer-field-grid align-items-end">
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" id="layoutGuides" [checked]="getSelectedWidgetShowGuides()"
+            (change)="updateSelectedWidgetConfig({ showGuides: $any($event.target).checked })" />
+          <label class="form-check-label" for="layoutGuides">Smart guides</label>
+        </div>
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Snap</span>
+          <select class="form-select" [ngModel]="getSelectedWidgetSnapStep()" (ngModelChange)="updateSelectedWidgetConfig({ snapStep: $event })">
+            <option [ngValue]="0">Off</option>
+            <option [ngValue]="1">1%</option>
+            <option [ngValue]="2">2%</option>
+            <option [ngValue]="5">5%</option>
+          </select>
+        </label>
+      </div>
+      <small class="form-text text-muted">Used while editing the widget layout on the canvas.</small>
+      }
+    </div>
+  </details>
+  <details class="inspector-section" [open]="isSectionOpen('widget-colors')" (toggle)="onSectionToggle('widget-colors', $event)">
+    <summary class="inspector-section-summary">
+      Colors
+      @if (hasWidgetColorOverrides(selectedWidget())) {
+        <span class="app-status-chip app-status-chip-warning override-chip" title="Some colors differ from the scheme">Custom</span>
+      }
+    </summary>
+    <div class="inspector-section-body">
+      @for (field of widgetColorFields; track field.key) {
+      <div class="color-row">
+        <span class="color-row-label">{{ field.label }}@if (isWidgetColorOverridden(selectedWidget(), field.key)) {<span class="override-dot" title="Overridden for this widget"></span>}</span>
+        <div class="swatch-group" role="radiogroup" [attr.aria-label]="field.label">
+          <button type="button" class="swatch swatch-default" role="radio"
+            [class.selected]="!selectedWidget()!.colorOverrides?.[field.key]" [attr.aria-checked]="!selectedWidget()!.colorOverrides?.[field.key]"
+            [attr.aria-label]="field.label + ': scheme default'" title="Scheme default"
+            (click)="clearWidgetColorOverride(selectedWidget()!, field.key)"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i></button>
+          @for (color of layout().colorScheme.palette; track color) {
+          <button type="button" class="swatch" role="radio" [style.background-color]="color"
+            [class.selected]="selectedWidget()!.colorOverrides?.[field.key] === color" [attr.aria-checked]="selectedWidget()!.colorOverrides?.[field.key] === color"
+            [attr.aria-label]="field.label + ': ' + getColorName(color)" [title]="getColorName(color)"
+            (click)="updateWidgetColorOverride(selectedWidget()!, field.key, color)"></button>
+          }
+        </div>
+      </div>
+      }
+    </div>
+  </details>
   }
 </ng-template>

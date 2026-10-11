@@ -1,133 +1,142 @@
 /* Shared inspector and mobile overlay primitives used by the dashboard designer. */
 app-dashboard-designer {
-/* Collapsible section cards – shared pattern */
-.collapsible-section {
-  border: 1px solid var(--bs-border-color, rgba(0, 0, 0, 0.125));
-  border-radius: 0.375rem;
+/* Designer tokens, derived from Bootstrap and app tokens so both themes follow automatically. */
+--designer-accent: var(--bs-primary);
+--designer-accent-soft: rgba(var(--bs-primary-rgb), 0.12);
+--designer-accent-strong: rgba(var(--bs-primary-rgb), 0.85);
+--designer-danger: var(--bs-danger);
+--designer-success: var(--bs-success);
+--designer-on-accent: var(--bs-white);
+--designer-canvas-bg: var(--bs-tertiary-bg);
+--designer-backdrop: color-mix(in srgb, var(--bs-black) 40%, transparent);
+--designer-shadow-sm: 0 0.25rem 0.75rem color-mix(in srgb, var(--bs-black) 12%, transparent);
+--designer-shadow-lg: 0 0.5rem 1.5rem color-mix(in srgb, var(--bs-black) 18%, transparent);
+--designer-overlay-bg: color-mix(in srgb, var(--bs-dark) 86%, transparent);
+/* Type follows Bootstrap's scale: badges/meta, .small/form-text, body. */
+--designer-text-xs: 0.75rem;
+--designer-text-sm: 0.875rem;
+--designer-text-md: 1rem;
+/* Same as .app-icon-button and full-size form controls. */
+--designer-hit-size: var(--app-control-min-height);
+/* Same height as .btn-sm, for controls that sit next to small buttons. */
+--designer-control-sm-height: calc(0.875rem * 1.5 + 0.5rem + 2px);
+
+html[data-bs-theme="dark"] & {
+  --designer-backdrop: color-mix(in srgb, var(--bs-black) 60%, transparent);
+  --designer-shadow-sm: 0 0.25rem 0.75rem color-mix(in srgb, var(--bs-black) 45%, transparent);
+  --designer-shadow-lg: 0 0.5rem 1.5rem color-mix(in srgb, var(--bs-black) 55%, transparent);
+  --designer-overlay-bg: color-mix(in srgb, var(--bs-black) 80%, transparent);
+}
+
+/* Inspector sections (native <details>) used for dashboard and widget settings alike. */
+.inspector-section {
   margin-bottom: 0.75rem;
-  background: var(--bs-card-bg, var(--bs-body-bg, #fff));
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--app-radius-sm);
+  background: var(--bs-card-bg, var(--bs-body-bg));
 
-  .collapsible-header {
+  > .inspector-section-summary {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    width: 100%;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    user-select: none;
+    gap: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    font-size: var(--designer-text-md);
     font-weight: 600;
-    font-size: 0.9rem;
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
 
-    &.collapsible-trigger,
-    .collapsible-trigger {
-      display: flex;
-      flex: 1;
-      align-items: center;
-      justify-content: space-between;
-      min-width: 0;
-      padding: 0.625rem 0.75rem;
-      border: 0;
-      background: transparent;
-      color: inherit;
-      font: inherit;
-      text-align: left;
-      cursor: pointer;
+    &::-webkit-details-marker {
+      display: none;
     }
 
-    &.collapsible-trigger:hover,
-    .collapsible-trigger:hover {
-      background: var(--bs-tertiary-bg, rgba(0, 0, 0, 0.02));
+    &::after {
+      content: '\f078';
+      margin-left: auto;
+      font-family: 'Font Awesome 7 Free', 'Font Awesome 6 Free';
+      font-size: var(--designer-text-xs);
+      font-weight: 900;
+      opacity: 0.7;
+      transition: transform 0.15s;
     }
 
-    &.collapsible-trigger:focus-visible,
-    .collapsible-trigger:focus-visible {
-      z-index: 1;
-      outline: 2px solid var(--bs-primary);
-      outline-offset: -2px;
-    }
-
-    .collapsible-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding-right: 0.5rem;
-    }
-
-    .section-title {
-      margin: 0;
-      font-size: inherit;
-      font-weight: inherit;
+    &:hover {
+      background: var(--bs-tertiary-bg);
     }
   }
 
-  .collapsible-body {
-    padding: 0.5rem 0.75rem;
-    border-top: 1px solid var(--bs-border-color, rgba(0, 0, 0, 0.125));
+  &[open] > .inspector-section-summary::after {
+    transform: rotate(180deg);
   }
 
-  &.collapsed {
-    .collapsible-header {
-      border-bottom: none;
+  > .inspector-section-body {
+    padding: 0.75rem;
+    border-top: 1px solid var(--bs-border-color);
+
+    > :last-child,
+    > :last-child > :last-child {
+      margin-bottom: 0;
     }
   }
 }
 
-.override-badge {
-  padding: 0.25em 0.5em;
-  font-size: 0.65em;
-  line-height: 1;
-}
-
-.designer-panel-right .card>.card-body {
+.inspector-section-actions {
   display: flex;
-  flex-direction: column;
-  scrollbar-width: thin;
-  scrollbar-color: var(--bs-secondary, #adb5bd) var(--bs-body-bg, #f8f9fa);
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--bs-border-color);
+}
+
+/* Palette swatches, used by dashboard, widget and graph series colors. */
+.swatch-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+
+.swatch {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
   padding: 0;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--app-radius-sm);
+  cursor: pointer;
 
-  .tab-pane {
-    display: none;
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: var(--bs-card-spacer-y, 1rem) var(--bs-card-spacer-x, 1rem);
-
-    &.active {
-      display: flex;
-      flex-direction: column;
-    }
+  &.selected {
+    outline: 2px solid var(--bs-primary);
+    outline-offset: 1px;
   }
+}
 
-  .widgets-list-pane {
-    display: none;
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 0.5rem;
+.swatch-default {
+  background: var(--bs-body-bg);
+  color: var(--bs-secondary-color);
+  font-size: var(--designer-text-xs);
+}
 
-    &.active {
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
+@media (pointer: coarse) {
+  .swatch {
+    position: relative;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: -0.375rem;
     }
   }
 }
 
-.col-md-3 .card>.card-body::-webkit-scrollbar {
-  width: 8px;
-}
-
-.col-md-3 .card>.card-body::-webkit-scrollbar-thumb {
-  background: var(--bs-secondary, #adb5bd);
-  border-radius: 4px;
-}
-
-.col-md-3 .card>.card-body::-webkit-scrollbar-track {
-  background: #f8f9fa;
+/* "Custom" marker for overridden colors, a compact app status chip. */
+.override-chip {
+  min-height: 0;
+  padding: 0.05rem 0.45rem;
+  font-size: var(--designer-text-xs);
+  font-weight: 600;
 }
 
 
@@ -141,62 +150,80 @@ app-dashboard-designer {
   flex-shrink: 0;
 }
 
-/* Compact header when mobile actions are present */
-.d-flex:has(.mobile-header-actions) {
+/* Phones keep the title and icon actions on one row. */
+.designer-action-bar:has(.mobile-header-actions) {
   flex-wrap: nowrap;
-  gap: 0.25rem;
 
-  > .d-flex.align-items-center {
-    gap: 0.5rem;
-    flex: 1;
-    min-width: 0;
-  }
-
-  h2 {
-    font-size: 0.9rem;
+  .designer-toolbar-start {
+    flex: 1 1 auto;
   }
 }
 
-/* FAB */
-.mobile-fab {
-  display: flex;
+/* Phone bottom bar: Layers · Add · Inspector */
+.mobile-bottom-bar {
   position: fixed;
-  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
-  right: 24px;
+  right: 0;
+  bottom: 0;
+  left: 0;
   z-index: 1050;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--bs-primary, #0d6efd);
-  color: #fff;
-  border: none;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 0.25rem 0.5rem calc(0.25rem + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--bs-border-color);
+  background: var(--bs-body-bg);
 
-  &:active {
-    transform: scale(0.92);
+  button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.35rem 0;
+    border: 0;
+    background: transparent;
+    color: var(--bs-secondary-color);
+    font-size: var(--designer-text-xs);
+    cursor: pointer;
+
+    i {
+      font-size: 1.05rem;
+    }
+
+    &.active {
+      color: var(--bs-primary);
+    }
   }
+
+  .bottom-bar-primary i {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    background: var(--bs-primary);
+    color: var(--designer-on-accent);
+  }
+}
+
+/* Keep page content clear of the fixed bottom bar on phones. */
+&.designer-mobile .designer-root {
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
 }
 
 /* Mobile selection toolbar (floating bar above FAB) */
 .mobile-selection-toolbar {
   display: flex;
   position: fixed;
-  bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(80px + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 1050;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  background: var(--bs-body-bg, #fff);
-  color: var(--bs-body-color, #212529);
-  border: 1px solid var(--bs-border-color, #dee2e6);
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
+  border: 1px solid var(--bs-border-color);
   border-radius: 2rem;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--designer-shadow-lg);
   animation: fadeInUp 0.15s ease-out;
 
   .toolbar-btn {
@@ -206,18 +233,18 @@ app-dashboard-designer {
     padding: 0.375rem 0.75rem;
     border: none;
     border-radius: 1rem;
-    background: var(--bs-tertiary-bg, #f8f9fa);
-    color: var(--bs-body-color, #212529);
-    font-size: 0.8rem;
+    background: var(--bs-tertiary-bg);
+    color: var(--bs-body-color);
+    font-size: var(--designer-text-sm);
     cursor: pointer;
     white-space: nowrap;
 
     &:active {
-      background: var(--bs-secondary-bg, #e9ecef);
+      background: var(--bs-secondary-bg);
     }
 
     &.toolbar-btn-danger {
-      color: var(--bs-danger, #dc3545);
+      color: var(--bs-danger);
     }
   }
 }
@@ -232,7 +259,7 @@ app-dashboard-designer {
   display: block;
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--designer-backdrop);
   z-index: 1060;
 }
 
@@ -244,11 +271,11 @@ app-dashboard-designer {
   left: 0;
   right: 0;
   z-index: 1070;
-  background: var(--bs-body-bg, #fff);
-  color: var(--bs-body-color, #212529);
-  --bs-card-bg: var(--bs-body-bg, #fff);
-  border-radius: 16px 16px 0 0;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
+  --bs-card-bg: var(--bs-body-bg);
+  border-radius: var(--app-radius-lg) var(--app-radius-lg) 0 0;
+  box-shadow: var(--designer-shadow-lg);
   max-height: 60vh;
   overflow: hidden;
   animation: slideUp 0.2s ease-out;
@@ -257,7 +284,7 @@ app-dashboard-designer {
     width: 36px;
     height: 4px;
     border-radius: 2px;
-    background: var(--bs-border-color, #dee2e6);
+    background: var(--bs-border-color);
     margin: 8px auto 0;
   }
 
@@ -266,19 +293,21 @@ app-dashboard-designer {
     justify-content: space-between;
     align-items: center;
     padding: 1rem 1rem 0.5rem;
-    border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+    border-bottom: 1px solid var(--bs-border-color);
 
     h5 {
       margin: 0;
       font-size: 1rem;
-      color: var(--bs-body-color, #212529);
+      color: var(--bs-body-color);
     }
 
     .btn-close-sheet {
+      min-width: var(--designer-hit-size);
+      min-height: var(--designer-hit-size);
       background: none;
       border: none;
       font-size: 1.25rem;
-      color: var(--bs-body-color, #212529);
+      color: var(--bs-body-color);
       opacity: 0.6;
       cursor: pointer;
       padding: 0.25rem;
@@ -288,40 +317,14 @@ app-dashboard-designer {
       }
     }
   }
+}
 
-  .bottom-sheet-body {
-    padding: 0.75rem;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.5rem;
-  }
+/* The picker manages its own scrolling inside the sheet. */
+.picker-sheet {
+  max-height: 75vh;
 
-  .widget-grid-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.375rem;
-    padding: 0.75rem 0.5rem;
-    border-radius: 0.5rem;
-    border: 1px solid var(--bs-border-color, #dee2e6);
-    background: var(--bs-tertiary-bg, #f8f9fa);
-    color: var(--bs-body-color, #212529);
-    cursor: pointer;
-    font-size: 0.75rem;
-    text-align: center;
-    transition: background 0.1s;
-
-    i {
-      font-size: 1.25rem;
-      color: var(--bs-primary, #0d6efd);
-    }
-
-    &:active {
-      background: var(--bs-secondary-bg, #e9ecef);
-    }
+  app-widget-picker {
+    flex: 1 1 auto;
   }
 }
 
@@ -335,7 +338,7 @@ app-dashboard-designer {
   display: block;
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--designer-backdrop);
   z-index: 1060;
 }
 
@@ -348,10 +351,10 @@ app-dashboard-designer {
   bottom: 0;
   z-index: 1070;
   width: min(85vw, 360px);
-  background: var(--bs-body-bg, #fff);
-  color: var(--bs-body-color, #212529);
-  --bs-card-bg: var(--bs-body-bg, #fff);
-  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+  background: var(--bs-body-bg);
+  color: var(--bs-body-color);
+  --bs-card-bg: var(--bs-body-bg);
+  box-shadow: var(--designer-shadow-lg);
   animation: slideInRight 0.2s ease-out;
   overflow: hidden;
 
@@ -360,19 +363,21 @@ app-dashboard-designer {
     justify-content: space-between;
     align-items: center;
     padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+    border-bottom: 1px solid var(--bs-border-color);
 
     h5 {
       margin: 0;
       font-size: 1rem;
-      color: var(--bs-body-color, #212529);
+      color: var(--bs-body-color);
     }
 
     .btn-close-drawer {
+      min-width: var(--designer-hit-size);
+      min-height: var(--designer-hit-size);
       background: none;
       border: none;
       font-size: 1.25rem;
-      color: var(--bs-body-color, #212529);
+      color: var(--bs-body-color);
       opacity: 0.6;
       cursor: pointer;
       padding: 0.25rem;
@@ -387,39 +392,20 @@ app-dashboard-designer {
     flex: 1;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 0.75rem;
+    padding: 1rem;
   }
+}
 
-  .drawer-tabs {
-    display: flex;
-    border-bottom: 1px solid var(--bs-border-color, #dee2e6);
-    padding: 0 0.5rem;
-    background: var(--bs-body-bg, #fff);
+.mobile-drawer.drawer-left {
+  right: auto;
+  left: 0;
+  box-shadow: var(--designer-shadow-lg);
+  animation: slideInLeft 0.2s ease-out;
+}
 
-    .drawer-tab-btn {
-      flex: 1;
-      padding: 0.5rem;
-      background: none;
-      border: none;
-      border-bottom: 2px solid transparent;
-      font-size: 0.8rem;
-      color: var(--bs-body-color, #212529);
-      opacity: 0.6;
-      cursor: pointer;
-      text-align: center;
-
-      &.active {
-        color: var(--bs-primary, #0d6efd);
-        border-bottom-color: var(--bs-primary, #0d6efd);
-        font-weight: 500;
-        opacity: 1;
-      }
-
-      &:hover {
-        opacity: 0.85;
-      }
-    }
-  }
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
 }
 
 @keyframes slideInRight {
@@ -436,11 +422,11 @@ app-dashboard-designer {
     top: 100%;
     right: 0;
     z-index: 1080;
-    background: var(--bs-body-bg, #fff);
-    color: var(--bs-body-color, #212529);
-    border: 1px solid var(--bs-border-color, #dee2e6);
-    border-radius: 0.5rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--app-radius-sm);
+    box-shadow: var(--designer-shadow-sm);
     min-width: 180px;
     padding: 0.25rem 0;
 
@@ -452,13 +438,13 @@ app-dashboard-designer {
       padding: 0.5rem 0.75rem;
       background: none;
       border: none;
-      font-size: 0.875rem;
-      color: var(--bs-body-color, #212529);
+      font-size: var(--designer-text-md);
+      color: var(--bs-body-color);
       cursor: pointer;
       text-align: left;
 
       &:active {
-        background: var(--bs-tertiary-bg, #e9ecef);
+        background: var(--bs-tertiary-bg);
       }
 
       &:disabled {
@@ -466,34 +452,6 @@ app-dashboard-designer {
         cursor: default;
       }
     }
-  }
-}
-
-/* Dark mode adjustments for mobile overlays */
-html[data-bs-theme="dark"] & {
-  .mobile-bottom-sheet {
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
-  }
-
-  .mobile-drawer {
-    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.4);
-  }
-
-  .mobile-fab {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  }
-
-  .mobile-bottom-sheet-backdrop,
-  .mobile-drawer-backdrop {
-    background: rgba(0, 0, 0, 0.6);
-  }
-
-  .overflow-dropdown {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  }
-
-  .mobile-selection-toolbar {
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
   }
 }
 

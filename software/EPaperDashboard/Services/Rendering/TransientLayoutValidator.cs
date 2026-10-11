@@ -41,6 +41,11 @@ public static class TransientLayoutValidator
                 || position.X + position.W > layout.GridCols
                 || position.Y + position.H > layout.GridRows)
                 return $"Widget '{widget.Id}' is outside the dashboard grid.";
+            if (widget.FontOverrides is { } fonts
+                && (fonts.TitleFontSize is < 1 or > 256 || fonts.TextFontSize is < 1 or > 256))
+                return $"Widget '{widget.Id}' font sizes are outside the supported range.";
+            if (widget.Name is { Length: > 200 })
+                return $"Widget '{widget.Id}' name is too long.";
             if (widget.Config.ValueKind is not (JsonValueKind.Object or JsonValueKind.Undefined))
                 return $"Widget '{widget.Id}' configuration must be an object.";
 

@@ -1,5 +1,7 @@
 import { Component, OnInit, inject, signal, computed, effect } from '@angular/core';
-import { RouterOutlet, RouterModule, Router } from '@angular/router';
+import { RouterOutlet, RouterModule, Router, NavigationEnd, ActivatedRouteSnapshot } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { filter, map } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { AuthService } from './services/auth.service';
 import { VersionService } from './services/version.service';
@@ -20,6 +22,15 @@ export class App implements OnInit {
 
   private readonly theme = signal<string>(this.getInitialTheme());
   readonly isDark = computed(() => this.theme() === 'dark');
+
+  /** Routes flagged with `data: { workspace: true }` use the full window width and height. */
+  protected readonly isWorkspace = toSignal(
+    this.router.events.pipe(
+      filter(event => event instanceof NavigationEnd),
+      map(() => App.isWorkspaceRoute(this.router.routerState.snapshot.root)),
+    ),
+    { initialValue: false },
+  );
 
   constructor() {
     effect(() => {
@@ -55,6 +66,12 @@ export class App implements OnInit {
     if (!navigation?.classList.contains('show')) return;
 
     document.querySelector<HTMLButtonElement>('.navbar-toggler')?.click();
+  }
+
+  private static isWorkspaceRoute(route: ActivatedRouteSnapshot): boolean {
+    let current: ActivatedRouteSnapshot | null = route;
+    while (current?.firstChild) current = current.firstChild;
+    return current?.data?.['workspace'] === true;
   }
 
   private getInitialTheme(): string {
