@@ -5,7 +5,7 @@
     <button type="button" class="btn btn-link btn-sm" (click)="loadAvailableEntities()">Retry sources</button>
   </div>
 }
-<div class="container-fluid py-2">
+<div class="designer-root">
   @if (dashboard()) {
   <div class="row">
     <div class="col-12">
@@ -153,39 +153,54 @@
       <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
           <h5 class="mb-0">Canvas</h5>
-          <button class="btn btn-sm btn-outline-secondary app-icon-button" (click)="refreshLivePreview()" [disabled]="renderedCanvasLoading()" aria-label="Refresh device preview and source data">
-            @if (renderedCanvasLoading()) {
-            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-            } @else {
-            <i class="fa fa-sync"></i>
-            }
-          </button>
+          <div class="canvas-tools" role="toolbar" aria-label="Canvas view">
+            <div class="btn-group btn-group-sm" role="group" aria-label="Zoom">
+              <button type="button" class="btn btn-outline-secondary" (click)="zoomCanvas(-1)" aria-label="Zoom out" title="Zoom out">
+                <i class="fa fa-minus" aria-hidden="true"></i>
+              </button>
+              <button type="button" class="btn btn-outline-secondary canvas-zoom-value" (click)="setCanvasZoom(canvasZoom() === 'fit' ? 1 : 'fit')"
+                [attr.aria-label]="canvasZoom() === 'fit' ? 'Zoom to actual size' : 'Fit canvas to view'"
+                [title]="canvasZoom() === 'fit' ? 'Fitted to view — click for actual size' : 'Click to fit to view'">
+                @if (canvasZoom() === 'fit') {<i class="fa fa-expand me-1" aria-hidden="true"></i>}{{ canvasZoomLabel() }}
+              </button>
+              <button type="button" class="btn btn-outline-secondary" (click)="zoomCanvas(1)" aria-label="Zoom in" title="Zoom in">
+                <i class="fa fa-plus" aria-hidden="true"></i>
+              </button>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary app-icon-button" (click)="refreshLivePreview()" [disabled]="renderedCanvasLoading()" aria-label="Refresh device preview and source data" title="Refresh preview and source data">
+              @if (renderedCanvasLoading()) {
+              <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+              } @else {
+              <i class="fa fa-sync" aria-hidden="true"></i>
+              }
+            </button>
+          </div>
         </div>
-        <div class="card-body overflow-auto">
-          <div class="canvas-wrapper">
+        <div class="card-body canvas-card-body">
+          <div class="canvas-wrapper" #canvasViewport>
             <div class="canvas-scale-wrapper" [ngStyle]="getCanvasScaleStyle()">
+            @if (renderedCanvasLoading() && !renderedCanvasImageUrl()) {
+              <div class="rendered-canvas-status rendered-canvas-status-loading">
+                <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                Rendering preview…
+              </div>
+            }
+            @if (renderedCanvasLoading() && renderedCanvasImageUrl()) {
+              <div class="rendered-canvas-status rendered-canvas-status-updating">
+                <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                Updating…
+              </div>
+            }
+            @if (renderedCanvasError()) {
+              <div class="rendered-canvas-status rendered-canvas-status-error" [title]="renderedCanvasError()">
+                <i class="fa fa-triangle-exclamation"></i>
+                Preview unavailable — showing the last available view
+              </div>
+            }
             <div class="dashboard-canvas" [class.backend-preview-active]="!!renderedCanvasImageUrl()" [ngStyle]="getCanvasStyle()" (mousedown)="onCanvasMouseDown($event)">
               @if (renderedCanvasImageUrl()) {
                 <img class="rendered-canvas-image" [src]="renderedCanvasImageUrl()"
                   alt="Backend-rendered dashboard preview" draggable="false" />
-              }
-              @if (renderedCanvasLoading() && !renderedCanvasImageUrl()) {
-                <div class="rendered-canvas-status rendered-canvas-status-loading">
-                  <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-                  Rendering preview…
-                </div>
-              }
-              @if (renderedCanvasLoading() && renderedCanvasImageUrl()) {
-                <div class="rendered-canvas-status rendered-canvas-status-updating">
-                  <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-                  Updating…
-                </div>
-              }
-              @if (renderedCanvasError()) {
-                <div class="rendered-canvas-status rendered-canvas-status-error" [title]="renderedCanvasError()">
-                  <i class="fa fa-triangle-exclamation"></i>
-                  Preview unavailable — showing the last available view
-                </div>
               }
               <div class="grid-overlay" [ngStyle]="getGridOverlayStyle()"></div>
               @for (widget of layout().widgets; track widget.id) {

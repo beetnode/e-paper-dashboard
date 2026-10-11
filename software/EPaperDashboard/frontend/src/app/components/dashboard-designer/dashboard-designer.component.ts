@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed, HostListener, effect } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, HostListener, effect, viewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { A11yModule } from '@angular/cdk/a11y';
@@ -47,11 +47,20 @@ import {
   WIDGET_DEFINITIONS,
   getWidgetRenderType,
 } from '../../models/widget-catalog';
+import {
+  CanvasZoom,
+  parseCanvasZoom,
+  resolveCanvasScale,
+  stepCanvasZoom,
+} from '../../models/designer-viewport';
+
+const CANVAS_ZOOM_STORAGE_KEY = 'designer.canvasZoom';
 
 @Component({
   selector: 'app-dashboard-designer',
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule, A11yModule, WidgetConfigComponent, RenderedPreviewModalComponent, WidgetElementOverlayComponent],
+  host: { '[class.designer-mobile]': 'isMobile()' },
   templateUrl: './dashboard-designer.component.html',
   styleUrls: ['./dashboard-designer.component.scss']
 })
@@ -152,7 +161,10 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   private renderPreviewRevision = 0;
   private renderedLayoutSignature = '';
   private forceRefreshOnNextRender = false;
-  private viewportWidth = signal(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  private canvasViewportSize = signal({ width: 0, height: 0 });
+  private canvasViewportObserver?: ResizeObserver;
+  private readonly canvasViewport = viewChild<ElementRef<HTMLElement>>('canvasViewport');
+  canvasZoom = signal<CanvasZoom>(DashboardDesignerComponent.readStoredZoom());
   private swipeStartY = 0;
   private swipeStartX = 0;
 
@@ -188,19 +200,36 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   private readonly LONG_PRESS_MS = 300;
   private pointerMoved = false;
 
+  /** Effective canvas scale. On phones the page scrolls vertically, so fit uses width only. */
   canvasScale = computed(() => {
-    if (!this.isMobile()) return 1;
-    const availableWidth = this.viewportWidth() - 16;
-    const canvasWidth = this.layout().width;
-    if (canvasWidth <= availableWidth) return 1;
-    return Math.max(0.2, availableWidth / canvasWidth);
+    const { width, height } = this.canvasViewportSize();
+    const layout = this.layout();
+    return resolveCanvasScale(
+      this.canvasZoom(),
+      { width, height: this.isMobile() ? 0 : height },
+      { width: layout.width, height: layout.height },
+    );
   });
+  canvasZoomLabel = computed(() => `${Math.round(this.canvasScale() * 100)}%`);
 
   constructor() {
     // Scroll lock when mobile overlays are open
     effect(() => {
       const lock = this.mobileWidgetDrawerOpen() || this.mobilePropertiesOpen();
       document.body.style.overflow = lock ? 'hidden' : '';
+    });
+
+    // Track the visible canvas area so fit-to-view follows panel, window and orientation changes.
+    effect(onCleanup => {
+      const element = this.canvasViewport()?.nativeElement;
+      if (!element || typeof ResizeObserver === 'undefined') return;
+      const observer = new ResizeObserver(entries => {
+        const box = entries[entries.length - 1].contentRect;
+        this.canvasViewportSize.set({ width: Math.floor(box.width), height: Math.floor(box.height) });
+      });
+      observer.observe(element);
+      this.canvasViewportObserver = observer;
+      onCleanup(() => observer.disconnect());
     });
 
     // The native renderer is the canonical visual source. Layout changes are rendered after a
@@ -221,7 +250,6 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   onWindowResize(): void {
     if (this.resizeTimer) clearTimeout(this.resizeTimer);
     this.resizeTimer = setTimeout(() => {
-      this.viewportWidth.set(window.innerWidth);
       this.isMobile.set(this.checkIsMobile());
     }, 100);
   }
@@ -244,7 +272,6 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
 
   ngOnInit(): void {
     this.isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
-    this.viewportWidth.set(window.innerWidth);
     this.isMobile.set(this.checkIsMobile());
     this.dashboardId = this.route.snapshot.paramMap.get('id') || '';
     if (this.dashboardId) {
@@ -258,6 +285,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
 
   ngOnDestroy(): void {
     this.renderPreviewSubscription?.unsubscribe();
+    this.canvasViewportObserver?.disconnect();
     if (this.longPressTimer) clearTimeout(this.longPressTimer);
     if (this.resizeTimer) clearTimeout(this.resizeTimer);
     if (this.renderPreviewTimer) clearTimeout(this.renderPreviewTimer);
@@ -1491,6 +1519,8 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       '--widget-border': `${layout.widgetBorder ?? 3}px`,
       position: 'relative',
       boxSizing: 'border-box',
+      transform: this.canvasScale() === 1 ? 'none' : `scale(${this.canvasScale()})`,
+      transformOrigin: '0 0',
     };
   }
 
@@ -1500,10 +1530,9 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     const gap = layout.widgetGap ?? 0;
     const cols = Math.max(1, layout.gridCols);
     const rows = Math.max(1, layout.gridRows);
-    const canvasEl = document.querySelector('.dashboard-canvas') as HTMLElement | null;
-    const rect = canvasEl ? canvasEl.getBoundingClientRect() : null;
-    const totalWidth = rect ? rect.width : layout.width;
-    const totalHeight = rect ? rect.height : layout.height;
+    // The overlay lives inside the scaled canvas, so it is laid out in unscaled device pixels.
+    const totalWidth = layout.width;
+    const totalHeight = layout.height;
 
     const innerWidth = Math.max(0, totalWidth - padding * 2 - gap * (cols - 1));
     const innerHeight = Math.max(0, totalHeight - padding * 2 - gap * (rows - 1));
@@ -1558,10 +1587,9 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     const cols    = layout.gridCols;
     const rows    = layout.gridRows;
 
-    // Use actual inner dimensions (clientWidth excludes the canvas CSS border)
-    const canvasEl = document.querySelector('.dashboard-canvas') as HTMLElement | null;
-    const totalW = canvasEl ? canvasEl.clientWidth  : layout.width;
-    const totalH = canvasEl ? canvasEl.clientHeight : layout.height;
+    // Laid out in unscaled device pixels inside the (possibly scaled) canvas.
+    const totalW = layout.width;
+    const totalH = layout.height;
 
     const cellW = (totalW - 2 * padding - gap * (cols - 1)) / cols;
     const cellH = (totalH - 2 * padding - gap * (rows - 1)) / rows;
@@ -1729,19 +1757,35 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
 
 
 
+  /** The wrapper occupies the scaled footprint so scrolling and centring see the visual size. */
   getCanvasScaleStyle(): any {
     const scale = this.canvasScale();
-    if (scale >= 1) return {};
-    const w = this.layout().width;
-    const h = this.layout().height;
+    const layout = this.layout();
     return {
-      transform: `scale(${scale})`,
-      'transform-origin': 'top left',
-      width: `${w}px`,
-      height: `${h}px`,
-      'margin-right': `-${w * (1 - scale)}px`,
-      'margin-bottom': `-${h * (1 - scale)}px`,
+      width: `${Math.round(layout.width * scale)}px`,
+      height: `${Math.round(layout.height * scale)}px`,
     };
+  }
+
+  zoomCanvas(direction: 1 | -1): void {
+    this.setCanvasZoom(stepCanvasZoom(this.canvasScale(), direction));
+  }
+
+  setCanvasZoom(zoom: CanvasZoom): void {
+    this.canvasZoom.set(zoom);
+    try {
+      localStorage.setItem(CANVAS_ZOOM_STORAGE_KEY, String(zoom));
+    } catch {
+      // Storage may be unavailable (private mode); zoom still applies for this session.
+    }
+  }
+
+  private static readStoredZoom(): CanvasZoom {
+    try {
+      return parseCanvasZoom(localStorage.getItem(CANVAS_ZOOM_STORAGE_KEY));
+    } catch {
+      return 'fit';
+    }
   }
 
   /** Touch-primary devices use a wider breakpoint (1024) so landscape phones still get mobile UI. */

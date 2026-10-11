@@ -32,6 +32,21 @@
 	}
 }
 
+/* Workspace routes (designer) use the whole window below the navbar and manage their own scrolling. */
+.app-root.app-workspace .app-content main {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.app-workspace-content {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 auto;
+	min-height: 0;
+	width: 100%;
+}
+
 /* Ensure header and footer stay visible while content scrolls */
 header {
 	position: relative;
