@@ -7,24 +7,24 @@
 }
 <div class="designer-root">
   @if (dashboard()) {
-  <div class="designer-toolbar">
+  <div class="app-action-bar designer-action-bar">
     <div class="designer-toolbar-start">
       <button type="button" class="btn btn-sm btn-outline-secondary" (click)="goBack()" aria-label="Back to dashboard settings" title="Back to dashboard settings">
-        <i class="fa fa-arrow-left" aria-hidden="true"></i>
+        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i><span class="d-none d-lg-inline"> Back</span>
       </button>
       <div class="designer-title">
-        <h1 class="h6 mb-0" [title]="dashboard()?.name ?? ''">@if (isMobile()) {Designer} @else {<span>{{ dashboard()?.name }}</span>}</h1>
+        <h1 class="h4 mb-0 text-truncate" [title]="dashboard()?.name ?? ''">@if (isMobile()) {Designer} @else {<span>{{ dashboard()?.name }}</span>}</h1>
         <span class="small" [ngClass]="isDirty() ? 'text-warning' : 'text-muted'">{{ isDirty() ? 'Unsaved changes' : 'All changes saved' }}</span>
       </div>
       @if (!isMobile()) {
       <button type="button" class="btn btn-sm btn-outline-secondary" [class.active]="usesDrawer() ? layersDrawerOpen() : layersOpen()"
         (click)="toggleLayers()" [attr.aria-pressed]="usesDrawer() ? layersDrawerOpen() : layersOpen()" title="Layers" aria-label="Show layers">
-        <i class="fa fa-layer-group" aria-hidden="true"></i>
+        <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
       </button>
       <div class="add-widget-anchor">
         <button type="button" class="btn btn-sm btn-outline-primary add-widget-button" (click)="togglePicker()"
           aria-haspopup="dialog" [attr.aria-expanded]="pickerOpen()" title="Add widget (A)">
-          <i class="fa fa-plus" aria-hidden="true"></i><span class="toolbar-label ms-1">Add widget</span>
+          <i class="fa-solid fa-plus" aria-hidden="true"></i><span class="d-none d-xl-inline ms-1">Add widget</span>
         </button>
         @if (pickerOpen() && !usesDrawer()) {
         <div class="picker-popover" role="dialog" aria-label="Add widget" cdkTrapFocus>
@@ -47,23 +47,23 @@
             [disabled]="aiConfigMode() === 'None'"
             (change)="onAiEnabledChange($any($event.target).checked)" />
           <label class="form-check-label" for="aiEnabledHeader">
-            <i class="fa fa-wand-magic-sparkles me-1"></i>AI
+            <i class="fa-solid fa-wand-magic-sparkles me-1"></i>AI
           </label>
         </div>
       </div>
       @if (panelAsDrawer()) {
       <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openInspector()" title="Inspector" aria-label="Open inspector">
-        <i class="fa fa-sliders" aria-hidden="true"></i><span class="toolbar-label ms-1">Inspector</span>
+        <i class="fa-solid fa-sliders" aria-hidden="true"></i><span class="d-none d-xl-inline ms-1">Inspector</span>
       </button>
       }
-      <button type="button" class="btn btn-sm btn-success" (click)="previewServerSideRendered()" title="Render the current layout, including unsaved changes" aria-label="Device output">
-        <i class="fa fa-external-link-alt" aria-hidden="true"></i><span class="toolbar-label ms-1">Device output</span>
+      <button type="button" class="btn btn-sm btn-success" (click)="previewServerSideRendered()" title="Preview the device image, including unsaved changes" aria-label="Preview">
+        <i class="fa-solid fa-eye" aria-hidden="true"></i><span class="d-none d-xl-inline ms-1">Preview</span>
       </button>
       <button type="button" class="btn btn-sm btn-outline-secondary" (click)="discardChanges()" [disabled]="!isDirty()" title="Discard changes" aria-label="Discard changes">
-        <i class="fa fa-rotate-left" aria-hidden="true"></i><span class="toolbar-label ms-1">Discard</span>
+        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i><span class="d-none d-xl-inline ms-1">Discard</span>
       </button>
       <button type="button" class="btn btn-sm btn-primary" (click)="saveDashboard()" [disabled]="!isDirty()" title="Save layout" aria-label="Save layout">
-        <i class="fa fa-save" aria-hidden="true"></i><span class="toolbar-label ms-1">Save</span>
+        <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i><span class="d-none d-xl-inline ms-1">Save</span>
       </button>
     </div>
     }
@@ -77,31 +77,31 @@
             [disabled]="aiConfigMode() === 'None'"
             (change)="onAiEnabledChange($any($event.target).checked)" />
           <label class="form-check-label" for="aiEnabledMobile">
-            <i class="fa fa-wand-magic-sparkles"></i>
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
           </label>
         </div>
       </div>
       <button type="button" class="btn btn-sm btn-outline-secondary app-icon-button" (click)="discardChanges()" [disabled]="!isDirty()" aria-label="Discard layout changes">
-        <i class="fa fa-rotate-left" aria-hidden="true"></i>
+        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
       </button>
       <button type="button" class="btn btn-sm btn-primary app-icon-button" (click)="saveDashboard()" [disabled]="!isDirty()" aria-label="Save layout">
-        <i class="fa fa-save" aria-hidden="true"></i>
+        <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
       </button>
       <div class="mobile-overflow-menu">
         <button type="button" class="btn btn-sm btn-outline-secondary app-icon-button" (click)="mobileOverflowOpen.set(!mobileOverflowOpen())"
           aria-label="More designer actions" [attr.aria-expanded]="mobileOverflowOpen()">
-          <i class="fa fa-ellipsis-vertical" aria-hidden="true"></i>
+          <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
         </button>
         @if (mobileOverflowOpen()) {
           <div class="overflow-dropdown">
             <button type="button" (click)="refreshLivePreview(); mobileOverflowOpen.set(false)" [disabled]="renderedCanvasLoading()">
-              <i class="fa fa-sync" aria-hidden="true"></i> Refresh preview
+              <i class="fa-solid fa-rotate-right" aria-hidden="true"></i> Refresh preview
             </button>
             <button type="button" (click)="setCanvasZoom(canvasZoom() === 'fit' ? 1 : 'fit'); mobileOverflowOpen.set(false)">
-              <i class="fa fa-expand" aria-hidden="true"></i> {{ canvasZoom() === 'fit' ? 'Actual size' : 'Fit to screen' }}
+              <i class="fa-solid fa-expand" aria-hidden="true"></i> {{ canvasZoom() === 'fit' ? 'Actual size' : 'Fit to screen' }}
             </button>
             <button type="button" (click)="previewServerSideRendered(); mobileOverflowOpen.set(false)">
-              <i class="fa fa-external-link-alt" aria-hidden="true"></i> Device output
+              <i class="fa-solid fa-eye" aria-hidden="true"></i> Preview
             </button>
           </div>
         }
@@ -140,7 +140,7 @@
         <div class="card-header panel-header">
           <h2 class="panel-title">Layers <span class="tab-count">{{ layout().widgets.length }}</span></h2>
           <button type="button" class="panel-icon-btn" (click)="layersOpen.set(false)" aria-label="Hide layers" title="Hide layers">
-            <i class="fa fa-angles-left" aria-hidden="true"></i>
+            <i class="fa-solid fa-angles-left" aria-hidden="true"></i>
           </button>
         </div>
         <div class="card-body layers-body">
@@ -170,7 +170,7 @@
             }
             @if (renderedCanvasError()) {
               <div class="rendered-canvas-status rendered-canvas-status-error" [title]="renderedCanvasError()">
-                <i class="fa fa-triangle-exclamation"></i>
+                <i class="fa-solid fa-triangle-exclamation"></i>
                 Preview unavailable — showing the last available view
               </div>
             }
@@ -228,9 +228,9 @@
                         (click)="toggleElementEditing(selectedWidget()!)"
                         [title]="elementEditingWidgetId() === selectedWidget()!.id ? 'Finish editing widget elements' : 'Edit widget elements'">
                         @if (elementEditingWidgetId() === selectedWidget()!.id) {
-                          <i class="fa fa-check"></i> Done
+                          <i class="fa-solid fa-check"></i> Done
                         } @else {
-                          <i class="fa fa-arrows-up-down-left-right"></i> Edit Layout
+                          <i class="fa-solid fa-arrows-up-down-left-right"></i> Edit Layout
                         }
                       </button>
                   }
@@ -255,7 +255,7 @@
                       (pointerdown)="$event.stopPropagation()"
                       (click)="deleteWidget(selectedWidget()!)"
                       aria-label="Delete selected widget">
-                      <i class="fa fa-trash" aria-hidden="true"></i>
+                      <i class="fa-solid fa-trash" aria-hidden="true"></i>
                     </button>
                   }
                 </div>
@@ -286,7 +286,7 @@
 
 <!-- Rendered Preview Modal -->
 <app-rendered-preview-modal
-  title="Device output"
+  title="Preview"
   [isOpen]="showPreviewModal"
   [isLoading]="previewLoading"
   [error]="previewError"
@@ -299,13 +299,13 @@
 @if (isMobile() && !isLoading() && dashboard()) {
   <nav class="mobile-bottom-bar" aria-label="Designer">
     <button type="button" [class.active]="layersDrawerOpen()" (click)="toggleLayers()">
-      <i class="fa fa-layer-group" aria-hidden="true"></i><span>Layers</span>
+      <i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>Layers</span>
     </button>
     <button type="button" class="bottom-bar-primary" (click)="openPicker()">
-      <i class="fa fa-plus" aria-hidden="true"></i><span>Add</span>
+      <i class="fa-solid fa-plus" aria-hidden="true"></i><span>Add</span>
     </button>
     <button type="button" [class.active]="inspectorDrawerOpen()" (click)="openInspector()">
-      <i class="fa fa-sliders" aria-hidden="true"></i><span>Inspector</span>
+      <i class="fa-solid fa-sliders" aria-hidden="true"></i><span>Inspector</span>
     </button>
   </nav>
 }
@@ -314,18 +314,18 @@
 @if (isMobile() && mobileSelectionToolbar() && selectedWidget()) {
   <div class="mobile-selection-toolbar" role="toolbar" aria-label="Widget actions">
     <button type="button" class="toolbar-btn" (click)="openInspector()">
-      <i class="fa fa-sliders" aria-hidden="true"></i> Edit
+      <i class="fa-solid fa-sliders" aria-hidden="true"></i> Edit
     </button>
     @if (selectedWidgetSupportsElementEditing()) {
       <button type="button" class="toolbar-btn" (click)="toggleElementEditing(selectedWidget()!)" [disabled]="renderedCanvasLoading() || !selectedWidgetGeometry()">
-        <i class="fa fa-arrows-up-down-left-right" aria-hidden="true"></i> {{ elementEditingWidgetId() === selectedWidget()!.id ? 'Done' : 'Layout' }}
+        <i class="fa-solid fa-arrows-up-down-left-right" aria-hidden="true"></i> {{ elementEditingWidgetId() === selectedWidget()!.id ? 'Done' : 'Layout' }}
       </button>
     }
     <button type="button" class="toolbar-btn toolbar-btn-danger" (click)="deleteWidget(selectedWidget()!); mobileSelectionToolbar.set(false)">
-      <i class="fa fa-trash" aria-hidden="true"></i> Delete
+      <i class="fa-solid fa-trash" aria-hidden="true"></i> Delete
     </button>
     <button type="button" class="toolbar-btn" (click)="clearSelection()" aria-label="Deselect widget">
-      <i class="fa fa-xmark" aria-hidden="true"></i>
+      <i class="fa-solid fa-xmark" aria-hidden="true"></i>
     </button>
   </div>
 }
@@ -339,7 +339,7 @@
     <div class="bottom-sheet-header">
       <h2 class="h5 mb-0">Add widget</h2>
       <button type="button" class="btn-close-sheet" (click)="pickerOpen.set(false)" aria-label="Close widget picker">
-        <i class="fa fa-xmark" aria-hidden="true"></i>
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
       </button>
     </div>
     <app-widget-picker [definitions]="availableWidgets" [recentTypes]="recentWidgetTypes()" [allowDrag]="false"
@@ -356,7 +356,7 @@
     <div class="drawer-header">
       <h2 class="h5 mb-0">Layers <span class="tab-count">{{ layout().widgets.length }}</span></h2>
       <button type="button" class="btn-close-drawer" (click)="layersDrawerOpen.set(false)" aria-label="Close layers">
-        <i class="fa fa-xmark" aria-hidden="true"></i>
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
       </button>
     </div>
     <div class="drawer-body layers-body">
@@ -374,7 +374,7 @@
     <div class="drawer-header">
       <h2 class="h5 mb-0">Inspector</h2>
       <button type="button" class="btn-close-drawer" (click)="inspectorDrawerOpen.set(false)" aria-label="Close inspector">
-        <i class="fa fa-xmark" aria-hidden="true"></i>
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
       </button>
     </div>
     <div class="drawer-body inspector-body">
@@ -389,7 +389,7 @@
   @if (selectedWidget(); as widget) {
     <div class="inspector-header">
       <button type="button" class="inspector-back" (click)="clearSelection()" title="Back to dashboard settings (Esc)">
-        <i class="fa fa-chevron-left" aria-hidden="true"></i> Dashboard
+        <i class="fa-solid fa-chevron-left" aria-hidden="true"></i> Dashboard
       </button>
       <div class="inspector-title-row">
         <span class="inspector-icon"><i class="fa {{ widgetIcon(widget) }}" aria-hidden="true"></i></span>
@@ -424,7 +424,7 @@
   } @else {
     <div class="inspector-header">
       <div class="inspector-title-row">
-        <span class="inspector-icon"><i class="fa fa-display" aria-hidden="true"></i></span>
+        <span class="inspector-icon"><i class="fa-solid fa-display" aria-hidden="true"></i></span>
         <h2 class="inspector-title">Dashboard</h2>
       </div>
       <p class="inspector-hint">Select a widget on the canvas or in Layers to edit it.</p>
@@ -438,7 +438,7 @@
     <div class="layers-empty">
       <p class="mb-2">No widgets yet.</p>
       <button type="button" class="btn btn-sm btn-primary" (click)="openPicker()">
-        <i class="fa fa-plus me-1" aria-hidden="true"></i>Add widget
+        <i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add widget
       </button>
     </div>
   } @else {
@@ -458,14 +458,14 @@
           <div class="layer-menu">
             <button type="button" class="layer-menu-btn" (click)="toggleLayerMenu(w, $event)"
               [attr.aria-label]="'Actions for ' + widgetDisplayName(w)" aria-haspopup="menu" [attr.aria-expanded]="layerMenuWidgetId() === w.id">
-              <i class="fa fa-ellipsis" aria-hidden="true"></i>
+              <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
             </button>
             @if (layerMenuWidgetId() === w.id) {
               <div class="layer-menu-dropdown" role="menu">
-                <button type="button" role="menuitem" (click)="duplicateWidget(w)"><i class="fa fa-clone" aria-hidden="true"></i>Duplicate</button>
-                <button type="button" role="menuitem" (click)="moveWidgetLayer(w, 'forward')" [disabled]="!canMoveWidgetLayer(w, 'forward')"><i class="fa fa-arrow-up" aria-hidden="true"></i>Bring forward</button>
-                <button type="button" role="menuitem" (click)="moveWidgetLayer(w, 'backward')" [disabled]="!canMoveWidgetLayer(w, 'backward')"><i class="fa fa-arrow-down" aria-hidden="true"></i>Send backward</button>
-                <button type="button" role="menuitem" class="text-danger" (click)="deleteWidget(w)"><i class="fa fa-trash" aria-hidden="true"></i>Delete</button>
+                <button type="button" role="menuitem" (click)="duplicateWidget(w)"><i class="fa-solid fa-clone" aria-hidden="true"></i>Duplicate</button>
+                <button type="button" role="menuitem" (click)="moveWidgetLayer(w, 'forward')" [disabled]="!canMoveWidgetLayer(w, 'forward')"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i>Bring forward</button>
+                <button type="button" role="menuitem" (click)="moveWidgetLayer(w, 'backward')" [disabled]="!canMoveWidgetLayer(w, 'backward')"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i>Send backward</button>
+                <button type="button" role="menuitem" class="text-danger" (click)="deleteWidget(w)"><i class="fa-solid fa-trash" aria-hidden="true"></i>Delete</button>
               </div>
             }
           </div>
@@ -473,7 +473,7 @@
       }
     </ul>
     <button type="button" class="layers-add" (click)="openPicker()">
-      <i class="fa fa-plus" aria-hidden="true"></i> Add widget
+      <i class="fa-solid fa-plus" aria-hidden="true"></i> Add widget
     </button>
   }
 </ng-template>
@@ -482,22 +482,22 @@
   <div class="canvas-tools" role="toolbar" aria-label="Canvas view">
     <div class="btn-group btn-group-sm" role="group" aria-label="Zoom">
       <button type="button" class="btn btn-outline-secondary" (click)="zoomCanvas(-1)" aria-label="Zoom out" title="Zoom out">
-        <i class="fa fa-minus" aria-hidden="true"></i>
+        <i class="fa-solid fa-minus" aria-hidden="true"></i>
       </button>
       <button type="button" class="btn btn-outline-secondary canvas-zoom-value" (click)="setCanvasZoom(canvasZoom() === 'fit' ? 1 : 'fit')"
         [attr.aria-label]="canvasZoom() === 'fit' ? 'Zoom to actual size' : 'Fit canvas to view'"
         [title]="canvasZoom() === 'fit' ? 'Fitted to view — click for actual size' : 'Click to fit to view'">
-        @if (canvasZoom() === 'fit') {<i class="fa fa-expand me-1" aria-hidden="true"></i>}{{ canvasZoomLabel() }}
+        @if (canvasZoom() === 'fit') {<i class="fa-solid fa-expand me-1" aria-hidden="true"></i>}{{ canvasZoomLabel() }}
       </button>
       <button type="button" class="btn btn-outline-secondary" (click)="zoomCanvas(1)" aria-label="Zoom in" title="Zoom in">
-        <i class="fa fa-plus" aria-hidden="true"></i>
+        <i class="fa-solid fa-plus" aria-hidden="true"></i>
       </button>
     </div>
     <button type="button" class="btn btn-sm btn-outline-secondary app-icon-button" (click)="refreshLivePreview()" [disabled]="renderedCanvasLoading()" aria-label="Refresh device preview and source data" title="Refresh preview and source data">
       @if (renderedCanvasLoading()) {
       <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
       } @else {
-      <i class="fa fa-sync" aria-hidden="true"></i>
+      <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
       }
     </button>
   </div>
@@ -509,12 +509,12 @@
       <button type="button" class="collapsible-trigger" (click)="colorSchemeCollapsed.set(!colorSchemeCollapsed())"
         [attr.aria-expanded]="!colorSchemeCollapsed()" aria-controls="colorSchemePanel">
         <span class="section-title">Color scheme</span>
-        <i class="fa" [ngClass]="colorSchemeCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
+        <i class="fa-solid" [ngClass]="colorSchemeCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
       </button>
       <div class="collapsible-actions">
         <button type="button" class="btn btn-sm btn-outline-danger" (click)="resetAllColorOverrides()"
           title="Reset all color overrides (layout + widgets) to the selected scheme defaults">
-          <i class="fa fa-undo" aria-hidden="true"></i> Reset all
+          <i class="fa-solid fa-undo" aria-hidden="true"></i> Reset all
         </button>
       </div>
     </div>
@@ -540,13 +540,13 @@
           <span class="badge bg-warning text-dark ms-2 override-badge" title="Some colors are overridden">Custom</span>
         }
         </span>
-        <i class="fa" [ngClass]="colorOverridesCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
+        <i class="fa-solid" [ngClass]="colorOverridesCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
       </button>
       <div class="collapsible-actions">
         @if (hasLayoutColorOverrides()) {
         <button type="button" class="btn btn-sm btn-outline-secondary app-icon-button" (click)="resetLayoutColorOverrides()"
           title="Reset layout colors to scheme defaults" aria-label="Reset layout colors to scheme defaults">
-          <i class="fa fa-undo" aria-hidden="true"></i>
+          <i class="fa-solid fa-undo" aria-hidden="true"></i>
         </button>
         }
       </div>
@@ -573,7 +573,7 @@
     <button type="button" class="collapsible-header collapsible-trigger" (click)="layoutCollapsed.set(!layoutCollapsed())"
       [attr.aria-expanded]="!layoutCollapsed()" aria-controls="layoutPanel">
       <span class="section-title">Layout</span>
-      <i class="fa" [ngClass]="layoutCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
+      <i class="fa-solid" [ngClass]="layoutCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
     </button>
     @if (!layoutCollapsed()) {
     <div id="layoutPanel" class="collapsible-body">
@@ -641,7 +641,7 @@
     <button type="button" class="collapsible-header collapsible-trigger" (click)="fontsCollapsed.set(!fontsCollapsed())"
       [attr.aria-expanded]="!fontsCollapsed()" aria-controls="typographyPanel">
       <span class="section-title">Typography</span>
-      <i class="fa" [ngClass]="fontsCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
+      <i class="fa-solid" [ngClass]="fontsCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
     </button>
     @if (!fontsCollapsed()) {
     <div id="typographyPanel" class="collapsible-body">
@@ -682,14 +682,14 @@
   <div class="collapsible-section mt-2">
     <button type="button" class="collapsible-header collapsible-trigger" (click)="aiSectionCollapsed.set(!aiSectionCollapsed())"
       [attr.aria-expanded]="!aiSectionCollapsed()" aria-controls="aiGenerationPanel">
-      <span><i class="fa fa-wand-magic-sparkles me-2" aria-hidden="true"></i>AI generation</span>
-      <i class="fa" [class.fa-chevron-down]="aiSectionCollapsed()" [class.fa-chevron-up]="!aiSectionCollapsed()" aria-hidden="true"></i>
+      <span><i class="fa-solid fa-wand-magic-sparkles me-2" aria-hidden="true"></i>AI generation</span>
+      <i class="fa-solid" [class.fa-chevron-down]="aiSectionCollapsed()" [class.fa-chevron-up]="!aiSectionCollapsed()" aria-hidden="true"></i>
     </button>
     @if (!aiSectionCollapsed()) {
     <div id="aiGenerationPanel" class="collapsible-body">
       @if (aiConfigMode() === 'None') {
         <div class="alert alert-warning py-2 small mb-3">
-          <i class="fa fa-triangle-exclamation me-1"></i>
+          <i class="fa-solid fa-triangle-exclamation me-1"></i>
           AI provider not configured. <a routerLink="/ai/config">Set up global AI provider</a> or <a [routerLink]="['/dashboards', dashboardId, 'edit']">use a Home Assistant agent</a>
         </div>
       }
@@ -720,19 +720,19 @@
             <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
             Generating…
           } @else {
-            <i class="fa fa-wand-magic-sparkles me-1"></i>Generate
+            <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Generate
           }
         </button>
       </div>
       @if (aiLastError()) {
         <div class="alert alert-danger py-1 small mb-2">
-          <i class="fa fa-circle-exclamation me-1"></i>
+          <i class="fa-solid fa-circle-exclamation me-1"></i>
           {{ aiLastError() }}
         </div>
       }
       @if (aiLastGenerated()) {
         <div class="alert alert-info py-1 small mb-2">
-          <i class="fa fa-clock me-1"></i>
+          <i class="fa-solid fa-clock me-1"></i>
           Last generated: {{ aiLastGenerated() }}
         </div>
       }
@@ -780,7 +780,7 @@
         <span class="badge bg-warning text-dark ms-2 override-badge" title="Some colors are overridden">Custom</span>
         }
       </span>
-      <i class="fa" [ngClass]="widgetColorOverridesCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
+      <i class="fa-solid" [ngClass]="widgetColorOverridesCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
     </button>
     @if (!widgetColorOverridesCollapsed()) {
     <div id="widgetColorOverridesPanel" class="collapsible-body">
@@ -791,7 +791,7 @@
           <button type="button" class="swatch swatch-default" role="radio"
             [class.selected]="!selectedWidget()!.colorOverrides?.[field.key]" [attr.aria-checked]="!selectedWidget()!.colorOverrides?.[field.key]"
             [attr.aria-label]="field.label + ': scheme default'" title="Scheme default"
-            (click)="clearWidgetColorOverride(selectedWidget()!, field.key)"><i class="fa fa-rotate-left" aria-hidden="true"></i></button>
+            (click)="clearWidgetColorOverride(selectedWidget()!, field.key)"><i class="fa-solid fa-rotate-left" aria-hidden="true"></i></button>
           @for (color of layout().colorScheme.palette; track color) {
           <button type="button" class="swatch" role="radio" [style.background-color]="color"
             [class.selected]="selectedWidget()!.colorOverrides?.[field.key] === color" [attr.aria-checked]="selectedWidget()!.colorOverrides?.[field.key] === color"

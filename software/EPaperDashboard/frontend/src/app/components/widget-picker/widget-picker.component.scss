@@ -17,7 +17,7 @@
     left: 1.125rem;
     transform: translateY(-50%);
     color: var(--bs-secondary-color);
-    font-size: 0.8rem;
+    font-size: var(--designer-text-sm);
     pointer-events: none;
   }
 
@@ -37,7 +37,7 @@
 .picker-group-label {
   padding: 0.5rem 0.375rem 0.25rem;
   color: var(--bs-secondary-color);
-  font-size: 0.68rem;
+  font-size: var(--designer-text-xs);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -59,7 +59,7 @@
   border-radius: 1rem;
   background: var(--bs-body-bg);
   color: var(--bs-body-color);
-  font-size: 0.78rem;
+  font-size: var(--designer-text-sm);
   cursor: pointer;
 
   i {
@@ -78,7 +78,7 @@
   width: 100%;
   padding: 0.375rem;
   border: 0;
-  border-radius: 0.375rem;
+  border-radius: var(--app-radius-sm);
   background: transparent;
   color: var(--bs-body-color);
   text-align: left;
@@ -88,11 +88,6 @@
   &:focus-visible {
     background: var(--bs-tertiary-bg);
   }
-
-  &:focus-visible {
-    outline: 2px solid var(--bs-primary);
-    outline-offset: -2px;
-  }
 }
 
 .picker-item-icon {
@@ -101,8 +96,8 @@
   flex: none;
   width: 2rem;
   height: 2rem;
-  border-radius: 0.375rem;
-  background: rgba(var(--bs-primary-rgb), 0.1);
+  border-radius: var(--app-radius-sm);
+  background: var(--designer-accent-soft);
   color: var(--bs-primary);
 }
 
@@ -114,14 +109,14 @@
 }
 
 .picker-item-label {
-  font-size: 0.85rem;
+  font-size: var(--designer-text-md);
   font-weight: 500;
 }
 
 .picker-item-description {
   overflow: hidden;
   color: var(--bs-secondary-color);
-  font-size: 0.75rem;
+  font-size: var(--designer-text-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -129,7 +124,7 @@
 .picker-empty {
   margin: 1rem 0.5rem;
   color: var(--bs-secondary-color);
-  font-size: 0.85rem;
+  font-size: var(--designer-text-md);
   text-align: center;
 }
 
@@ -138,7 +133,7 @@
   padding: 0.375rem 0.75rem;
   border-top: 1px solid var(--bs-border-color);
   color: var(--bs-secondary-color);
-  font-size: 0.72rem;
+  font-size: var(--designer-text-xs);
 }
 
 @media (pointer: coarse) {

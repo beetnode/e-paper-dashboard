@@ -9,20 +9,20 @@
 .editable-element {
   position: absolute;
   box-sizing: border-box;
-  border: 1px dashed rgba(0, 119, 255, 0.8);
+  border: 1px dashed var(--designer-accent-strong);
   cursor: grab;
   pointer-events: auto;
   touch-action: none;
 
   &:hover {
-    border-color: rgba(0, 119, 255, 0.8);
-    background: rgba(0, 119, 255, 0.04);
+    border-color: var(--designer-accent-strong);
+    background: var(--designer-accent-soft);
   }
 
   &.selected {
     z-index: 2;
-    border: 2px solid #0077ff;
-    background: rgba(0, 119, 255, 0.06);
+    border: 2px solid var(--designer-accent);
+    background: var(--designer-accent-soft);
     cursor: grabbing;
   }
 }
@@ -35,8 +35,8 @@
   padding: 1px 4px;
   overflow: hidden;
   border-radius: 2px;
-  background: rgba(0, 119, 255, 0.88);
-  color: #fff;
+  background: var(--designer-accent-strong);
+  color: var(--designer-on-accent);
   font-size: 9px;
   font-weight: 600;
   line-height: 1.2;
@@ -61,9 +61,9 @@
   z-index: 3;
   width: 9px;
   height: 9px;
-  border: 1px solid #fff;
+  border: 1px solid var(--designer-on-accent);
   border-radius: 2px;
-  background: #0077ff;
+  background: var(--designer-accent);
   pointer-events: auto;
   touch-action: none;
 }
@@ -80,7 +80,7 @@
 .element-guide {
   position: absolute;
   z-index: 4;
-  background: rgba(0, 119, 255, 0.8);
+  background: var(--designer-accent-strong);
   pointer-events: none;
 
   &.vertical { width: 1px; }

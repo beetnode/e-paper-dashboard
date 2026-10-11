@@ -15,9 +15,9 @@
 
 .entity-item {
   padding: 4px;
-  background-color: rgba(0, 0, 0, 0.02);
+  background-color: var(--bs-tertiary-bg);
   border-radius: 4px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--bs-border-color);
 
   .form-select-sm,
   .form-control-sm {
@@ -60,6 +60,6 @@
   font-weight: 600;
   padding: 1px 5px;
   border-radius: 3px;
-  background: rgba(0, 119, 255, 0.12);
-  color: #0056b3;
+  background: var(--bs-primary-bg-subtle);
+  color: var(--bs-primary-text-emphasis);
 }
