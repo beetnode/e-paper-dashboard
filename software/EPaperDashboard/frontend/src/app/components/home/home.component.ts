@@ -1,5 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterModule } from '@angular/router';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-home',
@@ -19,36 +20,41 @@ import { RouterModule } from '@angular/router';
 
         <!-- Subtitle -->
         <p class="hero-subtitle text-center mb-4">
-          Bring Home Assistant dashboards to an E‑Paper display
+          Dashboards for battery-powered e-paper displays, updated on your schedule
         </p>
 
         <!-- Core features -->
         <div class="hero-features mb-4">
           <div class="feature-item">
-            <i class="fa-solid fa-house" aria-hidden="true"></i>
-            <div>
-              Works with your existing Home Assistant dashboard views and cards
-              <i class="fa-solid fa-circle-info feature-info" aria-hidden="true" title="Dashboards and cards should follow sizing and color guidelines for optimal E-Paper display"></i>
-            </div>
+            <i class="fa-solid fa-palette" aria-hidden="true"></i>
+            <div>Design custom layouts from widgets in a drag-and-drop designer</div>
           </div>
           <div class="feature-item">
-            <i class="fa-solid fa-palette" aria-hidden="true"></i>
-            <div>Drag-and-drop designer to create custom dashboard layouts</div>
+            <i class="fa-solid fa-plug" aria-hidden="true"></i>
+            <div>Feed widgets with data from Home Assistant and Google Calendar &amp; Tasks</div>
+          </div>
+          <div class="feature-item">
+            <i class="fa-solid fa-house-signal" aria-hidden="true"></i>
+            <div>Show existing Home Assistant dashboards with the optional rendering component</div>
           </div>
           <div class="feature-item">
             <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
-            <div>AI-powered dashboard generation from natural language prompts</div>
+            <div>Generate widget content from a plain-language prompt with your own AI provider</div>
           </div>
           <div class="feature-item">
             <i class="fa-solid fa-clock" aria-hidden="true"></i>
-            <div>Automatic updates on your schedule for long battery life</div>
+            <div>Displays wake at the times you choose and sleep in between for long battery life</div>
+          </div>
+          <div class="feature-item">
+            <i class="fa-solid fa-microchip" aria-hidden="true"></i>
+            <div>Pair displays securely and update their firmware over the air</div>
           </div>
         </div>
 
         <!-- CTA Buttons -->
         <div class="d-flex gap-3 justify-content-center flex-wrap">
           <a class="btn btn-primary btn-lg px-5 hero-btn-primary" routerLink="/dashboards">
-            Get started
+            {{ isAuthenticated() ? 'Open dashboards' : 'Get started' }}
           </a>
           <a class="btn btn-outline-primary btn-lg px-5 hero-btn-github" href="https://github.com/izdev-digital/e-paper-dashboard" target="_blank" rel="noopener noreferrer">
             GitHub
@@ -120,12 +126,6 @@ import { RouterModule } from '@angular/router';
       line-height: 1.5;
     }
 
-    .feature-info {
-      margin-left: 0.35rem;
-      color: var(--bs-secondary-color);
-      font-size: 0.875rem;
-      cursor: help;
-    }
     
     /* Light mode - subtle neutral gradient */
     [data-bs-theme="light"] .izboard-hero {
@@ -279,4 +279,6 @@ import { RouterModule } from '@angular/router';
     }
   `]
 })
-export class HomeComponent { }
+export class HomeComponent {
+  protected readonly isAuthenticated = inject(AuthService).isAuthenticated;
+}
