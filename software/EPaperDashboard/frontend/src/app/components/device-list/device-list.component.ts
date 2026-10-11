@@ -17,72 +17,17 @@ import { Dashboard } from '../../models/types';
   standalone: true,
   imports: [CommonModule, SearchableSelectComponent],
   styles: [`
-    .device-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      margin-bottom: 2rem;
-    }
-
-    .device-card {
-      padding: 1rem 1.25rem;
-      background: var(--bs-body-bg);
-      border: 1px solid var(--bs-border-color);
-      border-radius: var(--app-radius);
-      transition: all 0.15s ease;
-    }
-
-    .device-card:hover {
-      background: var(--bs-secondary-bg);
-      border-color: var(--bs-primary);
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-    }
-
-    .device-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 0.5rem;
-    }
-
-    .device-name {
-      font-size: 1.1rem;
-      font-weight: 600;
-      margin: 0;
-    }
-
-    .device-title-row {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 0.625rem;
-    }
-
-    .device-meta {
+    .device-assignment {
       display: flex;
       flex-wrap: wrap;
-      gap: 1rem;
-      font-size: 0.85rem;
-      color: var(--bs-secondary-color);
-    }
-
-    .device-meta-item {
-      display: flex;
       align-items: center;
-      gap: 0.375rem;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
     }
 
     .dashboard-select {
-      max-width: 280px;
-      font-size: 0.85rem;
-    }
-
-    .device-assignment {
-      display: grid;
-      grid-template-columns: auto minmax(12rem, 280px) auto;
-      align-items: center;
-      gap: 0.5rem;
-      margin-top: 1rem;
+      flex: 0 1 18rem;
+      min-width: 12rem;
     }
 
     .pairing-steps {
@@ -116,29 +61,12 @@ import { Dashboard } from '../../models/types';
     }
 
     @media (max-width: 768px) {
-      .device-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
-      }
-
-      .device-meta {
-        flex-direction: column;
-        gap: 0.375rem;
-      }
-
-      .dashboard-select {
-        max-width: 100%;
-        width: 100%;
-      }
-
-      .device-assignment,
       .pairing-steps {
         grid-template-columns: 1fr;
       }
 
-      .device-assignment {
-        align-items: stretch;
+      .dashboard-select {
+        flex-basis: 100%;
       }
     }
 
@@ -205,19 +133,17 @@ import { Dashboard } from '../../models/types';
     @if (isPairingActive()) {
       <section class="app-section-card mb-4" aria-labelledby="pairDeviceTitle">
         <div class="d-flex flex-column gap-2">
-          <div class="d-flex justify-content-between align-items-start">
+          <div class="app-section-header mb-0">
             <div>
-              <div class="mb-2">
-                <h2 id="pairDeviceTitle" class="h5 mb-0">Pair a new device</h2>
-              </div>
-              <p class="text-muted mb-0">
+              <h2 id="pairDeviceTitle" class="app-section-title">Pair a new device</h2>
+              <p class="app-section-description">
                 {{ pairingMode() === 'device'
                   ? 'The display creates the claim code. Keep this page open while you configure it.'
                   : 'Legacy pairing for firmware older than 0.4.0.' }}
               </p>
             </div>
             <button type="button" class="btn btn-sm btn-outline-secondary" (click)="cancelPairing()">
-              <i class="fa-solid fa-times" aria-hidden="true"></i> Cancel
+              <i class="fa-solid fa-xmark me-1" aria-hidden="true"></i>Cancel
             </button>
           </div>
 
@@ -300,80 +226,59 @@ import { Dashboard } from '../../models/types';
           <button type="button" class="btn btn-sm btn-outline-warning" (click)="loadDashboards()">Retry dashboards</button>
         </div>
       }
-      <div class="device-list">
+      <div class="app-list">
         @for (device of devices(); track device.id) {
-          <div class="device-card">
-            <div class="device-header">
-              <div class="device-title-row">
-                <h2 class="device-name">{{ device.name }}</h2>
+          <article class="app-list-item">
+            <div style="min-width: 0">
+              <div class="app-list-item-heading">
+                <h2 class="app-list-item-title">{{ device.name }}</h2>
                 <span class="app-status-chip" [ngClass]="isDeviceOnline(device) ? 'app-status-chip-success' : 'app-status-chip-muted'">
                   <i class="fa-solid fa-circle" aria-hidden="true"></i>{{ isDeviceOnline(device) ? 'Online' : 'Offline' }}
                 </span>
                 @if (hasFirmwareUpdate(device)) {
-                  <span class="app-status-chip app-status-chip-warning"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i> Update available</span>
+                  <span class="app-status-chip app-status-chip-warning"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i>Update available</span>
                 }
               </div>
-              <div class="d-flex gap-2">
-                <button type="button" class="btn btn-outline-danger app-icon-button" (click)="removeDevice(device)" [attr.aria-label]="'Remove ' + device.name">
-                  <i class="fa-solid fa-trash" aria-hidden="true"></i>
-                </button>
+              <div class="app-list-item-meta">
+                @if (device.lastSeenAt) {
+                  <span><i class="fa-regular fa-clock" aria-hidden="true"></i>Last seen {{ device.lastSeenAt | date:'short' }}</span>
+                }
+                @if (device.screenWidth && device.screenHeight) {
+                  <span><i class="fa-solid fa-expand" aria-hidden="true"></i>{{ device.screenWidth }}×{{ device.screenHeight }}</span>
+                }
+                @if (device.firmwareVersion) {
+                  <span><i class="fa-solid fa-microchip" aria-hidden="true"></i>Firmware v{{ device.firmwareVersion }}</span>
+                }
               </div>
             </div>
-            <div class="device-meta">
-              @if (device.firmwareVersion) {
-                <div class="device-meta-item">
-                  <i class="fa-solid fa-microchip"></i>
-                  <span>v{{ device.firmwareVersion }}</span>
-                  @if (firmwareInfo()?.version) {
-                    @if (!isVersionLower(device.firmwareVersion!, firmwareInfo()!.version!)) {
-                      <span class="visually-hidden">Firmware up to date</span>
-                    } @else {
-                      <span class="visually-hidden">Firmware update available</span>
-                    }
-                  }
-                </div>
-              }
-              @if (device.lastSeenAt) {
-                <div class="device-meta-item">
-                  <i class="fa-regular fa-clock"></i>
-                  <span>Last seen: {{ device.lastSeenAt | date:'short' }}</span>
-                </div>
-              }
-              <div class="device-meta-item">
-                <i class="fa-solid fa-calendar"></i>
-                <span>Paired: {{ device.pairedAt | date:'mediumDate' }}</span>
+            <div class="app-list-item-actions">
+              <button type="button" class="btn btn-outline-danger app-icon-button" (click)="removeDevice(device)" [attr.aria-label]="'Remove ' + device.name" title="Remove">
+                <i class="fa-solid fa-trash" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div class="app-list-item-body">
+              <div class="device-assignment">
+                <app-searchable-select
+                  class="dashboard-select"
+                  [options]="compatibleDashboardOptions(device)"
+                  [value]="device.dashboardId || ''"
+                  emptyLabel="No dashboard"
+                  searchPlaceholder="Search dashboards…"
+                  [ariaLabel]="'Dashboard shown on ' + device.name"
+                  [disabled]="isAssigningDashboard(device.id)"
+                  (selectionChange)="assignDashboard(device, $event)"
+                ></app-searchable-select>
+                @if (isAssigningDashboard(device.id)) {
+                  <span class="small text-muted" role="status"><span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Saving</span>
+                }
               </div>
-              @if (device.screenWidth && device.screenHeight) {
-                <div class="device-meta-item">
-                  <i class="fa-solid fa-expand"></i>
-                  <span>Screen: {{ device.screenWidth }}×{{ device.screenHeight }}</span>
-                </div>
-              }
+              <details class="mt-2 small text-muted">
+                <summary>Technical details</summary>
+                <div class="pt-2"><i class="fa-solid fa-fingerprint me-1" aria-hidden="true"></i><code>{{ device.deviceIdentifier }}</code></div>
+                <div><i class="fa-solid fa-calendar me-1" aria-hidden="true"></i>Paired {{ device.pairedAt | date:'mediumDate' }}</div>
+              </details>
             </div>
-            <div class="device-assignment">
-              <label class="small text-muted mb-0"><i class="fa-solid fa-display me-1" aria-hidden="true"></i>Dashboard</label>
-              <app-searchable-select
-                class="dashboard-select"
-                [options]="compatibleDashboardOptions(device)"
-                [value]="device.dashboardId || ''"
-                emptyLabel="— No dashboard assigned —"
-                searchPlaceholder="Search dashboards…"
-                [ariaLabel]="'Dashboard assigned to ' + device.name"
-                [disabled]="isAssigningDashboard(device.id)"
-                (selectionChange)="assignDashboard(device, $event)"
-              ></app-searchable-select>
-              @if (isAssigningDashboard(device.id)) {
-                <span class="small text-muted" role="status"><span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Saving</span>
-              } @else {
-                <span class="small text-success"><i class="fa-solid fa-check" aria-hidden="true"></i><span class="visually-hidden">Assignment saved</span></span>
-              }
-            </div>
-            <details class="mt-3 small text-muted">
-              <summary>Technical details</summary>
-              <div class="pt-2"><i class="fa-solid fa-fingerprint me-1" aria-hidden="true"></i><code>{{ device.deviceIdentifier }}</code></div>
-              <div><i class="fa-solid fa-calendar me-1" aria-hidden="true"></i>Paired {{ device.pairedAt | date:'mediumDate' }}</div>
-            </details>
-          </div>
+          </article>
         }
       </div>
     } @else {
@@ -384,75 +289,52 @@ import { Dashboard } from '../../models/types';
       </div>
     }
 
-    <!-- Firmware Updates Section -->
     @if (devices().length > 0) {
-      <div class="card shadow-sm mt-4">
-        <div class="card-body">
-          <h2 class="h5 card-title mb-3"><i class="fa-solid fa-microchip me-2" aria-hidden="true"></i>Firmware updates</h2>
-          @if (isFirmwareLoading()) {
-            <div class="text-center py-2">
-              <div class="spinner-border spinner-border-sm" role="status">
-                <span class="visually-hidden">Checking firmware</span>
-              </div>
-            </div>
-          } @else if (firmwareInfo()) {
-            <div class="card border-secondary-subtle">
-              <div class="card-body py-2 px-3">
-                @if (firmwareInfo()!.version) {
-                  <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="small fw-semibold">Latest Available</span>
-                    <span class="badge bg-primary">v{{ firmwareInfo()!.version }}</span>
-                  </div>
-                  @if (firmwareInfo()!.publishedAt) {
-                    <div class="small text-muted mb-1">
-                      Released: {{ firmwareInfo()!.publishedAt | date:'mediumDate' }}
-                    </div>
-                  }
-                  @if (firmwareInfo()!.hasDownload) {
-                    <div class="small text-success mb-1">
-                      <i class="fa-solid fa-circle-check"></i> Firmware binary available for OTA
-                    </div>
-                  }
-                  @if (deviceUpdateSummary(); as summary) {
-                    <div class="small mb-1">
-                      @if (summary.upToDate === summary.total) {
-                        <span class="text-success"><i class="fa-solid fa-check-double"></i> All {{ summary.total }} device(s) up to date</span>
-                      } @else {
-                        <span class="text-warning"><i class="fa-solid fa-rotate"></i> {{ summary.upToDate }}/{{ summary.total }} device(s) on v{{ summary.latest }}</span>
-                        @if (summary.outdated > 0) {
-                          <span class="text-muted"> · {{ summary.outdated }} outdated</span>
-                        }
-                        @if (summary.unknown > 0) {
-                          <span class="text-muted"> · {{ summary.unknown }} unknown</span>
-                        }
-                      }
-                    </div>
-                  }
-                  @if (firmwareInfo()!.releaseNotes) {
-                    <details class="mt-1">
-                      <summary class="release-notes-summary small text-muted">Release notes</summary>
-                      <div class="release-notes small mt-1" [innerHTML]="renderMarkdown(firmwareInfo()!.releaseNotes!)"></div>
-                    </details>
-                  }
-                } @else {
-                  <div class="small text-muted">
-                    <i class="fa-solid fa-info-circle"></i> {{ firmwareInfo()!.message || 'No firmware release info available' }}
-                  </div>
-                }
-              </div>
-            </div>
-          } @else if (firmwareError()) {
-            <div class="small text-danger">
-              <i class="fa-solid fa-exclamation-circle"></i> {{ firmwareError() }}
-            </div>
-          }
-          <button type="button" class="btn btn-outline-secondary btn-sm w-100 mt-2"
-            (click)="refreshFirmware()" [disabled]="isFirmwareLoading()">
-            <i class="fa-solid fa-rotate"></i>
-            {{ isFirmwareLoading() ? 'Checking…' : 'Check for updates' }}
+      <section class="app-section-card mt-4" aria-labelledby="firmwareTitle">
+        <div class="app-section-header">
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <h2 id="firmwareTitle" class="app-section-title mb-0">Firmware</h2>
+            @if (firmwareInfo()?.version) {
+              <span class="app-status-chip app-status-chip-info">Latest v{{ firmwareInfo()!.version }}</span>
+            }
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="refreshFirmware()" [disabled]="isFirmwareLoading()">
+            <i class="fa-solid fa-rotate me-1" [class.fa-spin]="isFirmwareLoading()" aria-hidden="true"></i>{{ isFirmwareLoading() ? 'Checking…' : 'Check for updates' }}
           </button>
         </div>
-      </div>
+        @if (firmwareError()) {
+          <p class="small text-danger mb-0"><i class="fa-solid fa-circle-exclamation me-1" aria-hidden="true"></i>{{ firmwareError() }}</p>
+        } @else if (firmwareInfo(); as info) {
+          @if (info.version) {
+            <div class="small">
+              @if (deviceUpdateSummary(); as summary) {
+                @if (summary.upToDate === summary.total) {
+                  <span class="text-success"><i class="fa-solid fa-check-double me-1" aria-hidden="true"></i>All devices are up to date.</span>
+                } @else {
+                  <span>{{ summary.upToDate }} of {{ summary.total }} devices on the latest version</span>
+                  @if (summary.unknown > 0) {
+                    <span class="text-muted"> · {{ summary.unknown }} not reporting a version</span>
+                  }
+                }
+              }
+              @if (info.publishedAt) {
+                <span class="text-muted"> · Released {{ info.publishedAt | date:'mediumDate' }}</span>
+              }
+              @if (!info.hasDownload) {
+                <div class="text-muted mt-1">No firmware binary is published for over-the-air updates yet.</div>
+              }
+            </div>
+            @if (info.releaseNotes) {
+              <details class="mt-2">
+                <summary class="release-notes-summary small text-muted">Release notes</summary>
+                <div class="release-notes small mt-1" [innerHTML]="renderMarkdown(info.releaseNotes)"></div>
+              </details>
+            }
+          } @else {
+            <p class="small text-muted mb-0">{{ info.message || 'No firmware release information available.' }}</p>
+          }
+        }
+      </section>
     }
     </div>
   `
