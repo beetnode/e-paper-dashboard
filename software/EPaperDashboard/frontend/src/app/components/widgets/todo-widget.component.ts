@@ -1,7 +1,7 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import type { TodoItem } from '../../services/todo.service';
-import { WidgetConfig, ColorScheme, HassEntityState, TodoConfig, DashboardLayout } from '../../models/types';
+import { WidgetConfig, ColorScheme, EntityState, TodoConfig, DashboardLayout } from '../../models/types';
 import { resolveWidgetRenderContext } from './widget-render-context';
 
 @Component({
@@ -65,7 +65,7 @@ import { resolveWidgetRenderContext } from './widget-render-context';
 export class TodoWidgetComponent {
   @Input() widget!: WidgetConfig;
   @Input() colorScheme!: ColorScheme;
-  @Input() entityStates: Record<string, HassEntityState> | null = null;
+  @Input() entityStates: Record<string, EntityState> | null = null;
   @Input() todoItemsByEntityId?: Record<string, TodoItem[]>;
   @Input() designerSettings?: DashboardLayout;
 

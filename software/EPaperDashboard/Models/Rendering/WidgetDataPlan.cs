@@ -16,14 +16,14 @@ public sealed class WidgetDataPlan
     public Dictionary<string, int> HistoryHoursByEntityId { get; } = new(StringComparer.Ordinal);
     public HashSet<string> CachedContentWidgetIds { get; } = new(StringComparer.Ordinal);
 
-    public static WidgetDataPlan Create(LayoutConfig layout)
+    public static WidgetDataPlan Create(LayoutConfig layout, Func<string, string>? resolveWidgetType = null)
     {
         var plan = new WidgetDataPlan();
 
         foreach (var widget in layout.Widgets)
         {
             var entityId = GetString(widget.Config, "entityId");
-            switch (widget.Type)
+            switch (resolveWidgetType?.Invoke(widget.Type) ?? widget.Type)
             {
                 case "header":
                     AddHeaderBadges(widget.Config, plan.EntityStateIds);
@@ -44,7 +44,6 @@ public sealed class WidgetDataPlan
                     plan.CalendarEntityIds.Add(entityId);
                     break;
                 case "rss-feed" when entityId is not null:
-                    plan.EntityStateIds.Add(entityId);
                     plan.RssEntityIds.Add(entityId);
                     break;
                 case "graph":

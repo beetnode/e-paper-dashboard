@@ -102,7 +102,8 @@ export type WidgetType =
   | 'image'
   | 'version'
   | 'rss-feed'
-  | 'ai-content';
+  | 'ai-content'
+  | (string & {});
 
 export interface WidgetPosition {
   x: number;
@@ -385,7 +386,7 @@ export interface ColorScheme {
   text: string;
 }
 
-export interface HassEntityState {
+export interface EntityState {
   entityId: string;
   state: string;
   attributes?: Record<string, any>;

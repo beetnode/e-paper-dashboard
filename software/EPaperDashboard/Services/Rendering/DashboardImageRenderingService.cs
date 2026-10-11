@@ -27,19 +27,31 @@ public sealed class DashboardImageRenderingService
     private readonly RenderingUtilities _utils;
     private readonly Dictionary<string, IWidgetRenderer> _renderers;
     private readonly IMemoryCache _cache;
+    private readonly Plugins.PluginDataRouter? _providerRouter;
 
     public DashboardImageRenderingService(
         ISsrDataProvider ssrDataProvider,
         ILogger<DashboardImageRenderingService> logger,
         RenderingUtilities utils,
         IEnumerable<IWidgetRenderer> widgetRenderers,
-        IMemoryCache cache)
+        IMemoryCache cache,
+        Plugins.ProviderRegistry? plugins = null,
+        Plugins.PluginDataRouter? providerRouter = null)
     {
         _ssrDataProvider = ssrDataProvider;
         _logger = logger;
         _utils = utils;
         _renderers = widgetRenderers.ToDictionary(r => r.WidgetType, r => r);
+        if (plugins is not null)
+            foreach (var widget in plugins.Widgets)
+            {
+                if (_renderers.ContainsKey(widget.Type)) continue;
+                if (widget.RenderAs is null || !_renderers.TryGetValue(widget.RenderAs, out var renderer))
+                    throw new InvalidOperationException($"Plugin widget {widget.Type} requires renderer {widget.RenderAs}");
+                _renderers.Add(widget.Type, renderer);
+            }
         _cache = cache;
+        _providerRouter = providerRouter;
     }
 
     /// <summary>
@@ -141,7 +153,7 @@ public sealed class DashboardImageRenderingService
         bool cacheResult = true)
     {
         var layoutHash = ComputeLayoutHash(layoutConfig);
-        var cacheKey = $"ssr:{dashboardId}:{layoutHash}";
+        var cacheKey = $"ssr:{dashboardId}:{_providerRouter?.CacheVersion(dashboardId)}:{layoutHash}";
 
         if (!bypassCache && _cache.TryGetValue<CachedRender>(cacheKey, out var cached) && cached is not null)
         {

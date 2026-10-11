@@ -8,6 +8,7 @@ export interface EntitySourceOption {
   device_class?: string;
   unit_of_measurement?: string;
   state?: string;
+  connectionName?: string;
 }
 
 @Component({
@@ -18,18 +19,18 @@ export interface EntitySourceOption {
     <div class="mb-3">
       <label class="form-label fw-semibold small" for="entitySourceSelect">Data source</label>
       @if (loading) {
-        <div class="text-muted small" role="status"><i class="fa fa-spinner fa-spin me-1" aria-hidden="true"></i>Loading entities…</div>
+        <div class="text-muted small" role="status"><i class="fa fa-spinner fa-spin me-1" aria-hidden="true"></i>Loading sources…</div>
       } @else if (entities.length === 0) {
         <div class="alert alert-warning mb-0">
-          <i class="fa fa-exclamation-triangle"></i> No compatible entities available.
+          <i class="fa fa-exclamation-triangle"></i> No compatible sources available. Add a connection from Connections.
         </div>
       } @else {
         @if (entities.length > 8) {
-          <input class="form-control form-control-sm mb-2" type="search" placeholder="Filter entities…" aria-label="Filter available data sources"
+          <input class="form-control form-control-sm mb-2" type="search" placeholder="Filter sources…" aria-label="Filter available data sources"
             [ngModel]="query()" (ngModelChange)="query.set($event)" />
         }
         <select id="entitySourceSelect" class="form-select" [ngModel]="value" (ngModelChange)="valueChange.emit($event)">
-          <option value="">Select entity…</option>
+          <option value="">Select source…</option>
           @for (entity of filteredEntities(); track entity.entity_id) {
             <option [value]="entity.entity_id">{{ formatEntity(entity) }}</option>
           }
@@ -66,7 +67,8 @@ export class EntitySourceSelectorComponent {
   }
 
   formatEntity(entity: EntitySourceOption): string {
-    const name = entity.friendly_name || entity.entity_id;
+    const label = entity.friendly_name || entity.entity_id;
+    const name = entity.connectionName ? `${entity.connectionName} · ${label}` : label;
     const details = [entity.domain, entity.device_class, entity.unit_of_measurement]
       .filter(Boolean)
       .join(', ');

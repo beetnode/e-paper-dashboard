@@ -61,6 +61,8 @@ internal sealed class LiteDbContext : IPersistenceInitializer, IDisposable
     internal object UserWriteLock { get; } = new();
     internal ILiteCollection<BsonDocument> ServiceState => _db.GetCollection("serviceState");
 
+    internal ILiteCollection<ProviderConnection> ProviderConnections => _db.GetCollection<ProviderConnection>("providerConnections");
+
     internal ILiteCollection<User> Users => _db.GetCollection<User>("users");
     internal ILiteCollection<Dashboard> Dashboards => _db.GetCollection<Dashboard>("dashboards");
     internal ILiteCollection<Device> Devices => _db.GetCollection<Device>("devices");

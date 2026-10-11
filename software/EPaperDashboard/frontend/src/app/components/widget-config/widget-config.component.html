@@ -1,8 +1,11 @@
-@if (widget.config && ('entityId' in widget.config) && widget.type !== 'graph' && widget.type !== 'rss-feed' && widget.type !== 'weather' && widget.type !== 'calendar' && widget.type !== 'weather-forecast' && widget.type !== 'todo') {
+@if (pluginConfigComponent; as component) {
+  <ng-container *ngComponentOutlet="component; inputs: pluginConfigInputs" />
+} @else {
+@if (widget.config && ('entityId' in widget.config) && renderType !== 'graph' && renderType !== 'rss-feed' && renderType !== 'weather' && renderType !== 'calendar' && renderType !== 'weather-forecast' && renderType !== 'todo') {
   <app-entity-source-selector [value]="widget.config.entityId || ''" [entities]="getFilteredEntities()"
     [loading]="loadingEntities()" (valueChange)="updateEntityId($event)" />
 }
-@switch (widget.type) {
+@switch (renderType) {
 
 @case ('header') {
 <div class="mb-3">
@@ -68,7 +71,7 @@
         <select class="form-select form-select-sm flex-grow-1 widget-config-grow"
           [(ngModel)]="badge.entityId" (ngModelChange)="onPropertyChanged()">
           <option [ngValue]="undefined">No Entity</option>
-          @for (entity of entities(); track trackByEntityId($index, entity)) {
+          @for (entity of getFilteredEntities(); track trackByEntityId($index, entity)) {
             <option [ngValue]="entity.entity_id">{{ formatEntityLabel(entity) }}</option>
           }
         </select>
@@ -551,4 +554,6 @@
 </div>
 
 }
+}
+
 }

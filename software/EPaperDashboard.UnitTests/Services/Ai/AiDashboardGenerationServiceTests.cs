@@ -23,7 +23,7 @@ public class AiDashboardGenerationServiceTests
     {
         var entityStateProvider = new Mock<IEntityStateProvider>();
         entityStateProvider.Setup(p => p.FetchAllEntityStatesAsync(It.IsAny<string>()))
-            .ReturnsAsync(Result.Success<List<HassEntityState>, string>(new List<HassEntityState>()));
+            .ReturnsAsync(Result.Success<List<EntityState>, string>(new List<EntityState>()));
         var todoDataProvider = new Mock<ITodoDataProvider>();
         todoDataProvider.Setup(p => p.FetchAllTodoItemsAsync(It.IsAny<string>()))
             .ReturnsAsync(Result.Success<Dictionary<string, List<TodoItem>>, string>(new Dictionary<string, List<TodoItem>>()));

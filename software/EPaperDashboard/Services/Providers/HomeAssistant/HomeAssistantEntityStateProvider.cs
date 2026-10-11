@@ -25,7 +25,7 @@ public class HomeAssistantEntityStateProvider(
         "climate", "light", "switch", "lock", "cover", "fan"
     };
 
-    public async Task<Result<List<HassEntityState>, string>> FetchAllEntityStatesAsync(string dashboardId, CancellationToken cancellationToken = default)
+    public async Task<Result<List<EntityState>, string>> FetchAllEntityStatesAsync(string dashboardId, CancellationToken cancellationToken = default)
     {
         var connectionInfo = _connection.GetConnectionInfo(dashboardId);
         if (connectionInfo.IsFailure)
@@ -37,7 +37,7 @@ public class HomeAssistantEntityStateProvider(
 
         try
         {
-            using var ws = await WebSocketHelpers.ConnectAndAuthenticateAsync(hostUrl, token, _connection.WebSocketPath, cancellationToken);
+            using var ws = await WebSocketHelpers.ConnectAndAuthenticateAsync(hostUrl, token, _connection.GetWebSocketPath(dashboardId), cancellationToken);
 
             await HomeAssistantConnectionService.SendMessageAsync(ws, new
             {
@@ -48,7 +48,7 @@ public class HomeAssistantEntityStateProvider(
             var statesResponse = await HomeAssistantConnectionService.ReceiveMessageAsync(ws, cancellationToken);
             var statesResult = JsonSerializer.Deserialize<JsonElement>(statesResponse);
 
-            var entityStates = new List<HassEntityState>();
+            var entityStates = new List<EntityState>();
 
             if (statesResult.TryGetProperty("success", out var success) && success.GetBoolean() &&
                 statesResult.TryGetProperty("result", out var result) && result.ValueKind == JsonValueKind.Array)
@@ -82,7 +82,7 @@ public class HomeAssistantEntityStateProvider(
                         }
                     }
 
-                    entityStates.Add(new HassEntityState
+                    entityStates.Add(new EntityState
                     {
                         EntityId = entityId,
                         State = state ?? string.Empty,
@@ -106,7 +106,7 @@ public class HomeAssistantEntityStateProvider(
         }
     }
 
-    public async Task<Result<List<HassEntityState>, string>> FetchEntityStatesAsync(string dashboardId, string[] entityIds, CancellationToken cancellationToken = default)
+    public async Task<Result<List<EntityState>, string>> FetchEntityStatesAsync(string dashboardId, string[] entityIds, CancellationToken cancellationToken = default)
     {
         var connectionInfo = _connection.GetConnectionInfo(dashboardId);
         if (connectionInfo.IsFailure)
@@ -114,13 +114,13 @@ public class HomeAssistantEntityStateProvider(
 
         var requestedIds = new HashSet<string>(entityIds.Where(id => !string.IsNullOrWhiteSpace(id)), StringComparer.OrdinalIgnoreCase);
         if (requestedIds.Count == 0)
-            return Result.Success<List<HassEntityState>, string>(new List<HassEntityState>());
+            return Result.Success<List<EntityState>, string>(new List<EntityState>());
 
         var (hostUrl, token) = connectionInfo.Value;
 
         try
         {
-            using var ws = await WebSocketHelpers.ConnectAndAuthenticateAsync(hostUrl, token, _connection.WebSocketPath, cancellationToken);
+            using var ws = await WebSocketHelpers.ConnectAndAuthenticateAsync(hostUrl, token, _connection.GetWebSocketPath(dashboardId), cancellationToken);
 
             await HomeAssistantConnectionService.SendMessageAsync(ws, new
             {
@@ -131,7 +131,7 @@ public class HomeAssistantEntityStateProvider(
             var statesResponse = await HomeAssistantConnectionService.ReceiveMessageAsync(ws, cancellationToken);
             var statesResult = JsonSerializer.Deserialize<JsonElement>(statesResponse);
 
-            var entityStates = new List<HassEntityState>();
+            var entityStates = new List<EntityState>();
 
             if (statesResult.TryGetProperty("success", out var success) && success.GetBoolean() &&
                 statesResult.TryGetProperty("result", out var result) && result.ValueKind == JsonValueKind.Array)
@@ -153,7 +153,7 @@ public class HomeAssistantEntityStateProvider(
                         }
                     }
 
-                    entityStates.Add(new HassEntityState
+                    entityStates.Add(new EntityState
                     {
                         EntityId = entityId,
                         State = state ?? string.Empty,

@@ -6,7 +6,8 @@ The server component of the izBoard system. An ASP.NET Core web application with
 
 - Visual dashboard designer with multiple widget types
 - AI-powered dashboard generation — describe your ideal layout in natural language and have AI create it using your Home Assistant entities, calendars, weather, and more
-- Home Assistant integration
+- Built-in data provider plugins: Home Assistant and Google Calendar / Tasks
+- Multiple named connections per user, shared across their dashboards
 - E-Paper optimized image processing
 - Device management and pairing
 - Configurable update schedules
@@ -14,6 +15,10 @@ The server component of the izBoard system. An ASP.NET Core web application with
 - Multi-user authentication (standalone mode)
 - Deployable as standalone Docker or Home Assistant Add-on
 - Optional Home Assistant dashboard screenshots through an on-demand rendering component
+
+## Data providers
+
+Use **Connections** to configure your own Home Assistant and Google accounts. Common widgets can select compatible sources across providers. Existing Home Assistant dashboards remain compatible. See [provider setup and the plugin extension API](docs/data-provider-plugins.md) for Google OAuth setup, migration requirements, and adding plugins.
 
 ## Deployment
 

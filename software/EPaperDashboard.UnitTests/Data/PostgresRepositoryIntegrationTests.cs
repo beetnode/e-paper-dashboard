@@ -28,6 +28,7 @@ public class PostgresRepositoryIntegrationTests
         var dashboards = new PostgresDashboardRepository(context);
         var devices = new PostgresDeviceRepository(context);
         var sessions = new PostgresPairingSessionRepository(context);
+        var connections = new PostgresProviderConnectionRepository(context);
         var suffix = Guid.NewGuid().ToString("N");
         var user = new User { Username = $"user-{suffix}", PasswordHash = "hash", IsSuperUser = true };
         var dashboard = new Dashboard
@@ -51,6 +52,14 @@ public class PostgresRepositoryIntegrationTests
             users.Insert(user);
             dashboard.UserId = user.Id;
             dashboards.Insert(dashboard);
+            var provider = new ProviderConnection { UserId = user.Id, PluginId = "google", Name = "Personal", ProtectedCredentials = "ciphertext" };
+            connections.Insert(provider);
+            connections.FindByUserId(user.Id).Should().ContainSingle();
+            connections.Find(provider.Id, UserId.New()).Should().BeNull();
+            provider.ProtectedCredentials = "updated-ciphertext";
+            connections.Update(provider, "ciphertext").Should().BeTrue();
+            connections.Update(provider, "ciphertext").Should().BeFalse();
+            connections.Find(provider.Id, user.Id)!.ProtectedCredentials.Should().Be("updated-ciphertext");
             var device = new Device
             {
                 UserId = user.Id,
@@ -93,6 +102,7 @@ public class PostgresRepositoryIntegrationTests
         finally
         {
             dashboards.DeleteByUserId(user.Id);
+            connections.DeleteByUserId(user.Id);
             foreach (var device in devices.FindByUserId(user.Id)) devices.Delete(device.Id);
             users.Delete(user.Id);
         }
@@ -255,7 +265,7 @@ public class PostgresRepositoryIntegrationTests
             using var check = new NpgsqlConnection(connectionString);
             check.Open();
             using var unchanged = new NpgsqlCommand("SELECT version FROM izboard_schema_versions", check);
-            unchanged.ExecuteScalar().Should().BeOneOf(101L, 102L);
+            unchanged.ExecuteScalar().Should().BeOneOf(101L, 102L, 103L);
         });
     }
 

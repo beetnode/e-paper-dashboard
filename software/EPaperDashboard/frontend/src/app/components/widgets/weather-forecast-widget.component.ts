@@ -1,6 +1,6 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { WidgetConfig, ColorScheme, HassEntityState, WeatherForecastConfig, DashboardLayout, ForecastField, DEFAULT_FORECAST_FIELDS, getWeatherForecastDataKey } from '../../models/types';
+import { WidgetConfig, ColorScheme, EntityState, WeatherForecastConfig, DashboardLayout, ForecastField, DEFAULT_FORECAST_FIELDS, getWeatherForecastDataKey } from '../../models/types';
 import { resolveWidgetRenderContext } from './widget-render-context';
 
 interface ForecastItem {
@@ -90,7 +90,7 @@ interface ForecastItem {
 export class WeatherForecastWidgetComponent {
   @Input() widget!: WidgetConfig;
   @Input() colorScheme!: ColorScheme;
-  @Input() entityStates: Record<string, HassEntityState> | null = null;
+  @Input() entityStates: Record<string, EntityState> | null = null;
   @Input() weatherForecastsByKey: Record<string, any[]> | null | undefined = null;
   @Input() designerSettings?: DashboardLayout;
 

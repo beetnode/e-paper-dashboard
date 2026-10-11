@@ -42,13 +42,12 @@ internal sealed class PostgresDbContext(DatabaseSettings settings) : IDisposable
             return (bool)command.ExecuteScalar()!;
         });
 
-    internal void Execute(string sql, params NpgsqlParameter[] parameters)
+    internal int Execute(string sql, params NpgsqlParameter[] parameters)
     {
-        WithConnection(connection =>
+        return WithConnection(connection =>
         {
             using var command = CreateCommand(connection, sql, parameters);
-            command.ExecuteNonQuery();
-            return true;
+            return command.ExecuteNonQuery();
         });
     }
 

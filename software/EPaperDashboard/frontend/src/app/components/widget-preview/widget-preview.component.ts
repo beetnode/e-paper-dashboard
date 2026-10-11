@@ -30,11 +30,11 @@ import {
   GraphConfig,
   GraphSeriesConfig,
   TodoConfig,
-  HassEntityState,
+  EntityState,
   DashboardLayout,
   getWeatherForecastDataKey,
 } from '../../models/types';
-import { getWidgetDefinition } from '../../models/widget-catalog';
+import { getWidgetDefinition, getWidgetRenderType } from '../../models/widget-catalog';
 
 @Component({
   selector: 'app-widget-preview',
@@ -63,44 +63,48 @@ import { getWidgetDefinition } from '../../models/widget-catalog';
         </div>
       }
       @if (dataFetched && hasDataForWidget()) {
-      @if (widget.type === 'app-icon') {
+      @if (pluginPreviewComponent; as component) {
+        <ng-container *ngComponentOutlet="component; inputs: pluginPreviewInputs" />
+      } @else {
+      @if (renderType === 'app-icon') {
         <app-widget-app-icon [widget]="widget" [colorScheme]="colorScheme"></app-widget-app-icon>
       }
-      @if (widget.type === 'image') {
+      @if (renderType === 'image') {
         <app-widget-image [widget]="widget" [colorScheme]="colorScheme" [designerSettings]="designerSettings"></app-widget-image>
       }
-      @if (widget.type === 'header') {
+      @if (renderType === 'header') {
         <app-widget-header [widget]="widget" [colorScheme]="colorScheme" [entityStates]="entityStates" [designerSettings]="designerSettings">
         </app-widget-header>
       }
-      @if (widget.type === 'markdown') {
+      @if (renderType === 'markdown') {
         <app-widget-markdown [widget]="widget" [colorScheme]="colorScheme" [designerSettings]="designerSettings"></app-widget-markdown>
       }
-      @if (widget.type === 'weather') {
+      @if (renderType === 'weather') {
         <app-widget-weather [widget]="widget" [colorScheme]="colorScheme" [entityStates]="entityStates" [designerSettings]="designerSettings">
         </app-widget-weather>
       }
-      @if (widget.type === 'weather-forecast') {
+      @if (renderType === 'weather-forecast') {
         <app-widget-weather-forecast [widget]="widget" [colorScheme]="colorScheme" [entityStates]="entityStates" [weatherForecastsByKey]="weatherForecastsByKey" [designerSettings]="designerSettings"></app-widget-weather-forecast>
       }
-      @if (widget.type === 'graph') {
+      @if (renderType === 'graph') {
         <app-widget-graph [widget]="widget" [colorScheme]="colorScheme" [designerSettings]="designerSettings" [historyDataByEntityId]="historyDataByEntityId"></app-widget-graph>
       }
-      @if (widget.type === 'todo') {
+      @if (renderType === 'todo') {
         <app-widget-todo [widget]="widget" [colorScheme]="colorScheme" [entityStates]="entityStates" [todoItemsByEntityId]="todoItemsByEntityId" [designerSettings]="designerSettings"></app-widget-todo>
       }
-      @if (widget.type === 'calendar') {
+      @if (renderType === 'calendar') {
         <app-widget-calendar [widget]="widget" [colorScheme]="colorScheme" [entityStates]="entityStates" [calendarEventsByEntityId]="calendarEventsByEntityId" [designerSettings]="designerSettings">
         </app-widget-calendar>
       }
-      @if (widget.type === 'version') {
+      @if (renderType === 'version') {
         <app-widget-version [widget]="widget" [colorScheme]="colorScheme" [designerSettings]="designerSettings" [version]="appVersion"></app-widget-version>
       }
-      @if (widget.type === 'rss-feed') {
+      @if (renderType === 'rss-feed') {
         <app-widget-rss-feed [widget]="widget" [colorScheme]="colorScheme" [designerSettings]="designerSettings" [rssFeedEntriesByEntityId]="rssFeedEntriesByEntityId"></app-widget-rss-feed>
       }
-      @if (widget.type === 'ai-content') {
+      @if (renderType === 'ai-content') {
         <app-widget-ai-content [widget]="widget" [colorScheme]="colorScheme" [designerSettings]="designerSettings" [dashboardId]="dashboardId" [generatedContent]="generatedContentByWidgetId?.[widget.id] || ''"></app-widget-ai-content>
+      }
       }
       }
     </div>
@@ -115,14 +119,22 @@ export class WidgetPreviewComponent {
   @Input() historyDataByEntityId?: Record<string, HistoryStateData[]>;
   @Input() generatedContentByWidgetId?: Record<string, string>;
   @Input() sourceStatuses?: Record<string, DataSourceStatus>;
+  @Input() widgetData?: Record<string, unknown>;
+  get pluginPreviewComponent() { return getWidgetDefinition(this.widget.type).previewComponent; }
+  get pluginPreviewInputs() { return {
+    widget: this.widget, colorScheme: this.colorScheme, designerSettings: this.designerSettings,
+    data: this.widgetData?.[this.widget.id],
+  }; }
   @Input() appVersion = '';
   @Input() widget!: WidgetConfig;
   @Input() colorScheme!: ColorScheme;
   @Input() designerSettings?: DashboardLayout;
-  @Input() entityStates: Record<string, HassEntityState> | null = null;
+  @Input() entityStates: Record<string, EntityState> | null = null;
   @Input() dashboardId?: string;
   /** Whether live preview data has ever been fetched. When false, show icon+title placeholders. */
   @Input() dataFetched = true;
+  get renderType() { return getWidgetRenderType(this.widget.type); }
+
   getWidgetIcon(): string {
     return getWidgetDefinition(this.widget.type).icon;
   }
@@ -150,9 +162,9 @@ export class WidgetPreviewComponent {
     if (!this.sourceStatuses) return [];
     const config = this.widget.config as any;
     const entityId = config?.entityId as string | undefined;
-    const keys: string[] = [];
+    const keys: string[] = [`widget:${this.widget.id}`];
 
-    switch (this.widget.type) {
+    switch (this.renderType) {
       case 'header':
         keys.push(...((config?.badges ?? []) as any[])
           .map(badge => badge.entityId)
@@ -212,7 +224,7 @@ export class WidgetPreviewComponent {
   }
 
   hasDataForWidget(): boolean {
-    const type = this.widget.type;
+    const type = this.renderType;
     const config = this.widget.config as any;
     const entityId = config?.entityId as string | undefined;
 

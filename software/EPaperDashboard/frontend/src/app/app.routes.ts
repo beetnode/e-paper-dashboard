@@ -5,6 +5,7 @@ import { unsavedChangesGuard } from './guards/unsaved-changes.guard';
 import { systemAdminGuard } from './guards/system-admin.guard';
 
 export const routes: Routes = [
+  { path: 'connections', canActivate: [authGuard], loadComponent: () => import('./components/provider-connections/provider-connections.component').then(m => m.ProviderConnectionsComponent) },
   { path: '', redirectTo: '/home', pathMatch: 'full' },
   {
     path: 'home',

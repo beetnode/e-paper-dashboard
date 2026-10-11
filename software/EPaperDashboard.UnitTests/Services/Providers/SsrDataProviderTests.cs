@@ -25,7 +25,7 @@ public class SsrDataProviderTests
     {
         _entityStateProvider
             .Setup(p => p.FetchEntityStatesAsync(It.IsAny<string>(), It.IsAny<string[]>()))
-            .ReturnsAsync(Result.Success<List<HassEntityState>, string>(new List<HassEntityState>()));
+            .ReturnsAsync(Result.Success<List<EntityState>, string>(new List<EntityState>()));
 
         return new SsrDataProvider(
             _entityStateProvider.Object,
@@ -36,7 +36,7 @@ public class SsrDataProviderTests
             _aiContentProvider.Object,
             new MemoryCache(new MemoryCacheOptions()),
             TimeProvider.System,
-            NullLogger<SsrDataProvider>.Instance);
+            NullLogger<SsrDataProvider>.Instance, _rssFeedDataProvider.Object);
     }
 
     private static WidgetConfigEntry Widget(string type, object config, string id = "w1") => new(
@@ -44,6 +44,33 @@ public class SsrDataProviderTests
 
     private static LayoutConfig LayoutWith(params WidgetConfigEntry[] widgets) =>
         new(100, 100, 4, 4, null!, [.. widgets], 0, 0, 0, 0, 0, 0, 0, 0);
+
+    [Fact]
+    public async Task FailedConnectionDoesNotDiscardAnotherConnectionsStates()
+    {
+        var first = EPaperDashboard.Services.Plugins.SourceReference.Create(Guid.NewGuid().ToString("N"), "weather.home");
+        var second = EPaperDashboard.Services.Plugins.SourceReference.Create(Guid.NewGuid().ToString("N"), "weather.home");
+        var sut = CreateSut();
+        _entityStateProvider.Setup(p => p.FetchEntityStatesAsync("dash1", It.Is<string[]>(ids => ids.Length == 1 && ids[0] == first), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Failure<List<EntityState>, string>("Offline"));
+        _entityStateProvider.Setup(p => p.FetchEntityStatesAsync("dash1", It.Is<string[]>(ids => ids.Length == 1 && ids[0] == second), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success<List<EntityState>, string>([new() { EntityId = second, State = "sunny" }]));
+        var data = await sut.FetchSsrDataAsync("dash1", LayoutWith(Widget("weather", new { entityId = first }, "a"), Widget("weather", new { entityId = second }, "b")));
+        data.EntityStates.Should().ContainKey(second);
+        data.SourceStatuses[DataSourceKeys.Entity(first)].State.Should().Be("error");
+        data.SourceStatuses[DataSourceKeys.Entity(second)].State.Should().Be("ready");
+    }
+
+    [Fact]
+    public void PluginWidgetTemplatesUseTheSharedDataPlan()
+    {
+        var plugin = new Mock<EPaperDashboard.Services.Plugins.IDataProviderPlugin>();
+        plugin.SetupGet(p => p.Manifest).Returns(new EPaperDashboard.Services.Plugins.ProviderManifest("google", "Google", [], Widgets: [new("google.calendar", "calendar"), new("google.tasks", "todo")]));
+        var registry = new EPaperDashboard.Services.Plugins.ProviderRegistry([plugin.Object]);
+        var plan = WidgetDataPlan.Create(LayoutWith(Widget("google.calendar", new { entityId = "calendar-source" }), Widget("google.tasks", new { entityId = "task-source" })), registry.ResolveWidgetType);
+        plan.CalendarEntityIds.Should().ContainSingle().Which.Should().Be("calendar-source");
+        plan.TodoEntityIds.Should().ContainSingle().Which.Should().Be("task-source");
+    }
 
     [Fact]
     public async Task FetchSsrDataAsync_NoWidgets_ReturnsEmptyData()
@@ -160,20 +187,8 @@ public class SsrDataProviderTests
     public async Task FetchSsrDataAsync_RssFeedWidget_PopulatesRssEntries()
     {
         var sut = CreateSut();
-        _entityStateProvider
-            .Setup(p => p.FetchEntityStatesAsync("dash1", It.IsAny<string[]>()))
-            .ReturnsAsync(Result.Success<List<HassEntityState>, string>(
-            [
-                new HassEntityState
-                {
-                    EntityId = "sensor.feed",
-                    Attributes = new Dictionary<string, object?>
-                    {
-                        ["title"] = "Headline",
-                        ["link"] = "https://example.com/item"
-                    }
-                }
-            ]));
+        _rssFeedDataProvider.Setup(p => p.FetchRssFeedEntriesAsync("dash1", "sensor.feed", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success<List<RssFeedEntry>, string>([new() { Title = "Headline", Link = "https://example.com/item" }]));
         var layout = LayoutWith(Widget("rss-feed", new { entityId = "sensor.feed" }));
 
         var result = await sut.FetchSsrDataAsync("dash1", layout);
@@ -182,7 +197,7 @@ public class SsrDataProviderTests
         result.RssFeedEntries["sensor.feed"].Should().ContainSingle(item => item.Title == "Headline");
         _rssFeedDataProvider.Verify(
             provider => provider.FetchRssFeedEntriesAsync(It.IsAny<string>(), It.IsAny<string>()),
-            Times.Never);
+            Times.Once);
     }
 
     [Theory]
@@ -329,7 +344,7 @@ public class SsrDataProviderTests
 
         var plan = WidgetDataPlan.Create(layout);
 
-        plan.EntityStateIds.Should().BeEquivalentTo(["event.feed"]);
+        plan.EntityStateIds.Should().BeEmpty();
         plan.TodoEntityIds.Should().BeEquivalentTo(["todo.list"]);
         plan.RssEntityIds.Should().BeEquivalentTo(["event.feed"]);
         plan.HistoryHoursByEntityId.Should().Contain("sensor.temp", 168);

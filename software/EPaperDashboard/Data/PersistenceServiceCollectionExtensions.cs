@@ -20,6 +20,7 @@ public static class PersistenceServiceCollectionExtensions
                 services.AddSingleton<LiteDbContext>();
                 services.AddSingleton<IPersistenceInitializer>(sp => sp.GetRequiredService<LiteDbContext>());
                 services.AddSingleton<IUserRepository, LiteDbUserRepository>();
+                services.AddSingleton<IProviderConnectionRepository, LiteDbProviderConnectionRepository>();
                 services.AddSingleton<IDashboardRepository, LiteDbDashboardRepository>();
                 services.AddSingleton<IDeviceRepository, LiteDbDeviceRepository>();
                 services.AddSingleton<IPairingSessionRepository, LiteDbPairingSessionRepository>();
@@ -30,6 +31,7 @@ public static class PersistenceServiceCollectionExtensions
                 services.AddSingleton<PostgresDbContext>();
                 services.AddSingleton<IPersistenceInitializer, PostgresSchemaInitializer>();
                 services.AddSingleton<IUserRepository, PostgresUserRepository>();
+                services.AddSingleton<IProviderConnectionRepository, PostgresProviderConnectionRepository>();
                 services.AddSingleton<IDashboardRepository, PostgresDashboardRepository>();
                 services.AddSingleton<IDeviceRepository, PostgresDeviceRepository>();
                 services.AddSingleton<IPairingSessionRepository, PostgresPairingSessionRepository>();

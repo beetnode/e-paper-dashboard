@@ -62,7 +62,7 @@ public class RenderingUtilitiesTests
     [InlineData(false, "false")]
     public void GetEntityAttr_KnownValueTypes_FormatsAsString(object value, string expected)
     {
-        var state = new HassEntityState { Attributes = { ["key"] = value } };
+        var state = new EntityState { Attributes = { ["key"] = value } };
 
         RenderingUtilities.GetEntityAttr(state, "key").Should().Be(expected);
     }
@@ -70,7 +70,7 @@ public class RenderingUtilitiesTests
     [Fact]
     public void GetEntityAttr_MissingKey_ReturnsNull()
     {
-        var state = new HassEntityState();
+        var state = new EntityState();
 
         RenderingUtilities.GetEntityAttr(state, "missing").Should().BeNull();
     }

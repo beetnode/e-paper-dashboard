@@ -18,7 +18,7 @@ public class EntityStateSectionFormatterTests
     [Fact]
     public void HasData_HasEntityStates_ReturnsTrue()
     {
-        var data = new AiDataSnapshot { EntityStates = { ["sensor.x"] = new HassEntityState() } };
+        var data = new AiDataSnapshot { EntityStates = { ["sensor.x"] = new EntityState() } };
 
         Sut.HasData(data).Should().BeTrue();
     }
@@ -30,7 +30,7 @@ public class EntityStateSectionFormatterTests
         {
             EntityStates =
             {
-                ["sensor.temp"] = new HassEntityState
+                ["sensor.temp"] = new EntityState
                 {
                     EntityId = "sensor.temp",
                     State = "21.5",
@@ -49,7 +49,7 @@ public class EntityStateSectionFormatterTests
     {
         var data = new AiDataSnapshot
         {
-            EntityStates = { ["sensor.raw"] = new HassEntityState { EntityId = "sensor.raw", State = "on" } }
+            EntityStates = { ["sensor.raw"] = new EntityState { EntityId = "sensor.raw", State = "on" } }
         };
 
         var result = Sut.FormatSection(data);

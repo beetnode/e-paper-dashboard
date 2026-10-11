@@ -12,7 +12,7 @@ import {
   BadgeConfig,
   ColorScheme,
   DashboardLayout,
-  HassEntityState,
+  EntityState,
   HeaderConfig,
   WidgetConfig,
 } from '../../models/types';
@@ -97,7 +97,7 @@ interface VisibleBadge {
 export class HeaderWidgetComponent implements OnInit, OnChanges {
   @Input() widget!: WidgetConfig;
   @Input() colorScheme!: ColorScheme;
-  @Input() entityStates: Record<string, HassEntityState> | null = null;
+  @Input() entityStates: Record<string, EntityState> | null = null;
   @Input() designerSettings?: DashboardLayout;
 
   inlineSvg: SafeHtml | null = null;

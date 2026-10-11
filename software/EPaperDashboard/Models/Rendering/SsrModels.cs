@@ -69,11 +69,12 @@ public readonly record struct WeatherForecastDataKey(string EntityId, string For
 }
 
 /// <summary>
-/// Aggregated Home Assistant data used for server-side rendering.
+/// Normalized provider data used for server-side rendering.
 /// </summary>
 public class SsrData
 {
-    public ConcurrentDictionary<string, HassEntityState> EntityStates { get; set; } = new();
+    public ConcurrentDictionary<string, JsonElement> WidgetData { get; set; } = new();
+    public ConcurrentDictionary<string, EntityState> EntityStates { get; set; } = new();
     public ConcurrentDictionary<string, List<TodoItem>> TodoItems { get; set; } = new();
     public ConcurrentDictionary<string, List<CalendarEvent>> CalendarEvents { get; set; } = new();
     public ConcurrentDictionary<WeatherForecastDataKey, List<WeatherForecast>> WeatherForecasts { get; set; } = new();

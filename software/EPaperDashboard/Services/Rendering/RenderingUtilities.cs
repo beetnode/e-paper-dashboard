@@ -145,7 +145,7 @@ public sealed class RenderingUtilities
     public static double? GetBadgeDoubleProp(JsonElement badge, string prop) =>
         badge.TryGetProperty(prop, out var p) && p.ValueKind == JsonValueKind.Number ? p.GetDouble() : null;
 
-    public static string? GetEntityAttr(HassEntityState state, string key)
+    public static string? GetEntityAttr(EntityState state, string key)
     {
         if (state.Attributes.TryGetValue(key, out var val) && val != null)
         {

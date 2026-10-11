@@ -1,7 +1,7 @@
 using EPaperDashboard.Authorization;
 using EPaperDashboard.Services.Rendering;
 using EPaperDashboard.Services.Providers;
-using EPaperDashboard.Services.Providers.HomeAssistant;
+using EPaperDashboard.Services.Plugins;
 using EPaperDashboard.Services.Ai;
 using EPaperDashboard.Utilities;
 using EPaperDashboard.Data;
@@ -165,15 +165,7 @@ builder.Services
 	.AddSingleton<DashboardService>()
 	.AddSingleton<DeviceService>()
 	.AddSingleton<PairingService>()
-	.AddSingleton<HomeAssistantAuthService>()
-	.AddSingleton<HomeAssistantConnectionService>()
-	.AddSingleton<HomeAssistantService>()
-	.AddSingleton<IEntityStateProvider, HomeAssistantEntityStateProvider>()
-	.AddSingleton<ITodoDataProvider, HomeAssistantTodoDataProvider>()
-	.AddSingleton<ICalendarDataProvider, HomeAssistantCalendarDataProvider>()
-	.AddSingleton<IWeatherForecastProvider, HomeAssistantWeatherForecastProvider>()
-	.AddSingleton<IRssFeedDataProvider, HomeAssistantRssFeedDataProvider>()
-	.AddSingleton<IEntityHistoryProvider, HomeAssistantEntityHistoryProvider>()
+	.AddDataProviderPlugins()
 	.AddSingleton<IAiContentProvider, AiContentProvider>()
 	.AddSingleton<IAiDataSectionFormatter, EntityStateSectionFormatter>()
 	.AddSingleton<IAiDataSectionFormatter, EPaperDashboard.Services.Ai.DataSections.CalendarEventsSectionFormatter>()

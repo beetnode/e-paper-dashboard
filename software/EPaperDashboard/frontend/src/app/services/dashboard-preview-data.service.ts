@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { DashboardLayout, HassEntityState } from '../models/types';
+import { DashboardLayout, EntityState } from '../models/types';
 import { TodoItem } from './todo.service';
 
 export interface CalendarEventData {
@@ -40,7 +40,8 @@ export interface HistoryStateData {
 }
 
 export interface DashboardPreviewData {
-  entityStates: Record<string, HassEntityState>;
+  widgetData?: Record<string, unknown>;
+  entityStates: Record<string, EntityState>;
   todoItems: Record<string, TodoItem[]>;
   calendarEvents: Record<string, CalendarEventData[]>;
   weatherForecasts: Record<string, WeatherForecastData[]>;

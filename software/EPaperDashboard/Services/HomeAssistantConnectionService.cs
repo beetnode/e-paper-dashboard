@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using CSharpFunctionalExtensions;
 using EPaperDashboard.Models;
+using EPaperDashboard.Services.Plugins;
 
 namespace EPaperDashboard.Services;
 
@@ -13,13 +14,18 @@ namespace EPaperDashboard.Services;
 /// </summary>
 public class HomeAssistantConnectionService(
     DashboardService dashboardService,
-    IDeploymentStrategy deploymentStrategy)
+    IDeploymentStrategy deploymentStrategy,
+    ProviderConnectionStore? connections = null)
 {
     private readonly DashboardService _dashboardService = dashboardService;
     private readonly IDeploymentStrategy _deploymentStrategy = deploymentStrategy;
     private int _messageId = 2;
 
     public string WebSocketPath => _deploymentStrategy.WebSocketPath;
+
+    // Internal scope used by the HA plugin; ownership is checked against the persisted dashboard.
+    public static string ConnectionScope(string dashboardId, string connectionId) => $"connection:{connectionId}:{dashboardId}";
+    public string GetWebSocketPath(string scope) => scope.StartsWith("connection:", StringComparison.Ordinal) ? "/api/websocket" : WebSocketPath;
 
     public (string host, string token) GetHostAndToken(Dashboard dashboard)
     {
@@ -80,6 +86,18 @@ public class HomeAssistantConnectionService(
     /// </summary>
     public Result<(string hostUrl, string token), string> GetConnectionInfo(string dashboardId)
     {
+        if (dashboardId.StartsWith("connection:", StringComparison.Ordinal))
+        {
+            var parts = dashboardId.Split(':');
+            if (parts.Length != 3 || !DashboardId.TryParse(parts[2], out var id)) return "Invalid connection scope";
+            var scopedDashboard = _dashboardService.GetDashboardById(id);
+            if (scopedDashboard.HasNoValue) return "Dashboard not found";
+            var connection = connections?.Find(parts[1], scopedDashboard.Value.UserId);
+            if (connection is null || connection.PluginId != "home-assistant") return "Connection not found";
+            var credentials = connections!.Credentials(connection);
+            return (credentials["host"].TrimEnd('/'), credentials["token"]);
+        }
+
         var dashboardResult = ValidateAndGetDashboard(dashboardId);
         if (dashboardResult.IsFailure)
         {
@@ -91,7 +109,7 @@ public class HomeAssistantConnectionService(
         return (hostUrl.TrimEnd('/'), token);
     }
 
-    public int NextMessageId() => _messageId++;
+    public int NextMessageId() => Interlocked.Increment(ref _messageId);
 
     public static async Task SendMessageAsync(ClientWebSocket ws, object message, CancellationToken cancellationToken = default)
     {

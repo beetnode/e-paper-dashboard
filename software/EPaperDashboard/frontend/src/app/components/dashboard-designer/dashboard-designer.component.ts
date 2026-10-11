@@ -8,7 +8,7 @@ import { Subscription } from 'rxjs';
 import type { DataSourceStatus } from '../../services/dashboard-preview-data.service';
 import { DashboardService } from '../../services/dashboard.service';
 import { ToastService } from '../../services/toast.service';
-import { HomeAssistantService, HassEntity } from '../../services/home-assistant.service';
+import { DataProviderService, DataSource } from '../../services/data-provider.service';
 import { AiService } from '../../services/ai.service';
 import {
   DashboardRenderPreviewService,
@@ -45,6 +45,7 @@ import {
   WidgetCategory,
   WidgetDefinition,
   WIDGET_DEFINITIONS,
+  getWidgetRenderType,
 } from '../../models/widget-catalog';
 
 @Component({
@@ -60,7 +61,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   private readonly http = inject(HttpClient);
   private readonly dashboardService = inject(DashboardService);
   private readonly toastService = inject(ToastService);
-  private readonly homeAssistantService = inject(HomeAssistantService);
+  private readonly dataProviderService = inject(DataProviderService);
   private readonly renderPreviewService = inject(DashboardRenderPreviewService);
   private readonly aiService = inject(AiService);
   private readonly dialogService = inject(DialogService);
@@ -94,11 +95,20 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   availableWidgets = WIDGET_DEFINITIONS;
   readonly widgetCategories: ReadonlyArray<{ type: WidgetCategory; label: string }> = [
     { type: 'content', label: 'Content' },
+    { type: 'data', label: 'Data' },
     { type: 'home-assistant', label: 'Home Assistant' },
+    { type: 'google', label: 'Google' },
     { type: 'chart', label: 'Charts' },
     { type: 'asset', label: 'Assets' },
     { type: 'system', label: 'System' },
   ];
+
+  get allWidgetCategories(): ReadonlyArray<{ type: WidgetCategory; label: string }> {
+    const builtIn = new Set(this.widgetCategories.map(category => category.type));
+    const extra = new Map(this.availableWidgets.filter(widget => !builtIn.has(widget.category))
+      .map(widget => [widget.category, { type: widget.category, label: widget.categoryLabel ?? widget.category }]));
+    return [...this.widgetCategories, ...extra.values()];
+  }
 
   widgetsInCategory(category: WidgetCategory): readonly WidgetDefinition[] {
     return this.availableWidgets.filter(widget => widget.category === category);
@@ -108,7 +118,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   ghost = signal<{ id: string; position: WidgetPosition } | null>(null);
   isLoading = signal(false);
   loadError = signal('');
-  availableEntities = signal<HassEntity[]>([]);
+  availableEntities = signal<DataSource[]>([]);
   entitiesLoading = signal(false);
   activeTab = signal<'dashboard' | 'widgets' | 'properties'>('dashboard');
   renderedCanvasImageUrl = signal('');
@@ -318,15 +328,18 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     this.loadDashboard();
   }
 
+  sourceErrors = signal<string[]>([]);
+
   loadAvailableEntities(): void {
     if (!this.dashboardId) {
       return;
     }
 
     this.entitiesLoading.set(true);
-    this.homeAssistantService.getEntities(this.dashboardId).subscribe({
-      next: (entities) => {
-        this.availableEntities.set(entities);
+    this.dataProviderService.sources(this.dashboardId).subscribe({
+      next: (result) => {
+        this.sourceErrors.set(result.errors);
+        this.availableEntities.set(result.data);
         this.entitiesLoading.set(false);
         this.isLoading.set(false);
       },
@@ -719,9 +732,9 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     if (!widget) return [];
     const config = widget.config as any;
     const entityId = config?.entityId as string | undefined;
-    const sources: Array<{ key: string; label: string }> = [];
+    const sources: Array<{ key: string; label: string }> = [{ key: `widget:${widget.id}`, label: 'Widget data' }];
 
-    switch (widget.type) {
+    switch (getWidgetRenderType(widget.type)) {
       case 'header':
         for (const badge of config?.badges ?? []) {
           if (badge.entityId) sources.push({ key: `entity:${badge.entityId}`, label: badge.entityId });

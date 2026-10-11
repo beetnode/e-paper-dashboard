@@ -44,7 +44,7 @@ public class AiContentProviderTests
     {
         var mock = new Mock<IEntityStateProvider>();
         mock.Setup(p => p.FetchAllEntityStatesAsync(It.IsAny<string>()))
-            .ReturnsAsync(Result.Success<List<HassEntityState>, string>(new List<HassEntityState>()));
+            .ReturnsAsync(Result.Success<List<EntityState>, string>(new List<EntityState>()));
         return mock.Object;
     }
 

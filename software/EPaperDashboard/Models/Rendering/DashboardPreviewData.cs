@@ -3,7 +3,7 @@ using EPaperDashboard.Services;
 namespace EPaperDashboard.Models.Rendering;
 
 public sealed record DashboardPreviewData(
-    IReadOnlyDictionary<string, HassEntityState> EntityStates,
+    IReadOnlyDictionary<string, EntityState> EntityStates,
     IReadOnlyDictionary<string, List<TodoItem>> TodoItems,
     IReadOnlyDictionary<string, List<CalendarEvent>> CalendarEvents,
     IReadOnlyDictionary<string, List<WeatherForecast>> WeatherForecasts,
@@ -14,6 +14,8 @@ public sealed record DashboardPreviewData(
     string AppVersion,
     DateTimeOffset FetchedAt)
 {
+    public IReadOnlyDictionary<string, System.Text.Json.JsonElement> WidgetData { get; init; } = new Dictionary<string, System.Text.Json.JsonElement>();
+
     public static DashboardPreviewData FromSsrData(SsrData data, TimeProvider timeProvider) => new(
         data.EntityStates,
         data.TodoItems,
@@ -26,5 +28,5 @@ public sealed record DashboardPreviewData(
         data.AiContent,
         data.SourceStatuses,
         typeof(Services.Rendering.DashboardImageRenderingService).Assembly.GetName().Version?.ToString() ?? "?",
-        timeProvider.GetUtcNow());
+        timeProvider.GetUtcNow()) { WidgetData = data.WidgetData };
 }
