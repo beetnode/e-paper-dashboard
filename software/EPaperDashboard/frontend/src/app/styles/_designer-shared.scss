@@ -28,74 +28,7 @@ html[data-bs-theme="dark"] & {
   --designer-overlay-bg: color-mix(in srgb, var(--bs-black) 80%, transparent);
 }
 
-/* Collapsible section cards – shared pattern */
-.collapsible-section {
-  border: 1px solid var(--bs-border-color);
-  border-radius: var(--app-radius-sm);
-  margin-bottom: 0.75rem;
-  background: var(--bs-card-bg);
-
-  .collapsible-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    user-select: none;
-    font-weight: 600;
-    font-size: var(--designer-text-md);
-
-    &.collapsible-trigger,
-    .collapsible-trigger {
-      display: flex;
-      flex: 1;
-      align-items: center;
-      justify-content: space-between;
-      min-width: 0;
-      padding: 0.625rem 0.75rem;
-      border: 0;
-      background: transparent;
-      color: inherit;
-      font: inherit;
-      text-align: left;
-      cursor: pointer;
-    }
-
-    &.collapsible-trigger:hover,
-    .collapsible-trigger:hover {
-      background: var(--bs-tertiary-bg);
-    }
-
-    .collapsible-actions {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding-right: 0.5rem;
-    }
-
-    .section-title {
-      margin: 0;
-      font-size: inherit;
-      font-weight: inherit;
-    }
-  }
-
-  .collapsible-body {
-    padding: 0.5rem 0.75rem;
-    border-top: 1px solid var(--bs-border-color);
-  }
-
-  &.collapsed {
-    .collapsible-header {
-      border-bottom: none;
-    }
-  }
-}
-
-/* Inspector sections (native <details>), visually identical to .collapsible-section. */
+/* Inspector sections (native <details>) used for dashboard and widget settings alike. */
 .inspector-section {
   margin-bottom: 0.75rem;
   border: 1px solid var(--bs-border-color);
@@ -137,9 +70,23 @@ html[data-bs-theme="dark"] & {
   }
 
   > .inspector-section-body {
-    padding: 0.5rem 0.75rem 0.75rem;
+    padding: 0.75rem;
     border-top: 1px solid var(--bs-border-color);
+
+    > :last-child,
+    > :last-child > :last-child {
+      margin-bottom: 0;
+    }
   }
+}
+
+.inspector-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--bs-border-color);
 }
 
 /* "Custom" marker for overridden colors, a compact app status chip. */

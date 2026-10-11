@@ -138,12 +138,8 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   layerMenuWidgetId = signal<string | null>(null);
   sourceDetailsOpen = signal(false);
   recentWidgetTypes = signal<WidgetType[]>(DashboardDesignerComponent.readRecentWidgets());
-  colorSchemeCollapsed = signal(false); // Color scheme section expanded by default
-  colorOverridesCollapsed = signal(true); // Layout color overrides collapsed by default
-  layoutCollapsed = signal(false); // Layout section expanded by default
-  fontsCollapsed = signal(true); // Fonts section collapsed by default
-  aiSectionCollapsed = signal(false); // AI section expanded by default when AI enabled
-  widgetColorOverridesCollapsed = signal(true); // Widget color overrides collapsed by default
+  /** Open state of designer-owned inspector sections, kept while switching selection. */
+  private readonly sectionOpenState = signal<Record<string, boolean>>({});
   showPreviewModal = signal(false);
   previewLoading = signal(false);
   previewError = signal('');
@@ -193,6 +189,23 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     const current = this.computeCurrentSnapshot();
     return current !== this.savedSnapshot();
   });
+
+  /** Every inspector section is open by default except colors, which are rarely changed. */
+  isSectionOpen(key: string): boolean {
+    return this.sectionOpenState()[key] ?? !key.endsWith('colors');
+  }
+
+  onSectionToggle(key: string, event: Event): void {
+    const open = (event.target as HTMLDetailsElement).open;
+    if (open !== this.isSectionOpen(key)) this.sectionOpenState.update(state => ({ ...state, [key]: open }));
+  }
+
+  /** Merges config values for the selected widget, e.g. layout-editor snap and guides. */
+  updateSelectedWidgetConfig(patch: Record<string, unknown>): void {
+    const widget = this.selectedWidget();
+    if (!widget) return;
+    this.onWidgetConfigChanged({ ...widget, config: { ...widget.config, ...patch } as WidgetConfig['config'] });
+  }
 
   readonly layoutColorFields: ReadonlyArray<{ key: LayoutColorProperty; label: string }> = [
     { key: 'canvasBackgroundColor', label: 'Canvas background' },

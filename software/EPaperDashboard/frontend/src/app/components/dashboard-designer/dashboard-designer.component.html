@@ -514,79 +514,9 @@
 </ng-template>
 
 <ng-template #dashboardSettingsContent>
-  <div class="collapsible-section" [class.collapsed]="colorSchemeCollapsed()">
-    <div class="collapsible-header">
-      <button type="button" class="collapsible-trigger" (click)="colorSchemeCollapsed.set(!colorSchemeCollapsed())"
-        [attr.aria-expanded]="!colorSchemeCollapsed()" aria-controls="colorSchemePanel">
-        <span class="section-title">Color scheme</span>
-        <i class="fa-solid" [ngClass]="colorSchemeCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
-      </button>
-      <div class="collapsible-actions">
-        <button type="button" class="btn btn-sm btn-outline-danger" (click)="resetAllColorOverrides()"
-          title="Reset all color overrides (layout + widgets) to the selected scheme defaults">
-          <i class="fa-solid fa-undo" aria-hidden="true"></i> Reset all
-        </button>
-      </div>
-    </div>
-    @if (!colorSchemeCollapsed()) {
-    <div id="colorSchemePanel" class="collapsible-body">
-      <select class="form-select" [ngModel]="layout().colorScheme"
-        [compareWith]="compareColorSchemes"
-        (ngModelChange)="updateColorScheme($event)">
-        @for (scheme of colorSchemes; track scheme.name) {
-        <option [ngValue]="scheme">{{ scheme.name }}</option>
-        }
-      </select>
-    </div>
-    }
-  </div>
-  <div class="collapsible-section" [class.collapsed]="colorOverridesCollapsed()">
-    <div class="collapsible-header">
-      <button type="button" class="collapsible-trigger" (click)="colorOverridesCollapsed.set(!colorOverridesCollapsed())"
-        [attr.aria-expanded]="!colorOverridesCollapsed()" aria-controls="layoutColorOverridesPanel">
-        <span class="d-flex align-items-center">
-          <span class="section-title">Color overrides</span>
-        @if (hasLayoutColorOverrides()) {
-          <span class="app-status-chip app-status-chip-warning override-chip" title="Some colors differ from the scheme">Custom</span>
-        }
-        </span>
-        <i class="fa-solid" [ngClass]="colorOverridesCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
-      </button>
-      <div class="collapsible-actions">
-        @if (hasLayoutColorOverrides()) {
-        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetLayoutColorOverrides()"
-          title="Reset layout colors to scheme defaults" aria-label="Reset layout colors to scheme defaults">
-          <i class="fa-solid fa-undo" aria-hidden="true"></i>
-        </button>
-        }
-      </div>
-    </div>
-    @if (!colorOverridesCollapsed()) {
-    <div id="layoutColorOverridesPanel" class="collapsible-body">
-      @for (field of layoutColorFields; track field.key) {
-      <div class="color-row">
-        <span class="color-row-label">{{ field.label }}@if (isLayoutColorOverridden(field.key)) {<span class="override-dot" title="Differs from the scheme"></span>}</span>
-        <div class="swatch-group" role="radiogroup" [attr.aria-label]="field.label">
-          @for (color of layout().colorScheme.palette; track color) {
-          <button type="button" class="swatch" role="radio" [style.background-color]="color"
-            [class.selected]="layout().colorScheme[field.key] === color" [attr.aria-checked]="layout().colorScheme[field.key] === color"
-            [attr.aria-label]="field.label + ': ' + getColorName(color)" [title]="getColorName(color)"
-            (click)="updateLayoutColor(field.key, color)"></button>
-          }
-        </div>
-      </div>
-      }
-    </div>
-    }
-  </div>
-  <div class="collapsible-section" [class.collapsed]="layoutCollapsed()">
-    <button type="button" class="collapsible-header collapsible-trigger" (click)="layoutCollapsed.set(!layoutCollapsed())"
-      [attr.aria-expanded]="!layoutCollapsed()" aria-controls="layoutPanel">
-      <span class="section-title">Layout</span>
-      <i class="fa-solid" [ngClass]="layoutCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
-    </button>
-    @if (!layoutCollapsed()) {
-    <div id="layoutPanel" class="collapsible-body">
+  <details class="inspector-section" [open]="isSectionOpen('dashboard-layout')" (toggle)="onSectionToggle('dashboard-layout', $event)">
+    <summary class="inspector-section-summary">Layout</summary>
+    <div class="inspector-section-body">
       <div class="mb-2">
         <label class="form-label fw-semibold">Orientation</label>
         <div class="btn-group d-flex" role="group">
@@ -645,16 +575,10 @@
         </label>
       </div>
     </div>
-    }
-  </div>
-  <div class="collapsible-section" [class.collapsed]="fontsCollapsed()">
-    <button type="button" class="collapsible-header collapsible-trigger" (click)="fontsCollapsed.set(!fontsCollapsed())"
-      [attr.aria-expanded]="!fontsCollapsed()" aria-controls="typographyPanel">
-      <span class="section-title">Typography</span>
-      <i class="fa-solid" [ngClass]="fontsCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
-    </button>
-    @if (!fontsCollapsed()) {
-    <div id="typographyPanel" class="collapsible-body">
+  </details>
+  <details class="inspector-section" [open]="isSectionOpen('dashboard-typography')" (toggle)="onSectionToggle('dashboard-typography', $event)">
+    <summary class="inspector-section-summary">Typography</summary>
+    <div class="inspector-section-body">
       <div class="designer-field-grid">
         <label class="designer-field">
           <span class="form-label fw-semibold">Title size (px)</span>
@@ -684,19 +608,11 @@
         </label>
       </div>
     </div>
-    }
-  </div>
-
-  <!-- AI Section -->
+  </details>
   @if (aiEnabled()) {
-  <div class="collapsible-section mt-2">
-    <button type="button" class="collapsible-header collapsible-trigger" (click)="aiSectionCollapsed.set(!aiSectionCollapsed())"
-      [attr.aria-expanded]="!aiSectionCollapsed()" aria-controls="aiGenerationPanel">
-      <span><i class="fa-solid fa-wand-magic-sparkles me-2" aria-hidden="true"></i>AI generation</span>
-      <i class="fa-solid" [class.fa-chevron-down]="aiSectionCollapsed()" [class.fa-chevron-up]="!aiSectionCollapsed()" aria-hidden="true"></i>
-    </button>
-    @if (!aiSectionCollapsed()) {
-    <div id="aiGenerationPanel" class="collapsible-body">
+  <details class="inspector-section" [open]="isSectionOpen('dashboard-ai')" (toggle)="onSectionToggle('dashboard-ai', $event)">
+    <summary class="inspector-section-summary">AI generation</summary>
+    <div class="inspector-section-body">
       @if (aiConfigMode() === 'None') {
         <div class="alert alert-warning py-2 small mb-3">
           <i class="fa-solid fa-triangle-exclamation me-1"></i>
@@ -762,31 +678,92 @@
         </div>
       }
     </div>
-    }
-  </div>
+  </details>
   }
+  <details class="inspector-section" [open]="isSectionOpen('dashboard-colors')" (toggle)="onSectionToggle('dashboard-colors', $event)">
+    <summary class="inspector-section-summary">Colors
+      @if (hasLayoutColorOverrides()) {
+        <span class="app-status-chip app-status-chip-warning override-chip" title="Some colors differ from the scheme">Custom</span>
+      }
+    </summary>
+    <div class="inspector-section-body">
+      <label class="form-label fw-semibold" for="dashboardColorScheme">Color scheme</label>
+      <select id="dashboardColorScheme" class="form-select mb-3" [ngModel]="layout().colorScheme"
+        [compareWith]="compareColorSchemes"
+        (ngModelChange)="updateColorScheme($event)">
+        @for (scheme of colorSchemes; track scheme.name) {
+        <option [ngValue]="scheme">{{ scheme.name }}</option>
+        }
+      </select>
+      @for (field of layoutColorFields; track field.key) {
+      <div class="color-row">
+        <span class="color-row-label">{{ field.label }}@if (isLayoutColorOverridden(field.key)) {<span class="override-dot" title="Differs from the scheme"></span>}</span>
+        <div class="swatch-group" role="radiogroup" [attr.aria-label]="field.label">
+          @for (color of layout().colorScheme.palette; track color) {
+          <button type="button" class="swatch" role="radio" [style.background-color]="color"
+            [class.selected]="layout().colorScheme[field.key] === color" [attr.aria-checked]="layout().colorScheme[field.key] === color"
+            [attr.aria-label]="field.label + ': ' + getColorName(color)" [title]="getColorName(color)"
+            (click)="updateLayoutColor(field.key, color)"></button>
+          }
+        </div>
+      </div>
+      }
+      <div class="inspector-section-actions">
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetLayoutColorOverrides()" [disabled]="!hasLayoutColorOverrides()"
+          title="Reset dashboard colors to the scheme defaults">
+          <i class="fa-solid fa-rotate-left me-1" aria-hidden="true"></i>Reset colors
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-danger" (click)="resetAllColorOverrides()"
+          title="Reset dashboard and widget colors to the scheme defaults">
+          <i class="fa-solid fa-rotate-left me-1" aria-hidden="true"></i>Reset all, including widgets
+        </button>
+      </div>
+    </div>
+  </details>
 </ng-template>
 
 <ng-template #propertiesContent>
   @if (selectedWidget()) {
-  @if (selectedWidgetSupportsElementEditing()) {
-    <button type="button" class="btn w-100 mb-2"
-      [ngClass]="elementEditingWidgetId() === selectedWidget()!.id ? 'btn-success' : 'btn-outline-primary'"
-      [disabled]="renderedCanvasLoading() || !selectedWidgetGeometry()"
-      (click)="toggleElementEditing(selectedWidget()!)">
-      <i class="fa-solid me-1" [ngClass]="elementEditingWidgetId() === selectedWidget()!.id ? 'fa-check' : 'fa-arrows-up-down-left-right'" aria-hidden="true"></i>
-      {{ elementEditingWidgetId() === selectedWidget()!.id ? 'Done' : 'Edit layout' }}
-    </button>
-    @if (renderedCanvasLoading()) {
-      <p class="small text-muted mb-2" role="status">Updating the preview before layout editing…</p>
-    }
-  }
   <app-widget-config [widget]="selectedWidget()!" [dashboard]="dashboard()"
     [availableEntities]="availableEntities()" [entitiesLoading]="entitiesLoading()"
     [colorScheme]="layout().colorScheme"
     (widgetChanged)="onWidgetConfigChanged($event)"
     [attr.key]="selectedWidget()!.id"></app-widget-config>
-  <details class="inspector-section" [open]="!widgetColorOverridesCollapsed()" (toggle)="widgetColorOverridesCollapsed.set(!$any($event.target).open)">
+  @if (selectedWidgetSupportsElementEditing()) {
+  <details class="inspector-section" [open]="isSectionOpen('widget-layout')" (toggle)="onSectionToggle('widget-layout', $event)">
+    <summary class="inspector-section-summary">Layout</summary>
+    <div class="inspector-section-body">
+      <button type="button" class="btn w-100 mb-2"
+        [ngClass]="elementEditingWidgetId() === selectedWidget()!.id ? 'btn-success' : 'btn-outline-primary'"
+        [disabled]="renderedCanvasLoading() || !selectedWidgetGeometry()"
+        (click)="toggleElementEditing(selectedWidget()!)">
+        <i class="fa-solid me-1" [ngClass]="elementEditingWidgetId() === selectedWidget()!.id ? 'fa-check' : 'fa-arrows-up-down-left-right'" aria-hidden="true"></i>
+        {{ elementEditingWidgetId() === selectedWidget()!.id ? 'Done' : 'Edit layout' }}
+      </button>
+      @if (renderedCanvasLoading()) {
+        <p class="small text-muted mb-2" role="status">Updating the preview before layout editing…</p>
+      }
+      <div class="designer-field-grid align-items-end">
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" id="layoutGuides" [checked]="getSelectedWidgetShowGuides()"
+            (change)="updateSelectedWidgetConfig({ showGuides: $any($event.target).checked })" />
+          <label class="form-check-label" for="layoutGuides">Smart guides</label>
+        </div>
+        <label class="designer-field">
+          <span class="form-label fw-semibold">Snap</span>
+          <select class="form-select" [ngModel]="getSelectedWidgetSnapStep()" (ngModelChange)="updateSelectedWidgetConfig({ snapStep: $event })">
+            <option [ngValue]="0">Off</option>
+            <option [ngValue]="1">1%</option>
+            <option [ngValue]="2">2%</option>
+            <option [ngValue]="5">5%</option>
+          </select>
+        </label>
+      </div>
+      <small class="form-text text-muted">Drag elements inside the widget on the canvas while layout editing is on.</small>
+    </div>
+  </details>
+  }
+  <details class="inspector-section" [open]="isSectionOpen('widget-colors')" (toggle)="onSectionToggle('widget-colors', $event)">
     <summary class="inspector-section-summary">
       Colors
       @if (hasWidgetColorOverrides(selectedWidget())) {

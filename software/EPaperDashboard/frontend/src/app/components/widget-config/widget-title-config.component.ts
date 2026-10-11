@@ -18,7 +18,6 @@ import { WidgetConfig } from '../../models/types';
         (ngModelChange)="setTitle($event)" placeholder="Override widget title" />
       <small class="form-text text-muted">Leave empty to use the default title</small>
     </div>
-    <hr class="my-2" />
   `,
 })
 export class WidgetTitleConfigComponent {
