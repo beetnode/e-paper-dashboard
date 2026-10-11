@@ -69,8 +69,9 @@
 .ai-toggle-pill {
   display: flex;
   align-items: center;
-  padding: 0.25rem 0.75rem;
-  border-radius: var(--bs-border-radius);
+  min-height: var(--designer-control-sm-height);
+  padding: 0 0.75rem;
+  border-radius: var(--bs-border-radius-sm);
   border: 1px solid var(--bs-border-color);
   background: var(--bs-body-bg);
   transition: background-color 0.15s, border-color 0.15s;
@@ -88,11 +89,7 @@
   }
 
   &.ai-toggle-pill-mobile {
-    padding: 0.2rem 0.5rem;
-
-    .form-check-label {
-      font-size: var(--designer-text-xs);
-    }
+    padding: 0 0.5rem;
   }
 }
 
@@ -172,8 +169,8 @@
 .panel-icon-btn {
   display: grid;
   place-items: center;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: var(--designer-hit-size);
+  height: var(--designer-hit-size);
   padding: 0;
   border: 0;
   border-radius: var(--app-radius-sm);
@@ -229,6 +226,7 @@
   align-items: center;
   gap: 0.5rem;
   min-width: 0;
+  min-height: var(--designer-hit-size);
   padding: 0.375rem 0.25rem 0.375rem 0.5rem;
   border: 0;
   background: transparent;
@@ -269,8 +267,8 @@
 .layer-menu-btn {
   display: grid;
   place-items: center;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: var(--designer-hit-size);
+  height: var(--designer-hit-size);
   margin-right: 0.125rem;
   padding: 0;
   border: 0;
@@ -365,7 +363,7 @@
 
 .designer-grid-container .card .inspector-body,
 .inspector-body {
-  padding: 0.75rem;
+  padding: 1rem;
   overflow: hidden auto;
 }
 
@@ -401,8 +399,8 @@
   display: grid;
   place-items: center;
   flex: none;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2rem;
+  height: 2rem;
   border-radius: var(--app-radius-sm);
   background: var(--designer-accent-soft);
   color: var(--bs-primary);
@@ -414,8 +412,8 @@
   min-width: 0;
   margin: 0;
   overflow: hidden;
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -477,16 +475,6 @@
 
 /* Touch screens: finger-sized hit areas without changing the compact visuals. */
 @media (pointer: coarse) {
-  .panel-icon-btn,
-  .layer-menu-btn {
-    width: var(--designer-hit-size);
-    height: var(--designer-hit-size);
-  }
-
-  .layer-main {
-    min-height: var(--designer-hit-size);
-  }
-
   .swatch {
     position: relative;
 
@@ -586,8 +574,8 @@
 .swatch {
   display: inline-grid;
   place-items: center;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 2rem;
+  height: 2rem;
   padding: 0;
   border: 1px solid var(--bs-border-color);
   border-radius: var(--app-radius-sm);
@@ -605,12 +593,6 @@
   font-size: var(--designer-text-xs);
 }
 
-@media (pointer: coarse) {
-  .swatch {
-    width: 2rem;
-    height: 2rem;
-  }
-}
 
 /* Single scroll container; auto margins centre the canvas without clipping it when zoomed in. */
 .canvas-wrapper {

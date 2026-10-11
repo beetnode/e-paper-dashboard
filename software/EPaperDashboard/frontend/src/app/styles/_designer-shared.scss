@@ -12,10 +12,14 @@ app-dashboard-designer {
 --designer-shadow-sm: 0 0.25rem 0.75rem color-mix(in srgb, var(--bs-black) 12%, transparent);
 --designer-shadow-lg: 0 0.5rem 1.5rem color-mix(in srgb, var(--bs-black) 18%, transparent);
 --designer-overlay-bg: color-mix(in srgb, var(--bs-dark) 86%, transparent);
+/* Type follows Bootstrap's scale: badges/meta, .small/form-text, body. */
 --designer-text-xs: 0.75rem;
---designer-text-sm: 0.8125rem;
---designer-text-md: 0.875rem;
---designer-hit-size: 2.75rem;
+--designer-text-sm: 0.875rem;
+--designer-text-md: 1rem;
+/* Same as .app-icon-button and full-size form controls. */
+--designer-hit-size: var(--app-control-min-height);
+/* Same height as .btn-sm, for controls that sit next to small buttons. */
+--designer-control-sm-height: calc(0.875rem * 1.5 + 0.5rem + 2px);
 
 html[data-bs-theme="dark"] & {
   --designer-backdrop: color-mix(in srgb, var(--bs-black) 60%, transparent);
@@ -399,7 +403,7 @@ html[data-bs-theme="dark"] & {
     flex: 1;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 0.75rem;
+    padding: 1rem;
   }
 }
 

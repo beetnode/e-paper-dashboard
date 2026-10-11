@@ -12,7 +12,7 @@
   <summary class="inspector-section-summary">Title</summary>
   <div class="inspector-section-body">
 <div class="mb-3">
-  <label class="form-label fw-semibold small" [for]="'headerTitle-' + widget.id">Widget title</label>
+  <label class="form-label fw-semibold" [for]="'headerTitle-' + widget.id">Widget title</label>
   <div class="form-check form-switch mb-2">
     <input class="form-check-input" type="checkbox" id="showTitle-{{widget.id}}"
       [checked]="widget.showTitle !== false"
@@ -29,15 +29,15 @@
   <div class="inspector-section-body">
 <div class="row g-2 mb-2">
   <div class="col">
-    <label class="form-label small mb-1">Position</label>
-    <select class="form-select form-select-sm" [(ngModel)]="headerConfig.iconPosition" (ngModelChange)="onPropertyChanged()">
+    <label class="form-label fw-semibold mb-1">Position</label>
+    <select class="form-select" [(ngModel)]="headerConfig.iconPosition" (ngModelChange)="onPropertyChanged()">
       <option [ngValue]="'left'">Left (default)</option>
       <option [ngValue]="'right'">Right</option>
     </select>
   </div>
   <div class="col">
-    <label class="form-label small mb-1">Size (px)</label>
-    <input type="number" class="form-control form-control-sm" [(ngModel)]="headerConfig.iconSize" min="16" max="128" placeholder="32"
+    <label class="form-label fw-semibold mb-1">Size (px)</label>
+    <input type="number" class="form-control" [(ngModel)]="headerConfig.iconSize" min="16" max="128" placeholder="32"
       (ngModelChange)="onPropertyChanged()" />
   </div>
 </div>
@@ -65,20 +65,20 @@
         <span class="flex-grow-1 text-truncate widget-config-grow">
           {{ getBadgeEntityLabel(badge) || 'No entity' }}
         </span>
-        <button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0 py-0 px-1" (click)="removeBadge(i)"
+        <button type="button" class="btn btn-outline-danger app-icon-button flex-shrink-0" (click)="removeBadge(i)"
           [attr.aria-label]="'Remove badge ' + (getBadgeEntityLabel(badge) || (i + 1))">
           <i class="fa-solid fa-trash" aria-hidden="true"></i>
         </button>
       </div>
       <div class="d-flex align-items-center gap-2 mt-1">
         <i class="fa-solid fa-icons text-muted flex-shrink-0 widget-config-icon" aria-hidden="true"></i>
-        <input type="text" class="form-control form-control-sm flex-grow-1 widget-config-grow"
+        <input type="text" class="form-control flex-grow-1 widget-config-grow"
           placeholder="Icon (e.g., fa-thermometer)"
           [(ngModel)]="badge.icon" (ngModelChange)="onPropertyChanged()" />
       </div>
       <div class="d-flex align-items-center gap-2 mt-1">
         <i class="fa-solid fa-link text-muted flex-shrink-0 widget-config-icon" aria-hidden="true"></i>
-        <select class="form-select form-select-sm flex-grow-1 widget-config-grow"
+        <select class="form-select flex-grow-1 widget-config-grow"
           [(ngModel)]="badge.entityId" (ngModelChange)="onPropertyChanged()">
           <option [ngValue]="undefined">No source</option>
           @for (group of getGroupedEntities(); track group.name) {
@@ -96,7 +96,7 @@
     <div class="list-group-item px-2 py-2 text-muted small">No badges configured.</div>
   }
 </div>
-<button type="button" class="btn btn-sm btn-outline-primary w-100 mt-2" (click)="addBadge()">
+<button type="button" class="btn btn-outline-primary w-100 mt-2" (click)="addBadge()">
   <i class="fa-solid fa-plus"></i> Add badge
 </button>
 
@@ -113,8 +113,8 @@
     <label class="form-check-label" for="showGuides-{{widget.id}}">Smart guides</label>
   </div>
   <div class="d-flex align-items-center gap-2">
-    <label class="form-label small mb-0 text-nowrap">Snap</label>
-    <select class="form-select form-select-sm w-auto" [(ngModel)]="headerConfig.snapStep"
+    <label class="form-label fw-semibold mb-0 text-nowrap">Snap</label>
+    <select class="form-select w-auto" [(ngModel)]="headerConfig.snapStep"
       (ngModelChange)="onPropertyChanged()">
       <option [ngValue]="0">Off</option>
       <option [ngValue]="1">1%</option>
@@ -171,7 +171,7 @@
       @if (getDefaultCalendarEventItemIcon(item)) {
         <div class="d-flex align-items-center gap-2 mt-1">
           <i class="fa {{ item.icon || getDefaultCalendarEventItemIcon(item) }} text-muted flex-shrink-0 widget-config-icon" aria-hidden="true"></i>
-          <input type="text" class="form-control form-control-sm flex-grow-1 widget-config-grow"
+          <input type="text" class="form-control flex-grow-1 widget-config-grow"
             placeholder="{{ getDefaultCalendarEventItemIcon(item) }}"
             [(ngModel)]="item.icon"
             (ngModelChange)="onPropertyChanged()" />
@@ -187,13 +187,13 @@
   <div class="inspector-section-body">
 <div class="row g-2">
   <div class="col">
-    <label class="form-label small mb-1">Max events</label>
-    <input type="number" class="form-control form-control-sm" [(ngModel)]="calendarConfig.maxEvents" min="1" max="20"
+    <label class="form-label fw-semibold mb-1">Max events</label>
+    <input type="number" class="form-control" [(ngModel)]="calendarConfig.maxEvents" min="1" max="20"
       (ngModelChange)="onPropertyChanged()" />
   </div>
   <div class="col">
-    <label class="form-label small mb-1">Event gap (px)</label>
-    <input type="number" class="form-control form-control-sm"
+    <label class="form-label fw-semibold mb-1">Event gap (px)</label>
+    <input type="number" class="form-control"
       id="calEventGap-{{widget.id}}" min="0" step="1"
       [(ngModel)]="calendarConfig.eventGap"
       (ngModelChange)="onPropertyChanged()" placeholder="0" />
@@ -233,7 +233,7 @@
       </div>
       <div class="d-flex align-items-center gap-2 mt-1">
         <i class="fa {{ item.icon || getDefaultWeatherItemIcon(item) }} text-muted flex-shrink-0 widget-config-icon" aria-hidden="true"></i>
-        <input type="text" class="form-control form-control-sm flex-grow-1 widget-config-grow"
+        <input type="text" class="form-control flex-grow-1 widget-config-grow"
           placeholder="{{ getDefaultWeatherItemIcon(item) }}"
           [(ngModel)]="item.icon"
           (ngModelChange)="onPropertyChanged()" />
@@ -255,8 +255,8 @@
     <label class="form-check-label" for="wShowGuides-{{widget.id}}">Smart guides</label>
   </div>
   <div class="d-flex align-items-center gap-2">
-    <label class="form-label small mb-0 text-nowrap">Snap</label>
-    <select class="form-select form-select-sm w-auto" [(ngModel)]="weatherConfig.snapStep"
+    <label class="form-label fw-semibold mb-0 text-nowrap">Snap</label>
+    <select class="form-select w-auto" [(ngModel)]="weatherConfig.snapStep"
       (ngModelChange)="onPropertyChanged()">
       <option [ngValue]="0">Off</option>
       <option [ngValue]="1">1%</option>
@@ -278,7 +278,7 @@
 <app-entity-source-selector [value]="weatherForecastConfig.entityId" [entities]="getFilteredEntities()"
   [loading]="loadingEntities()" (valueChange)="updateEntityId($event)" />
 <div class="mb-3">
-  <label class="form-label fw-semibold small">Forecast type</label>
+  <label class="form-label fw-semibold">Forecast type</label>
   <select class="form-select" [(ngModel)]="weatherForecastConfig.forecastMode" (ngModelChange)="onPropertyChanged()">
     <option value="daily">Daily</option>
     <option value="hourly">Hourly</option>
@@ -317,14 +317,14 @@
   <div class="inspector-section-body">
 <div class="row g-2">
   <div class="col">
-    <label class="form-label small mb-1">Max items</label>
-    <input type="number" class="form-control form-control-sm" [(ngModel)]="weatherForecastConfig.maxItems" min="1" max="14" placeholder="Auto"
+    <label class="form-label fw-semibold mb-1">Max items</label>
+    <input type="number" class="form-control" [(ngModel)]="weatherForecastConfig.maxItems" min="1" max="14" placeholder="Auto"
       (ngModelChange)="onPropertyChanged()" />
     <small class="form-text text-muted">Leave empty for auto</small>
   </div>
   <div class="col">
-    <label class="form-label small mb-1">Row gap (px)</label>
-    <input type="number" class="form-control form-control-sm" [(ngModel)]="weatherForecastConfig.rowGap" min="0" placeholder="0"
+    <label class="form-label fw-semibold mb-1">Row gap (px)</label>
+    <input type="number" class="form-control" [(ngModel)]="weatherForecastConfig.rowGap" min="0" placeholder="0"
       (ngModelChange)="onPropertyChanged()" />
   </div>
 </div>
@@ -350,16 +350,16 @@
         <div class="card-body p-3">
           <div class="d-flex justify-content-between align-items-start mb-2">
             <h6 class="card-subtitle text-muted mb-0">Series {{ idx + 1 }}</h6>
-            <button type="button" class="btn btn-sm btn-link text-danger p-0" (click)="removeGraphSeries(idx)" title="Remove series">
-              <i class="fa-solid fa-times-circle"></i>
+            <button type="button" class="btn btn-outline-danger app-icon-button" (click)="removeGraphSeries(idx)" title="Remove series" [attr.aria-label]="'Remove series ' + (idx + 1)">
+              <i class="fa-solid fa-trash" aria-hidden="true"></i>
             </button>
           </div>
           
           <div class="row g-2">
             <!-- Entity Selection -->
             <div class="col-12">
-              <label class="form-label small mb-1">Source</label>
-              <select class="form-select form-select-sm" [(ngModel)]="series.entityId" (ngModelChange)="onPropertyChanged()">
+              <label class="form-label fw-semibold mb-1">Source</label>
+              <select class="form-select" [(ngModel)]="series.entityId" (ngModelChange)="onPropertyChanged()">
                 <option value="">Select source…</option>
                 @for (group of getGroupedEntities(); track group.name) {
                   <optgroup [label]="group.name">
@@ -373,14 +373,14 @@
             
             <!-- Label and Color -->
             <div class="col-8">
-              <label class="form-label small mb-1">Label</label>
-              <input type="text" class="form-control form-control-sm" [(ngModel)]="series.label" (ngModelChange)="onPropertyChanged()" [placeholder]="series.entityId || 'Optional label'" />
+              <label class="form-label fw-semibold mb-1">Label</label>
+              <input type="text" class="form-control" [(ngModel)]="series.label" (ngModelChange)="onPropertyChanged()" [placeholder]="series.entityId || 'Optional label'" />
               <small class="form-text text-muted d-block mt-1">Leave empty to use the source name</small>
             </div>
             
             <div class="col-4">
-              <label class="form-label small mb-1">Color</label>
-              <select class="form-select form-select-sm" [(ngModel)]="series.color" (ngModelChange)="onPropertyChanged()">
+              <label class="form-label fw-semibold mb-1">Color</label>
+              <select class="form-select" [(ngModel)]="series.color" (ngModelChange)="onPropertyChanged()">
                 <option [value]="null">Auto</option>
                 @for (color of colorScheme?.palette; track color) {
                   <option [value]="color">{{ getColorName(color) }}</option>
@@ -393,7 +393,7 @@
     }
   </div>
 }
-<button type="button" class="btn btn-primary btn-sm w-100" (click)="addGraphSeries()">
+<button type="button" class="btn btn-outline-primary w-100" (click)="addGraphSeries()">
   <i class="fa-solid fa-plus"></i> Add series
 </button>
 
@@ -404,8 +404,8 @@
   <div class="inspector-section-body">
 <div class="row g-2 mb-2">
   <div class="col">
-    <label class="form-label small mb-1">Period</label>
-    <select class="form-select form-select-sm" [(ngModel)]="graphConfig.period" (ngModelChange)="onPropertyChanged()">
+    <label class="form-label fw-semibold mb-1">Period</label>
+    <select class="form-select" [(ngModel)]="graphConfig.period" (ngModelChange)="onPropertyChanged()">
       <option value="1h">1 hour</option>
       <option value="6h">6 hours</option>
       <option value="24h">24 hours</option>
@@ -414,8 +414,8 @@
     </select>
   </div>
   <div class="col">
-    <label class="form-label small mb-1">Plot type</label>
-    <select class="form-select form-select-sm" [(ngModel)]="graphConfig.plotType" (ngModelChange)="onPropertyChanged()">
+    <label class="form-label fw-semibold mb-1">Plot type</label>
+    <select class="form-select" [(ngModel)]="graphConfig.plotType" (ngModelChange)="onPropertyChanged()">
       <option value="line">Line chart</option>
       <option value="bar">Bar chart</option>
     </select>
@@ -423,15 +423,15 @@
 </div>
 @if (graphConfig.plotType === 'line') {
 <div>
-  <label class="form-label small mb-1">Line width (px)</label>
-  <input type="number" class="form-control form-control-sm" [(ngModel)]="graphConfig.lineWidth" (ngModelChange)="onPropertyChanged()" min="1" max="10" placeholder="2" />
+  <label class="form-label fw-semibold mb-1">Line width (px)</label>
+  <input type="number" class="form-control" [(ngModel)]="graphConfig.lineWidth" (ngModelChange)="onPropertyChanged()" min="1" max="10" placeholder="2" />
   <small class="form-text text-muted">Default: 2px</small>
 </div>
 }
 @if (graphConfig.plotType === 'bar') {
 <div>
-  <label class="form-label small mb-1">Bar width</label>
-  <input type="number" class="form-control form-control-sm" [(ngModel)]="graphConfig.barWidth" (ngModelChange)="onPropertyChanged()" min="1" max="20" placeholder="Auto" />
+  <label class="form-label fw-semibold mb-1">Bar width</label>
+  <input type="number" class="form-control" [(ngModel)]="graphConfig.barWidth" (ngModelChange)="onPropertyChanged()" min="1" max="20" placeholder="Auto" />
   <small class="form-text text-muted">Leave empty for automatic width</small>
 </div>
 }
@@ -459,8 +459,8 @@
   </label>
 </div>
 <div class="mb-3">
-  <label class="form-label small mb-1">Max items</label>
-  <input type="number" class="form-control form-control-sm" [(ngModel)]="todoConfig.maxItems" min="1" max="50"
+  <label class="form-label fw-semibold mb-1">Max items</label>
+  <input type="number" class="form-control" [(ngModel)]="todoConfig.maxItems" min="1" max="50"
     (ngModelChange)="onPropertyChanged()" placeholder="Auto" />
   <small class="form-text text-muted">Leave empty to show as many as fit in the widget</small>
 </div>
@@ -476,7 +476,7 @@
     </div>
     <div class="d-flex align-items-center gap-2 mt-1">
       <i class="fa {{ todoConfig.pendingIcon || 'fa-circle' }} text-muted flex-shrink-0 widget-config-icon" aria-hidden="true"></i>
-      <input type="text" class="form-control form-control-sm flex-grow-1 widget-config-grow"
+      <input type="text" class="form-control flex-grow-1 widget-config-grow"
         placeholder="fa-circle"
         [(ngModel)]="todoConfig.pendingIcon"
         (ngModelChange)="onPropertyChanged()" />
@@ -488,7 +488,7 @@
     </div>
     <div class="d-flex align-items-center gap-2 mt-1">
       <i class="fa {{ todoConfig.completedIcon || 'fa-check-circle' }} text-muted flex-shrink-0 widget-config-icon" aria-hidden="true"></i>
-      <input type="text" class="form-control form-control-sm flex-grow-1 widget-config-grow"
+      <input type="text" class="form-control flex-grow-1 widget-config-grow"
         placeholder="fa-check-circle"
         [(ngModel)]="todoConfig.completedIcon"
         (ngModelChange)="onPropertyChanged()" />
@@ -515,8 +515,8 @@
   <summary class="inspector-section-summary">Icon</summary>
   <div class="inspector-section-body">
 <div class="mb-2">
-  <label class="form-label small mb-1">Size (px)</label>
-  <input type="number" class="form-control form-control-sm" [(ngModel)]="appIconConfig.size" min="16" max="256"
+  <label class="form-label fw-semibold mb-1">Size (px)</label>
+  <input type="number" class="form-control" [(ngModel)]="appIconConfig.size" min="16" max="256"
     (ngModelChange)="onPropertyChanged()" />
 </div>
 <div class="form-check form-switch">
@@ -542,14 +542,14 @@
   <summary class="inspector-section-summary">Image source</summary>
   <div class="inspector-section-body">
 <div class="d-flex gap-2 mb-2">
-  <button type="button" class="btn btn-sm btn-outline-primary flex-grow-1" (click)="imageFileInput.click()">
+  <button type="button" class="btn btn-outline-primary flex-grow-1" (click)="imageFileInput.click()">
     <i class="fa-solid fa-upload"></i> From file
   </button>
-  <button type="button" class="btn btn-sm btn-outline-secondary flex-grow-1" (click)="showImageUrlInput = !showImageUrlInput">
+  <button type="button" class="btn btn-outline-secondary flex-grow-1" (click)="showImageUrlInput = !showImageUrlInput">
     <i class="fa-solid fa-link"></i> From URL
   </button>
   @if (widget.config.imageUrl) {
-  <button type="button" class="btn btn-sm btn-outline-danger app-icon-button" (click)="clearUploadedImage()" aria-label="Clear image">
+  <button type="button" class="btn btn-outline-danger app-icon-button" (click)="clearUploadedImage()" aria-label="Clear image">
     <i class="fa-solid fa-trash" aria-hidden="true"></i>
   </button>
   }
@@ -557,7 +557,7 @@
 <input #imageFileInput type="file" accept="image/*" class="d-none"
   (change)="onImageFileSelected($event)" />
 @if (showImageUrlInput) {
-<div class="input-group input-group-sm mb-2">
+<div class="input-group mb-2">
   <input type="text" class="form-control" [(ngModel)]="imageUrlValue"
     placeholder="https://example.com/image.png" />
   <button type="button" class="btn btn-outline-primary" [disabled]="!imageUrlValue || imageUploading"
@@ -583,14 +583,14 @@
   <summary class="inspector-section-summary">Framing</summary>
   <div class="inspector-section-body">
 <div class="mb-2">
-  <label class="form-label small mb-1">Zoom ({{ (widget.config.zoom || 1) | number:'1.1-1' }}x)</label>
+  <label class="form-label fw-semibold mb-1">Zoom ({{ (widget.config.zoom || 1) | number:'1.1-1' }}x)</label>
   <input type="range" class="form-range" min="1" max="5" step="0.1"
     [ngModel]="widget.config.zoom || 1"
     (ngModelChange)="widget.config.zoom = $event; onPropertyChanged()" />
 </div>
 @if (widget.config.zoom && widget.config.zoom > 1) {
 <div class="mb-2">
-  <label class="form-label small mb-1">Horizontal position ({{ (widget.config.offsetX ?? 0) | number:'1.1-1' }})</label>
+  <label class="form-label fw-semibold mb-1">Horizontal position ({{ (widget.config.offsetX ?? 0) | number:'1.1-1' }})</label>
   <input type="range" class="form-range" min="-1" max="1" step="0.05"
     [ngModel]="widget.config.offsetX ?? 0"
     (ngModelChange)="widget.config.offsetX = $event; onPropertyChanged()" />
@@ -599,7 +599,7 @@
   </div>
 </div>
 <div class="mb-2">
-  <label class="form-label small mb-1">Vertical position ({{ (widget.config.offsetY ?? 0) | number:'1.1-1' }})</label>
+  <label class="form-label fw-semibold mb-1">Vertical position ({{ (widget.config.offsetY ?? 0) | number:'1.1-1' }})</label>
   <input type="range" class="form-range" min="-1" max="1" step="0.05"
     [ngModel]="widget.config.offsetY ?? 0"
     (ngModelChange)="widget.config.offsetY = $event; onPropertyChanged()" />
@@ -637,15 +637,15 @@
   <div class="inspector-section-body">
 <app-widget-title-config [widget]="widget" (widgetChange)="applyWidgetChange($event)" />
 <div class="mb-3">
-  <label class="form-label fw-semibold small">AI prompt</label>
+  <label class="form-label fw-semibold">AI prompt</label>
   <textarea class="form-control" rows="4" [(ngModel)]="aiContentConfig.prompt"
     (ngModelChange)="onPropertyChanged()"
     placeholder="e.g. 'Write a motivational quote for today'"></textarea>
   <small class="form-text text-muted">Describe what content the AI should generate</small>
 </div>
 <div class="mb-3">
-  <label class="form-label fw-semibold small">Data access</label>
-  <select class="form-select form-select-sm"
+  <label class="form-label fw-semibold">Data access</label>
+  <select class="form-select"
     [ngModel]="aiContentConfig.dataScope || 'dashboard'"
     (ngModelChange)="aiContentConfig.dataScope = $event; onPropertyChanged()">
     <option value="dashboard">Dashboard data</option>
@@ -654,7 +654,7 @@
   <small class="form-text text-muted">Choose whether source states, calendars, tasks, weather, and feeds are sent with the prompt.</small>
 </div>
 <div class="mb-3">
-  <button class="btn btn-sm btn-outline-primary" type="button"
+  <button class="btn btn-outline-primary" type="button"
     (click)="generateAiContent()"
     [disabled]="generatingAiContent() || !aiContentConfig.prompt">
     @if (generatingAiContent()) {

@@ -81,14 +81,14 @@
           </label>
         </div>
       </div>
-      <button type="button" class="btn btn-sm btn-outline-secondary app-icon-button" (click)="discardChanges()" [disabled]="!isDirty()" aria-label="Discard layout changes">
+      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="discardChanges()" [disabled]="!isDirty()" aria-label="Discard layout changes">
         <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
       </button>
-      <button type="button" class="btn btn-sm btn-primary app-icon-button" (click)="saveDashboard()" [disabled]="!isDirty()" aria-label="Save layout">
+      <button type="button" class="btn btn-sm btn-primary" (click)="saveDashboard()" [disabled]="!isDirty()" aria-label="Save layout">
         <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
       </button>
       <div class="mobile-overflow-menu">
-        <button type="button" class="btn btn-sm btn-outline-secondary app-icon-button" (click)="mobileOverflowOpen.set(!mobileOverflowOpen())"
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="mobileOverflowOpen.set(!mobileOverflowOpen())"
           aria-label="More designer actions" [attr.aria-expanded]="mobileOverflowOpen()">
           <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
         </button>
@@ -438,7 +438,7 @@
     <div class="app-empty-state app-empty-state-compact">
       <span class="app-empty-state-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>
       <p class="mb-0">No widgets yet.</p>
-      <button type="button" class="btn btn-sm btn-primary" (click)="openPicker()">
+      <button type="button" class="btn btn-primary" (click)="openPicker()">
         <i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add widget
       </button>
     </div>
@@ -494,7 +494,7 @@
         <i class="fa-solid fa-plus" aria-hidden="true"></i>
       </button>
     </div>
-    <button type="button" class="btn btn-sm btn-outline-secondary app-icon-button" (click)="refreshLivePreview()" [disabled]="renderedCanvasLoading()" aria-label="Refresh device preview and source data" title="Refresh preview and source data">
+    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="refreshLivePreview()" [disabled]="renderedCanvasLoading()" aria-label="Refresh device preview and source data" title="Refresh preview and source data">
       @if (renderedCanvasLoading()) {
       <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
       } @else {
@@ -545,7 +545,7 @@
       </button>
       <div class="collapsible-actions">
         @if (hasLayoutColorOverrides()) {
-        <button type="button" class="btn btn-sm btn-outline-secondary app-icon-button" (click)="resetLayoutColorOverrides()"
+        <button type="button" class="btn btn-sm btn-outline-secondary" (click)="resetLayoutColorOverrides()"
           title="Reset layout colors to scheme defaults" aria-label="Reset layout colors to scheme defaults">
           <i class="fa-solid fa-undo" aria-hidden="true"></i>
         </button>
@@ -579,15 +579,15 @@
     @if (!layoutCollapsed()) {
     <div id="layoutPanel" class="collapsible-body">
       <div class="mb-2">
-        <label class="form-label small">Orientation</label>
+        <label class="form-label fw-semibold">Orientation</label>
         <div class="btn-group d-flex" role="group">
-          <button type="button" class="btn btn-sm flex-grow-1"
+          <button type="button" class="btn flex-grow-1"
             [class.btn-secondary]="orientation() === 'Landscape'"
             [class.btn-outline-secondary]="orientation() !== 'Landscape'"
             (click)="setOrientation('Landscape')">
             <i class="fa-solid fa-display"></i> Landscape
           </button>
-          <button type="button" class="btn btn-sm flex-grow-1"
+          <button type="button" class="btn flex-grow-1"
             [class.btn-secondary]="orientation() === 'Portrait'"
             [class.btn-outline-secondary]="orientation() !== 'Portrait'"
             (click)="setOrientation('Portrait')">
@@ -596,8 +596,8 @@
         </div>
       </div>
       <div class="mb-2">
-        <label class="form-label small">Screen Size</label>
-        <select class="form-select form-select-sm" [(ngModel)]="selectedSizeIndex" (ngModelChange)="onSizeChange()">
+        <label class="form-label fw-semibold">Screen Size</label>
+        <select class="form-select" [(ngModel)]="selectedSizeIndex" (ngModelChange)="onSizeChange()">
           @for (size of sizePresets; track size.label; let i = $index) {
             <option [ngValue]="i">{{ size.label }}</option>
           }
@@ -605,33 +605,33 @@
       </div>
       <div class="designer-field-grid">
         <label class="designer-field">
-          <span class="form-label small">Columns</span>
-          <input type="number" class="form-control form-control-sm" [ngModel]="layout().gridCols"
+          <span class="form-label fw-semibold">Columns</span>
+          <input type="number" class="form-control" [ngModel]="layout().gridCols"
             (ngModelChange)="updateLayoutGridCols($event)" min="1" />
         </label>
         <label class="designer-field">
-          <span class="form-label small">Rows</span>
-          <input type="number" class="form-control form-control-sm" [ngModel]="layout().gridRows"
+          <span class="form-label fw-semibold">Rows</span>
+          <input type="number" class="form-control" [ngModel]="layout().gridRows"
             (ngModelChange)="updateLayoutGridRows($event)" min="1" />
         </label>
         <label class="designer-field">
-          <span class="form-label small">Canvas padding</span>
-          <input type="number" class="form-control form-control-sm" [ngModel]="layout().canvasPadding"
+          <span class="form-label fw-semibold">Canvas padding</span>
+          <input type="number" class="form-control" [ngModel]="layout().canvasPadding"
             (ngModelChange)="updateCanvasPadding($event)" min="0" max="128" />
         </label>
         <label class="designer-field">
-          <span class="form-label small">Widget gap</span>
-          <input type="number" class="form-control form-control-sm" [ngModel]="layout().widgetGap"
+          <span class="form-label fw-semibold">Widget gap</span>
+          <input type="number" class="form-control" [ngModel]="layout().widgetGap"
             (ngModelChange)="updateWidgetGap($event)" min="0" max="64" />
         </label>
         <label class="designer-field">
-          <span class="form-label small">Border (px)</span>
-          <input type="number" class="form-control form-control-sm" [ngModel]="layout().widgetBorder"
+          <span class="form-label fw-semibold">Border (px)</span>
+          <input type="number" class="form-control" [ngModel]="layout().widgetBorder"
             (ngModelChange)="updateWidgetBorder($event)" min="0" max="20" />
         </label>
         <label class="designer-field">
-          <span class="form-label small">Widget padding</span>
-          <input type="number" class="form-control form-control-sm" [ngModel]="layout().widgetPadding"
+          <span class="form-label fw-semibold">Widget padding</span>
+          <input type="number" class="form-control" [ngModel]="layout().widgetPadding"
             (ngModelChange)="updateWidgetPadding($event)" min="0" max="32" />
         </label>
       </div>
@@ -648,26 +648,26 @@
     <div id="typographyPanel" class="collapsible-body">
       <div class="designer-field-grid">
         <label class="designer-field">
-          <span class="form-label small">Title size (px)</span>
-          <input type="number" class="form-control form-control-sm" [ngModel]="layout().titleFontSize"
+          <span class="form-label fw-semibold">Title size (px)</span>
+          <input type="number" class="form-control" [ngModel]="layout().titleFontSize"
             (ngModelChange)="updateTitleFontSize($event)" min="8" max="72" placeholder="16" />
         </label>
         <label class="designer-field">
-          <span class="form-label small">Title weight</span>
-          <select class="form-select form-select-sm" [ngModel]="layout().titleFontWeight || 700"
+          <span class="form-label fw-semibold">Title weight</span>
+          <select class="form-select" [ngModel]="layout().titleFontWeight || 700"
             (ngModelChange)="updateTitleFontWeight($event)">
             <option [value]="400">Regular</option>
             <option [value]="700">Bold</option>
           </select>
         </label>
         <label class="designer-field">
-          <span class="form-label small">Text size (px)</span>
-          <input type="number" class="form-control form-control-sm" [ngModel]="layout().textFontSize"
+          <span class="form-label fw-semibold">Text size (px)</span>
+          <input type="number" class="form-control" [ngModel]="layout().textFontSize"
             (ngModelChange)="updateTextFontSize($event)" min="6" max="48" placeholder="14" />
         </label>
         <label class="designer-field">
-          <span class="form-label small">Text weight</span>
-          <select class="form-select form-select-sm" [ngModel]="layout().textFontWeight || 400"
+          <span class="form-label fw-semibold">Text weight</span>
+          <select class="form-select" [ngModel]="layout().textFontWeight || 400"
             (ngModelChange)="updateTextFontWeight($event)">
             <option [value]="400">Regular</option>
             <option [value]="700">Bold</option>
@@ -695,15 +695,15 @@
         </div>
       }
       <div class="mb-3">
-        <label class="form-label fw-semibold small">Prompt</label>
-        <textarea class="form-control form-control-sm" rows="4"
+        <label class="form-label fw-semibold">Prompt</label>
+        <textarea class="form-control" rows="4"
           [value]="aiPrompt()"
           (input)="onAiPromptChange($any($event.target).value)"
           placeholder="e.g. 'Show today's weather, calendar events, and a motivational quote'"></textarea>
       </div>
       <div class="mb-3">
-        <label class="form-label fw-semibold small">Pre-generation Lead Time</label>
-        <div class="input-group input-group-sm">
+        <label class="form-label fw-semibold">Pre-generation Lead Time</label>
+        <div class="input-group">
           <input type="number" class="form-control"
             [value]="aiLeadTimeMinutes()"
             (input)="onAiLeadTimeChange($any($event.target).value)"
@@ -715,7 +715,7 @@
         }
       </div>
       <div class="mb-3">
-        <button class="btn btn-sm btn-primary w-100" (click)="generateAiContent()" [disabled]="isGeneratingAi() || aiConfigMode() === 'None' || !aiPrompt() || isDirty()"
+        <button class="btn btn-primary w-100" (click)="generateAiContent()" [disabled]="isGeneratingAi() || aiConfigMode() === 'None' || !aiPrompt() || isDirty()"
           [title]="isDirty() ? 'Save your changes before generating' : ''">
           @if (isGeneratingAi()) {
             <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
@@ -761,7 +761,7 @@
 <ng-template #propertiesContent>
   @if (selectedWidget()) {
   @if (selectedWidgetSupportsElementEditing()) {
-    <button type="button" class="btn btn-sm w-100 mb-2"
+    <button type="button" class="btn w-100 mb-2"
       [ngClass]="elementEditingWidgetId() === selectedWidget()!.id ? 'btn-success' : 'btn-outline-primary'"
       [disabled]="renderedCanvasLoading() || !selectedWidgetGeometry()"
       (click)="toggleElementEditing(selectedWidget()!)">

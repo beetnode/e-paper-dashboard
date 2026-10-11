@@ -1,6 +1,6 @@
 <div class="picker-search">
   <i class="fa fa-magnifying-glass" aria-hidden="true"></i>
-  <input #search type="search" class="form-control form-control-sm" placeholder="Search widgets"
+  <input #search type="search" class="form-control" placeholder="Search widgets"
     aria-label="Search widgets" [value]="query()" (input)="query.set($any($event.target).value)"
     (keydown)="onSearchKeydown($event)" />
 </div>

@@ -32,7 +32,7 @@ export function groupByConnection<T extends { connectionName?: string }>(sources
   imports: [FormsModule],
   template: `
     <div class="mb-3">
-      <label class="form-label fw-semibold small" for="entitySourceSelect">Data source</label>
+      <label class="form-label fw-semibold" for="entitySourceSelect">Data source</label>
       @if (loading) {
         <div class="text-muted small" role="status"><i class="fa fa-spinner fa-spin me-1" aria-hidden="true"></i>Loading sources…</div>
       } @else if (entities.length === 0) {
@@ -41,7 +41,7 @@ export function groupByConnection<T extends { connectionName?: string }>(sources
         </div>
       } @else {
         @if (entities.length > 8) {
-          <input class="form-control form-control-sm mb-2" type="search" placeholder="Filter sources…" aria-label="Filter available data sources"
+          <input class="form-control mb-2" type="search" placeholder="Filter sources…" aria-label="Filter available data sources"
             [ngModel]="query()" (ngModelChange)="query.set($event)" />
         }
         <select id="entitySourceSelect" class="form-select" [ngModel]="value" (ngModelChange)="valueChange.emit($event)">

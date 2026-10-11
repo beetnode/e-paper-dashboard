@@ -8,7 +8,7 @@ import { WidgetConfig } from '../../models/types';
   imports: [FormsModule],
   template: `
     <div class="mb-3">
-      <label class="form-label fw-semibold small" [for]="'widgetTitle-' + widget.id">Widget title</label>
+      <label class="form-label fw-semibold" [for]="'widgetTitle-' + widget.id">Widget title</label>
       <div class="form-check form-switch mb-2">
         <input class="form-check-input" type="checkbox" [id]="'showTitle-' + widget.id"
           [checked]="widget.showTitle !== false" (change)="setVisible($event)" />
