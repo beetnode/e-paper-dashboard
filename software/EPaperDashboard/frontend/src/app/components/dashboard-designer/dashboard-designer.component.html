@@ -26,7 +26,7 @@
           aria-haspopup="dialog" [attr.aria-expanded]="pickerOpen()" title="Add widget (A)">
           <i class="fa-solid fa-plus" aria-hidden="true"></i><span class="d-none d-xl-inline ms-1">Add widget</span>
         </button>
-        @if (pickerOpen() && !usesDrawer()) {
+        @if (pickerOpen() && !usesDrawer() && pickerAnchor() === 'toolbar') {
         <div class="picker-popover" role="dialog" aria-label="Add widget" cdkTrapFocus>
           <app-widget-picker [definitions]="availableWidgets" [recentTypes]="recentWidgetTypes()"
             (pick)="addWidgetToFirstSlot($event)" (dragStart)="onPickerDragStart($event)" />
@@ -295,6 +295,15 @@
   (reload)="openRenderedPreview()">
 </app-rendered-preview-modal>
 
+<!-- Widget picker beside the layers panel (desktop) -->
+@if (pickerOpen() && !usesDrawer() && pickerAnchor() === 'layers') {
+  <div class="picker-popover picker-popover-beside" role="dialog" aria-label="Add widget" cdkTrapFocus
+    [style.top.px]="pickerPosition().top" [style.left.px]="pickerPosition().left">
+    <app-widget-picker [definitions]="availableWidgets" [recentTypes]="recentWidgetTypes()"
+      (pick)="addWidgetToFirstSlot($event)" (dragStart)="onPickerDragStart($event)" />
+  </div>
+}
+
 <!-- Phone bottom bar -->
 @if (isMobile() && !isLoading() && dashboard()) {
   <nav class="mobile-bottom-bar" aria-label="Designer">
@@ -438,7 +447,7 @@
     <div class="app-empty-state app-empty-state-compact">
       <span class="app-empty-state-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>
       <p class="mb-0">No widgets yet.</p>
-      <button type="button" data-opens-picker class="btn btn-primary" (click)="openPicker()">
+      <button type="button" data-opens-picker class="btn btn-primary" (click)="openPickerBesideLayers($event)">
         <i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add widget
       </button>
     </div>
@@ -473,7 +482,7 @@
         </li>
       }
     </ul>
-    <button type="button" data-opens-picker class="layers-add" (click)="openPicker()">
+    <button type="button" data-opens-picker class="layers-add" (click)="openPickerBesideLayers($event)">
       <i class="fa-solid fa-plus" aria-hidden="true"></i> Add widget
     </button>
   }

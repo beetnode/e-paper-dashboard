@@ -131,6 +131,9 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   layersDrawerOpen = signal(false);
   inspectorDrawerOpen = signal(false);
   pickerOpen = signal(false);
+  /** Where the desktop picker popover is shown: under the toolbar button or beside the layers panel. */
+  pickerAnchor = signal<'toolbar' | 'layers'>('toolbar');
+  pickerPosition = signal({ top: 0, left: 0 });
   hoveredWidgetId = signal<string | null>(null);
   layerMenuWidgetId = signal<string | null>(null);
   sourceDetailsOpen = signal(false);
@@ -266,6 +269,8 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       this.viewportWidth.set(window.innerWidth);
       const isWide = this.viewportWidth() >= LAYERS_PANEL_MIN_WIDTH;
       if (wasWide !== isWide) this.layersOpen.set(isWide);
+      // A popover beside the layers panel would be left at a stale position.
+      if (this.pickerAnchor() === 'layers') this.pickerOpen.set(false);
       this.isMobile.set(this.checkIsMobile());
       if (!this.usesDrawer()) {
         this.inspectorDrawerOpen.set(false);
@@ -497,12 +502,33 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   openPicker(): void {
     this.mobileOverflowOpen.set(false);
     this.layerMenuWidgetId.set(null);
+    this.pickerAnchor.set('toolbar');
     this.pickerOpen.set(true);
   }
 
   togglePicker(): void {
-    if (this.pickerOpen()) this.pickerOpen.set(false);
+    if (this.pickerOpen() && this.pickerAnchor() === 'toolbar') this.pickerOpen.set(false);
     else this.openPicker();
+  }
+
+  /**
+   * Opens the picker next to the layers panel, aligned with the button that opened it and kept
+   * inside the window. Drawers (tablets, phones) use the bottom sheet instead.
+   */
+  openPickerBesideLayers(event: Event): void {
+    const panel = (event.currentTarget as HTMLElement).closest('.designer-panel-left');
+    if (this.usesDrawer() || !panel) {
+      this.openPicker();
+      return;
+    }
+    const margin = 8;
+    const panelRect = panel.getBoundingClientRect();
+    const triggerRect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const popoverHeight = Math.min(window.innerHeight * 0.7, 544);
+    const top = Math.max(margin, Math.min(triggerRect.top, window.innerHeight - popoverHeight - margin));
+    this.openPicker();
+    this.pickerAnchor.set('layers');
+    this.pickerPosition.set({ top, left: panelRect.right + margin });
   }
 
   openInspector(): void {

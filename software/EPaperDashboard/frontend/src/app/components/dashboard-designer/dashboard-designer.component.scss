@@ -490,6 +490,11 @@
   }
 }
 
+/* Opened from the layers panel: fixed so the panel's clipping does not cut it off. */
+.picker-popover.picker-popover-beside {
+  position: fixed;
+}
+
 .hover-overlay {
   outline: 2px dashed var(--designer-accent-strong);
   outline-offset: -2px;
