@@ -107,6 +107,146 @@ body {
   font-size: 0.9rem;
 }
 
+/* Section title with actions on the right, wrapping under the title on narrow screens. */
+.app-section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1rem;
+
+  > :first-child {
+    min-width: 0;
+  }
+
+  .app-section-description {
+    margin-bottom: 0;
+  }
+}
+
+.app-section-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+/* Page-level actions: Discard appears only with unsaved changes, so it doubles as the change indicator. */
+.app-page-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* Rows of entities (dashboards, devices, connections, users). */
+.app-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.app-list-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--app-radius);
+  background: var(--bs-body-bg);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+
+  &:hover,
+  &:focus-within {
+    border-color: var(--bs-primary-border-subtle);
+  }
+}
+
+/* A row whose main area is a link stretches the link over the padding. */
+.app-list-item-link {
+  min-width: 0;
+  margin: -0.875rem 0 -0.875rem -1rem;
+  padding: 0.875rem 0 0.875rem 1rem;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--app-radius) 0 0 var(--app-radius);
+
+  &:hover .app-list-item-title {
+    color: var(--bs-primary);
+  }
+
+  &:focus-visible {
+    outline-offset: -3px;
+  }
+}
+
+.app-list-item-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.625rem;
+  min-width: 0;
+}
+
+.app-list-item-title {
+  margin: 0;
+  overflow: hidden;
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-list-item-description {
+  margin: 0.25rem 0 0;
+  overflow: hidden;
+  color: var(--bs-secondary-color);
+  font-size: 0.875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-list-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-top: 0.5rem;
+  color: var(--bs-secondary-color);
+  font-size: 0.8125rem;
+
+  i {
+    margin-right: 0.25rem;
+  }
+}
+
+.app-list-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.375rem;
+}
+
+.app-list-item-body {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 575.98px) {
+  .app-list-item-title {
+    white-space: normal;
+  }
+
+  .app-list-item-wrap {
+    grid-template-columns: minmax(0, 1fr);
+
+    .app-list-item-actions {
+      justify-content: flex-start;
+    }
+  }
+}
+
 .app-action-bar {
   position: sticky;
   top: 0;
@@ -149,6 +289,16 @@ body {
 .app-status-chip-muted {
   color: var(--bs-secondary-color);
   background: var(--bs-secondary-bg);
+}
+
+.app-status-chip-danger {
+  color: var(--bs-danger-text-emphasis);
+  background: var(--bs-danger-bg-subtle);
+}
+
+.app-status-chip-info {
+  color: var(--bs-primary-text-emphasis);
+  background: var(--bs-primary-bg-subtle);
 }
 
 .app-empty-state {
