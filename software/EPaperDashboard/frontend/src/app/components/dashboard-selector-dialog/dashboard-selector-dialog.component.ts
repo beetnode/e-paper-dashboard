@@ -60,7 +60,7 @@ export interface DashboardOption {
               }
             </div>
             <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" (click)="cancel()">Cancel</button>
+              <button type="button" class="btn btn-outline-secondary" (click)="cancel()">Cancel</button>
             </div>
           </div>
         </div>

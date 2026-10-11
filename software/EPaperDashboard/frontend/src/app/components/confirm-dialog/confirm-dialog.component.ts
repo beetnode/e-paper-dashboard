@@ -21,7 +21,7 @@ import { DialogService } from '../../services/dialog.service';
               <button 
                 #cancelButton
                 type="button" 
-                class="btn btn-secondary"
+                class="btn btn-outline-secondary"
                 [disabled]="dialogService.isLoading()"
                 (click)="cancel()"
               >

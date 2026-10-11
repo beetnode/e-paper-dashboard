@@ -44,7 +44,7 @@ import { AuthService } from '../../services/auth.service';
         @if (errorMessage()) {
           <div class="alert alert-danger" role="alert">{{ errorMessage() }}</div>
         }
-        <button type="submit" class="btn btn-success w-100" [disabled]="isLoading() || !registrationAllowed()">
+        <button type="submit" class="btn btn-primary w-100" [disabled]="isLoading() || !registrationAllowed()">
           @if (isLoading()) {
             <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
           }
