@@ -19,6 +19,7 @@ import { HasUnsavedChanges } from '../../guards/unsaved-changes.guard';
 import { WidgetConfigComponent } from '../widget-config/widget-config.component';
 import { RenderedPreviewModalComponent } from '../rendered-preview-modal/rendered-preview-modal.component';
 import { WidgetElementOverlayComponent } from '../widget-element-overlay/widget-element-overlay.component';
+import { WidgetPickerComponent, WidgetPickerDragStart } from '../widget-picker/widget-picker.component';
 import {
   applyEditableElementChange,
   EditableElementChange,
@@ -42,11 +43,13 @@ import {
 import {
   createDefaultWidgetConfig,
   getWidgetDefaultSize,
-  WidgetCategory,
   WidgetDefinition,
   WIDGET_DEFINITIONS,
+  getWidgetDefinition,
   getWidgetRenderType,
 } from '../../models/widget-catalog';
+import { rememberRecentWidget } from '../../models/widget-picker';
+import { findFreeSlot, moveWidgetInPaintOrder } from '../../models/designer-layers';
 import {
   CanvasZoom,
   parseCanvasZoom,
@@ -57,8 +60,9 @@ import {
 const CANVAS_ZOOM_STORAGE_KEY = 'designer.canvasZoom';
 /** Below this width the side panel moves into a drawer so the canvas keeps its space. */
 const PANEL_DRAWER_MAX_WIDTH = 992;
-/** Below this width the widget toolbox starts collapsed to icons. */
-const TOOLBOX_COLLAPSE_MAX_WIDTH = 1400;
+/** Below this width the layers panel starts hidden so the canvas keeps its space. */
+const LAYERS_PANEL_MIN_WIDTH = 1400;
+const RECENT_WIDGETS_STORAGE_KEY = 'designer.recentWidgets';
 
 type LayoutColorProperty = 'canvasBackgroundColor' | 'widgetBackgroundColor' | 'widgetBorderColor'
   | 'widgetTitleTextColor' | 'widgetTextColor' | 'iconColor';
@@ -66,7 +70,7 @@ type LayoutColorProperty = 'canvasBackgroundColor' | 'widgetBackgroundColor' | '
 @Component({
   selector: 'app-dashboard-designer',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, A11yModule, WidgetConfigComponent, RenderedPreviewModalComponent, WidgetElementOverlayComponent],
+  imports: [CommonModule, FormsModule, RouterModule, A11yModule, WidgetConfigComponent, RenderedPreviewModalComponent, WidgetElementOverlayComponent, WidgetPickerComponent],
   host: { '[class.designer-mobile]': 'isMobile()' },
   templateUrl: './dashboard-designer.component.html',
   styleUrls: ['./dashboard-designer.component.scss']
@@ -109,32 +113,12 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   // UI State
   colorSchemes = DEFAULT_COLOR_SCHEMES;
   availableWidgets = WIDGET_DEFINITIONS;
-  readonly widgetCategories: ReadonlyArray<{ type: WidgetCategory; label: string }> = [
-    { type: 'content', label: 'Content' },
-    { type: 'data', label: 'Data' },
-    { type: 'chart', label: 'Charts' },
-    { type: 'asset', label: 'Assets' },
-    { type: 'system', label: 'System' },
-  ];
-
-  get allWidgetCategories(): ReadonlyArray<{ type: WidgetCategory; label: string }> {
-    const builtIn = new Set(this.widgetCategories.map(category => category.type));
-    const extra = new Map(this.availableWidgets.filter(widget => !builtIn.has(widget.category))
-      .map(widget => [widget.category, { type: widget.category, label: widget.categoryLabel ?? widget.category }]));
-    return [...this.widgetCategories, ...extra.values()];
-  }
-
-  widgetsInCategory(category: WidgetCategory): readonly WidgetDefinition[] {
-    return this.availableWidgets.filter(widget => widget.category === category);
-  }
-
   selectedWidget = signal<WidgetConfig | null>(null);
   ghost = signal<{ id: string; position: WidgetPosition } | null>(null);
   isLoading = signal(false);
   loadError = signal('');
   availableEntities = signal<DataSource[]>([]);
   entitiesLoading = signal(false);
-  activeTab = signal<'dashboard' | 'widgets' | 'properties'>('dashboard');
   renderedCanvasImageUrl = signal('');
   renderedCanvasLoading = signal(false);
   renderedCanvasError = signal('');
@@ -142,7 +126,15 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   renderedWidgetGeometry = signal<Record<string, WidgetRenderGeometry>>({});
   renderedSourceStatuses = signal<Record<string, DataSourceStatus>>({});
   elementEditingWidgetId = signal<string | null>(null);
-  toolboxCollapsed = signal(false); // Widget toolbox left panel collapsed
+  /** Desktop layers column visibility; tablets and phones show layers in a drawer instead. */
+  layersOpen = signal(true);
+  layersDrawerOpen = signal(false);
+  inspectorDrawerOpen = signal(false);
+  pickerOpen = signal(false);
+  hoveredWidgetId = signal<string | null>(null);
+  layerMenuWidgetId = signal<string | null>(null);
+  sourceDetailsOpen = signal(false);
+  recentWidgetTypes = signal<WidgetType[]>(DashboardDesignerComponent.readRecentWidgets());
   colorSchemeCollapsed = signal(false); // Color scheme section expanded by default
   colorOverridesCollapsed = signal(true); // Layout color overrides collapsed by default
   layoutCollapsed = signal(false); // Layout section expanded by default
@@ -155,8 +147,6 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   previewImageUrl = signal('');
   // Mobile responsive state
   isMobile = signal(false);
-  mobileWidgetDrawerOpen = signal(false);
-  mobilePropertiesOpen = signal(false);
   mobileOverflowOpen = signal(false);
   mobileSelectionToolbar = signal(false);
   longPressActive = signal(false);
@@ -213,8 +203,6 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     this.layoutColorFields.filter((field): field is { key: keyof WidgetColorOverrides & LayoutColorProperty; label: string } =>
       field.key !== 'canvasBackgroundColor');
 
-  // Tab navigation
-  tabOrder: Array<'dashboard' | 'widgets' | 'properties'> = ['dashboard', 'widgets', 'properties'];
 
   // Drag state
   private dragStartPos = { x: 0, y: 0 };
@@ -239,7 +227,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   constructor() {
     // Scroll lock when mobile overlays are open
     effect(() => {
-      const lock = this.mobileWidgetDrawerOpen() || this.mobilePropertiesOpen();
+      const lock = this.usesDrawer() && (this.pickerOpen() || this.inspectorDrawerOpen() || this.layersDrawerOpen());
       document.body.style.overflow = lock ? 'hidden' : '';
     });
 
@@ -274,35 +262,63 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   onWindowResize(): void {
     if (this.resizeTimer) clearTimeout(this.resizeTimer);
     this.resizeTimer = setTimeout(() => {
-      const wasNarrow = this.viewportWidth() < TOOLBOX_COLLAPSE_MAX_WIDTH;
+      const wasWide = this.viewportWidth() >= LAYERS_PANEL_MIN_WIDTH;
       this.viewportWidth.set(window.innerWidth);
-      const isNarrow = this.viewportWidth() < TOOLBOX_COLLAPSE_MAX_WIDTH;
-      if (wasNarrow !== isNarrow) this.toolboxCollapsed.set(isNarrow);
-      if (!this.usesDrawer()) this.mobilePropertiesOpen.set(false);
+      const isWide = this.viewportWidth() >= LAYERS_PANEL_MIN_WIDTH;
+      if (wasWide !== isWide) this.layersOpen.set(isWide);
       this.isMobile.set(this.checkIsMobile());
+      if (!this.usesDrawer()) {
+        this.inspectorDrawerOpen.set(false);
+        this.layersDrawerOpen.set(false);
+      }
     }, 100);
   }
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: Event): void {
-    if (!this.mobileOverflowOpen()) return;
     const target = event.target as HTMLElement;
-    if (!target.closest('.mobile-overflow-menu')) {
+    if (this.mobileOverflowOpen() && !target.closest('.mobile-overflow-menu')) {
       this.mobileOverflowOpen.set(false);
+    }
+    if (this.layerMenuWidgetId() && !target.closest('.layer-menu')) {
+      this.layerMenuWidgetId.set(null);
+    }
+    if (this.pickerOpen() && !this.usesDrawer() && !target.closest('.picker-popover, .add-widget-button')) {
+      this.pickerOpen.set(false);
     }
   }
 
   @HostListener('document:keydown.escape')
   closeOpenDesignerOverlay(): void {
     if (this.mobileOverflowOpen()) this.mobileOverflowOpen.set(false);
-    else if (this.mobileWidgetDrawerOpen()) this.mobileWidgetDrawerOpen.set(false);
-    else if (this.mobilePropertiesOpen()) this.mobilePropertiesOpen.set(false);
+    else if (this.pickerOpen()) this.pickerOpen.set(false);
+    else if (this.layerMenuWidgetId()) this.layerMenuWidgetId.set(null);
+    else if (this.inspectorDrawerOpen()) this.inspectorDrawerOpen.set(false);
+    else if (this.layersDrawerOpen()) this.layersDrawerOpen.set(false);
+    else if (this.elementEditingWidgetId()) this.elementEditingWidgetId.set(null);
+    else if (this.selectedWidget() && !DashboardDesignerComponent.isEditableTarget(document.activeElement)) {
+      this.clearSelection();
+    }
+  }
+
+  /** `A` opens the widget picker, like the Add widget button. */
+  @HostListener('document:keydown', ['$event'])
+  onDocumentKeydown(event: KeyboardEvent): void {
+    if (event.key.toLowerCase() !== 'a' || event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+    if (DashboardDesignerComponent.isEditableTarget(event.target) || this.isLoading() || !this.dashboard()) return;
+    event.preventDefault();
+    this.openPicker();
+  }
+
+  private static isEditableTarget(target: EventTarget | Element | null): boolean {
+    const element = target as HTMLElement | null;
+    return !!element?.closest?.('input, textarea, select, [contenteditable="true"]');
   }
 
   ngOnInit(): void {
     this.isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
     this.viewportWidth.set(window.innerWidth);
-    this.toolboxCollapsed.set(window.innerWidth < TOOLBOX_COLLAPSE_MAX_WIDTH);
+    this.layersOpen.set(window.innerWidth >= LAYERS_PANEL_MIN_WIDTH);
     this.isMobile.set(this.checkIsMobile());
     this.dashboardId = this.route.snapshot.paramMap.get('id') || '';
     if (this.dashboardId) {
@@ -408,9 +424,119 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     });
   }
 
-  onWidgetSelect(widget: WidgetConfig): void {
+  private selectWidget(widget: WidgetConfig): void {
+    if (this.selectedWidget()?.id !== widget.id) this.sourceDetailsOpen.set(false);
     this.selectedWidget.set(widget);
-    this.activeTab.set('properties');
+  }
+
+  /** Returns the inspector to dashboard settings. */
+  clearSelection(): void {
+    this.selectedWidget.set(null);
+    this.elementEditingWidgetId.set(null);
+    this.mobileSelectionToolbar.set(false);
+  }
+
+  /** Layers are listed top-most first, the reverse of paint order. */
+  readonly layerWidgets = computed(() => [...this.layout().widgets].reverse());
+
+  widgetIcon(widget: WidgetConfig): string {
+    try {
+      return getWidgetDefinition(widget.type).icon;
+    } catch {
+      return 'fa-square';
+    }
+  }
+
+  widgetDisplayName(widget: WidgetConfig): string {
+    if (widget.titleOverride) return widget.titleOverride;
+    try {
+      return getWidgetDefinition(widget.type).label;
+    } catch {
+      return widget.type;
+    }
+  }
+
+  onLayerSelect(widget: WidgetConfig): void {
+    this.selectWidget(widget);
+    if (this.usesDrawer()) this.layersDrawerOpen.set(false);
+    if (this.isMobile()) this.mobileSelectionToolbar.set(true);
+  }
+
+  toggleLayerMenu(widget: WidgetConfig, event: Event): void {
+    event.stopPropagation();
+    this.layerMenuWidgetId.set(this.layerMenuWidgetId() === widget.id ? null : widget.id);
+  }
+
+  duplicateWidget(widget: WidgetConfig): void {
+    this.layerMenuWidgetId.set(null);
+    const layout = this.layout();
+    const slot = findFreeSlot(layout.widgets, layout.gridCols, layout.gridRows, widget.position.w, widget.position.h);
+    if (!slot) {
+      this.toastService.show('No free space of the same size for a copy of this widget', 'error');
+      return;
+    }
+    const copy: WidgetConfig = { ...structuredClone(widget), id: this.generateId(), position: slot };
+    this.layout.update(value => ({ ...value, widgets: [...value.widgets, copy] }));
+    this.selectWidget(copy);
+  }
+
+  moveWidgetLayer(widget: WidgetConfig, direction: 'forward' | 'backward'): void {
+    this.layerMenuWidgetId.set(null);
+    this.layout.update(value => {
+      const widgets = moveWidgetInPaintOrder(value.widgets, widget.id, direction);
+      return widgets === value.widgets ? value : { ...value, widgets: [...widgets] };
+    });
+  }
+
+  canMoveWidgetLayer(widget: WidgetConfig, direction: 'forward' | 'backward'): boolean {
+    const widgets = this.layout().widgets;
+    const index = widgets.findIndex(item => item.id === widget.id);
+    return direction === 'forward' ? index < widgets.length - 1 : index > 0;
+  }
+
+  openPicker(): void {
+    this.mobileOverflowOpen.set(false);
+    this.layerMenuWidgetId.set(null);
+    this.pickerOpen.set(true);
+  }
+
+  togglePicker(): void {
+    if (this.pickerOpen()) this.pickerOpen.set(false);
+    else this.openPicker();
+  }
+
+  openInspector(): void {
+    this.mobileSelectionToolbar.set(false);
+    this.layersDrawerOpen.set(false);
+    this.inspectorDrawerOpen.set(true);
+  }
+
+  toggleLayers(): void {
+    if (this.usesDrawer()) {
+      this.inspectorDrawerOpen.set(false);
+      this.layersDrawerOpen.set(!this.layersDrawerOpen());
+    } else {
+      this.layersOpen.set(!this.layersOpen());
+    }
+  }
+
+  private rememberWidgetUse(type: WidgetType): void {
+    const recent = rememberRecentWidget(this.recentWidgetTypes(), type);
+    this.recentWidgetTypes.set(recent);
+    try {
+      localStorage.setItem(RECENT_WIDGETS_STORAGE_KEY, JSON.stringify(recent));
+    } catch {
+      // Recent widgets are a convenience; ignore unavailable storage.
+    }
+  }
+
+  private static readRecentWidgets(): WidgetType[] {
+    try {
+      const value = JSON.parse(localStorage.getItem(RECENT_WIDGETS_STORAGE_KEY) ?? '[]');
+      return Array.isArray(value) ? value.filter((item): item is WidgetType => typeof item === 'string') : [];
+    } catch {
+      return [];
+    }
   }
 
   loadAiGeneratedWidgets(): void {
@@ -465,10 +591,8 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       ...layout,
       widgets: layout.widgets.filter(w => w.id !== widget.id)
     }));
-    if (this.selectedWidget()?.id === widget.id) {
-      this.selectedWidget.set(null);
-      this.elementEditingWidgetId.set(null);
-    }
+    this.layerMenuWidgetId.set(null);
+    if (this.selectedWidget()?.id === widget.id) this.clearSelection();
 
     this.toastService.showWithAction(
       'Widget removed from the layout',
@@ -486,14 +610,12 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     );
   }
 
-  onToolboxWidgetPointerDown(event: PointerEvent, widget: WidgetDefinition): void {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    // Dragging from a scrollable list is unreliable on touch; a tap places the widget instead.
-    if (event.pointerType === 'touch') {
-      this.addWidgetToFirstSlot(widget);
-      return;
-    }
+  /**
+   * Mouse press on a picker item: dragging onto the canvas places the widget there, while a
+   * press without movement places it in the first free slot.
+   */
+  onPickerDragStart({ event, widget }: WidgetPickerDragStart): void {
+    this.pickerOpen.set(false);
     const layout = this.layout();
     const canvas = document.querySelector('.dashboard-canvas') as HTMLElement;
     if (!canvas) return;
@@ -513,9 +635,11 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       preview.style.top = e.clientY + 8 + 'px';
     };
     movePreview(event);
+    let moved = false;
 
     const onPointerMove = (e: PointerEvent) => {
       movePreview(e);
+      if (Math.abs(e.clientX - event.clientX) > 4 || Math.abs(e.clientY - event.clientY) > 4) moved = true;
 
       const rect = canvas.getBoundingClientRect();
       if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
@@ -546,7 +670,10 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       preview.remove();
 
       const g = this.ghost();
-      if (g) {
+      this.ghost.set(null);
+      if (!moved) {
+        this.addWidgetToFirstSlot(widget);
+      } else if (g) {
         const newWidget: WidgetConfig = {
           id: this.generateId(),
           type: widget.type,
@@ -554,95 +681,44 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
           config: createDefaultWidgetConfig(widget.type)
         };
         this.layout.update(l => ({ ...l, widgets: [...l.widgets, newWidget] }));
+        this.selectWidget(newWidget);
+        this.rememberWidgetUse(widget.type);
       }
-      this.ghost.set(null);
     };
 
     this.trackPointer(event, onPointerMove, onPointerUp);
   }
 
-  onToolboxWidgetKeyDown(event: KeyboardEvent, widget: WidgetDefinition): void {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    this.addWidgetToFirstSlot(widget);
-  }
-
-  /** Add a widget to the first available grid position (used on mobile). */
+  /** Adds a widget at the first free grid position (picker click, keyboard and touch). */
   addWidgetToFirstSlot(widget: WidgetDefinition): void {
     const layout = this.layout();
-    const cols = layout.gridCols;
-    const rows = layout.gridRows;
-    const { w: defaultW, h: defaultH } = getWidgetDefaultSize(widget.type, cols, rows);
-
-    // Build occupancy grid
-    const occupied = new Set<string>();
-    for (const w of layout.widgets) {
-      for (let dx = 0; dx < w.position.w; dx++) {
-        for (let dy = 0; dy < w.position.h; dy++) {
-          occupied.add(`${w.position.x + dx},${w.position.y + dy}`);
-        }
-      }
-    }
-
-    // Find first position that fits
-    let placed = false;
-    for (let y = 0; y <= rows - defaultH && !placed; y++) {
-      for (let x = 0; x <= cols - defaultW && !placed; x++) {
-        let fits = true;
-        for (let dx = 0; dx < defaultW && fits; dx++) {
-          for (let dy = 0; dy < defaultH && fits; dy++) {
-            if (occupied.has(`${x + dx},${y + dy}`)) fits = false;
-          }
-        }
-        if (fits) {
-          const newWidget: WidgetConfig = {
-            id: this.generateId(),
-            type: widget.type,
-            position: { x, y, w: defaultW, h: defaultH },
-            config: createDefaultWidgetConfig(widget.type)
-          };
-          this.layout.update(l => ({ ...l, widgets: [...l.widgets, newWidget] }));
-          this.selectedWidget.set(newWidget);
-          this.activeTab.set('properties');
-          if (this.isMobile()) {
-            this.mobileWidgetDrawerOpen.set(false);
-            this.mobilePropertiesOpen.set(true);
-          }
-          placed = true;
-        }
-      }
-    }
-
-    if (!placed) {
+    const { w, h } = getWidgetDefaultSize(widget.type, layout.gridCols, layout.gridRows);
+    const position = findFreeSlot(layout.widgets, layout.gridCols, layout.gridRows, w, h);
+    this.pickerOpen.set(false);
+    if (!position) {
       this.toastService.show('No space available on the canvas for a new widget', 'error');
+      return;
     }
+
+    const newWidget: WidgetConfig = {
+      id: this.generateId(),
+      type: widget.type,
+      position,
+      config: createDefaultWidgetConfig(widget.type)
+    };
+    this.layout.update(l => ({ ...l, widgets: [...l.widgets, newWidget] }));
+    this.selectWidget(newWidget);
+    this.rememberWidgetUse(widget.type);
+    // New widgets usually need a data source, so show their settings straight away on small screens.
+    if (this.usesDrawer()) this.openInspector();
   }
-
-  onDesignerTabKeydown(event: KeyboardEvent): void {
-    const current = this.tabOrder.indexOf(this.activeTab());
-    let newIndex = current;
-
-    if (event.key === 'ArrowLeft') newIndex = (current - 1 + this.tabOrder.length) % this.tabOrder.length;
-    else if (event.key === 'ArrowRight') newIndex = (current + 1) % this.tabOrder.length;
-    else if (event.key === 'Home') newIndex = 0;
-    else if (event.key === 'End') newIndex = this.tabOrder.length - 1;
-    else return;
-
-    event.preventDefault();
-    this.activeTab.set(this.tabOrder[newIndex]);
-    const tabList = (event.currentTarget as HTMLElement).closest('[role="tablist"]');
-    const tabs = tabList?.querySelectorAll<HTMLElement>('[role="tab"]');
-    setTimeout(() => tabs?.item(newIndex).focus());
-  }
-
 
   onWidgetPointerDown(event: PointerEvent, widget: WidgetConfig): void {
     if (event.button !== 0) return;
     event.stopPropagation();
     if (this.elementEditingWidgetId() === widget.id) return;
     if (this.elementEditingWidgetId()) this.elementEditingWidgetId.set(null);
-    this.selectedWidget.set(widget);
-    this.activeTab.set('properties');
+    this.selectWidget(widget);
 
     // On mobile, show floating toolbar instead of immediately opening drawer
     if (this.isMobile()) {
@@ -710,7 +786,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   onWidgetKeyDown(event: KeyboardEvent, widget: WidgetConfig): void {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      this.onWidgetSelect(widget);
+      this.selectWidget(widget);
       return;
     }
 
@@ -743,7 +819,6 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       widgets: value.widgets.map(item => item.id === widget.id ? updated : item),
     }));
     this.selectedWidget.set(updated);
-    this.activeTab.set('properties');
   }
 
   /** Renderer geometry for the selection, only while the preview matches the current layout. */
@@ -1064,8 +1139,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     this.aiEnabled.set(snapshot.aiEnabled);
     this.aiPrompt.set(snapshot.aiPrompt);
     this.aiLeadTimeMinutes.set(snapshot.aiLeadTimeMinutes);
-    this.selectedWidget.set(null);
-    this.elementEditingWidgetId.set(null);
+    this.clearSelection();
   }
 
   private computeCurrentSnapshot(): string {
@@ -1566,6 +1640,23 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   private buildSelectionOverlayStyle(): any {
     const widget = this.selectedWidget();
     if (!widget) return { display: 'none' };
+    const editingElements = this.elementEditingWidgetId() === widget.id;
+    return {
+      ...this.widgetRect(widget),
+      pointerEvents: editingElements ? 'none' : 'auto',
+      zIndex: 100,
+    };
+  }
+
+  /** Outline for the widget hovered in the layers list. */
+  readonly hoverOverlayStyle = computed(() => {
+    const id = this.hoveredWidgetId();
+    const widget = id && id !== this.selectedWidget()?.id ? this.layout().widgets.find(item => item.id === id) : undefined;
+    return widget ? { ...this.widgetRect(widget), pointerEvents: 'none', zIndex: 95 } : null;
+  });
+
+  /** Widget rectangle in unscaled canvas pixels, preferring renderer-resolved bounds. */
+  private widgetRect(widget: WidgetConfig): Record<string, string> {
     const layout = this.layout();
     const padding = layout.canvasPadding ?? 0;
     const gap     = layout.widgetGap ?? 0;
@@ -1590,7 +1681,6 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     const top    = resolvedBounds?.y ?? padding + p.y * (cellH + gap);
     const width  = resolvedBounds?.width ?? p.w * cellW + (p.w - 1) * gap;
     const height = resolvedBounds?.height ?? p.h * cellH + (p.h - 1) * gap;
-    const editingElements = this.elementEditingWidgetId() === widget.id;
 
     return {
       position: 'absolute',
@@ -1599,8 +1689,6 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       width:  `${width}px`,
       height: `${height}px`,
       boxSizing: 'border-box',
-      pointerEvents: editingElements ? 'none' : 'auto',
-      zIndex: 100,
     };
   }
 
@@ -1785,18 +1873,11 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     return width < this.mobileBreakpoint;
   }
 
-  openMobileProperties(): void {
-    this.mobileSelectionToolbar.set(false);
-    this.mobilePropertiesOpen.set(true);
-    this.activeTab.set('properties');
-  }
 
   onCanvasPointerDown(event: PointerEvent): void {
     const target = event.target as HTMLElement;
     if (target.classList.contains('dashboard-canvas') || target.classList.contains('grid-overlay')) {
-      this.selectedWidget.set(null);
-      this.elementEditingWidgetId.set(null);
-      this.mobileSelectionToolbar.set(false);
+      this.clearSelection();
     }
   }
 
@@ -1807,7 +1888,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   onBottomSheetTouchEnd(event: TouchEvent): void {
     const deltaY = event.changedTouches[0].clientY - this.swipeStartY;
     if (deltaY > 80) {
-      this.mobileWidgetDrawerOpen.set(false);
+      this.pickerOpen.set(false);
     }
   }
 
@@ -1815,10 +1896,21 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     this.swipeStartX = event.touches[0].clientX;
   }
 
-  onDrawerTouchEnd(event: TouchEvent): void {
+  /** Swiping a drawer back towards its edge closes it. */
+  onDrawerTouchEnd(event: TouchEvent, side: 'left' | 'right'): void {
     const deltaX = event.changedTouches[0].clientX - this.swipeStartX;
-    if (deltaX > 80) {
-      this.mobilePropertiesOpen.set(false);
-    }
+    if (side === 'right' && deltaX > 80) this.inspectorDrawerOpen.set(false);
+    if (side === 'left' && deltaX < -80) this.layersDrawerOpen.set(false);
   }
+
+  /** Worst status across the selected widget's sources, for the inspector header chip. */
+  readonly selectedSourceSummary = computed(() => {
+    const sources = this.selectedWidgetSourceStatuses();
+    if (sources.length === 0) return null;
+    const errors = sources.filter(source => source.status.state === 'error').length;
+    const empty = sources.filter(source => source.status.state === 'empty').length;
+    if (errors > 0) return { tone: 'warning', label: errors === 1 ? '1 source issue' : `${errors} source issues` };
+    if (empty > 0) return { tone: 'muted', label: 'No data' };
+    return { tone: 'success', label: 'Data ready' };
+  });
 }

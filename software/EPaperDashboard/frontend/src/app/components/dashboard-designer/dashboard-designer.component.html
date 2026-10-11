@@ -16,6 +16,24 @@
         <h1 class="h6 mb-0" [title]="dashboard()?.name ?? ''">@if (isMobile()) {Designer} @else {<span>{{ dashboard()?.name }}</span>}</h1>
         <span class="small" [ngClass]="isDirty() ? 'text-warning' : 'text-muted'">{{ isDirty() ? 'Unsaved changes' : 'All changes saved' }}</span>
       </div>
+      @if (!isMobile()) {
+      <button type="button" class="btn btn-sm btn-outline-secondary" [class.active]="usesDrawer() ? layersDrawerOpen() : layersOpen()"
+        (click)="toggleLayers()" [attr.aria-pressed]="usesDrawer() ? layersDrawerOpen() : layersOpen()" title="Layers" aria-label="Show layers">
+        <i class="fa fa-layer-group" aria-hidden="true"></i>
+      </button>
+      <div class="add-widget-anchor">
+        <button type="button" class="btn btn-sm btn-outline-primary add-widget-button" (click)="togglePicker()"
+          aria-haspopup="dialog" [attr.aria-expanded]="pickerOpen()" title="Add widget (A)">
+          <i class="fa fa-plus" aria-hidden="true"></i><span class="toolbar-label ms-1">Add widget</span>
+        </button>
+        @if (pickerOpen() && !usesDrawer()) {
+        <div class="picker-popover" role="dialog" aria-label="Add widget" cdkTrapFocus>
+          <app-widget-picker [definitions]="availableWidgets" [recentTypes]="recentWidgetTypes()"
+            (pick)="addWidgetToFirstSlot($event)" (dragStart)="onPickerDragStart($event)" />
+        </div>
+        }
+      </div>
+      }
     </div>
     <!-- Desktop and tablet actions -->
     @if (!isMobile()) {
@@ -34,8 +52,8 @@
         </div>
       </div>
       @if (panelAsDrawer()) {
-      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="mobilePropertiesOpen.set(true)" title="Settings and properties" aria-label="Open settings and properties">
-        <i class="fa fa-sliders" aria-hidden="true"></i><span class="toolbar-label ms-1">Panel</span>
+      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="openInspector()" title="Inspector" aria-label="Open inspector">
+        <i class="fa fa-sliders" aria-hidden="true"></i><span class="toolbar-label ms-1">Inspector</span>
       </button>
       }
       <button type="button" class="btn btn-sm btn-success" (click)="previewServerSideRendered()" title="Render the current layout, including unsaved changes" aria-label="Device output">
@@ -76,9 +94,6 @@
         </button>
         @if (mobileOverflowOpen()) {
           <div class="overflow-dropdown">
-            <button type="button" (click)="mobilePropertiesOpen.set(true); mobileOverflowOpen.set(false)">
-              <i class="fa fa-sliders" aria-hidden="true"></i> Settings and properties
-            </button>
             <button type="button" (click)="refreshLivePreview(); mobileOverflowOpen.set(false)" [disabled]="renderedCanvasLoading()">
               <i class="fa fa-sync" aria-hidden="true"></i> Refresh preview
             </button>
@@ -117,45 +132,23 @@
   }
 
   @if (!isLoading() && dashboard()) {
-  <div class="designer-grid-container" [class.toolbox-collapsed]="toolboxCollapsed()" [class.panel-drawer]="panelAsDrawer()" [class.mobile-layout]="isMobile()">
-    <!-- Left Panel - Widget Toolbar -->
+  <div class="designer-grid-container" [class.layers-hidden]="!layersOpen()" [class.panel-drawer]="panelAsDrawer()" [class.mobile-layout]="isMobile()">
+    <!-- Left Panel - Layers -->
+    @if (layersOpen() && !usesDrawer()) {
     <div class="designer-panel-left">
       <div class="card">
-        <div class="card-header d-flex align-items-center" [class.justify-content-between]="!toolboxCollapsed()" [class.justify-content-center]="toolboxCollapsed()">
-          @if (!toolboxCollapsed()) {
-            <h5 class="mb-0">Widgets</h5>
-          }
-          <button class="toolbox-collapse-btn" (click)="toolboxCollapsed.set(!toolboxCollapsed())"
-            [attr.aria-label]="toolboxCollapsed() ? 'Expand widget toolbox' : 'Collapse widget toolbox'"
-            [attr.aria-expanded]="!toolboxCollapsed()"
-            [title]="toolboxCollapsed() ? 'Expand widget toolbox' : 'Collapse widget toolbox'">
-            <i class="fa fa-bars"></i>
+        <div class="card-header panel-header">
+          <h2 class="panel-title">Layers <span class="tab-count">{{ layout().widgets.length }}</span></h2>
+          <button type="button" class="panel-icon-btn" (click)="layersOpen.set(false)" aria-label="Hide layers" title="Hide layers">
+            <i class="fa fa-angles-left" aria-hidden="true"></i>
           </button>
         </div>
-        <div class="card-body p-2">
-          <div class="widget-list">
-            @for (category of allWidgetCategories; track category.type) {
-              @if (!toolboxCollapsed()) {
-                <div class="designer-menu-label text-uppercase text-muted fw-semibold px-2 pt-2">
-                  {{ category.label }}
-                </div>
-              }
-              @for (widget of widgetsInCategory(category.type); track widget.type) {
-              <button type="button" class="widget-item toolbox-drag-item" [class.icon-only]="toolboxCollapsed()"
-                (pointerdown)="onToolboxWidgetPointerDown($event, widget)"
-                (keydown)="onToolboxWidgetKeyDown($event, widget)"
-                [attr.aria-label]="'Add ' + widget.label + ' widget'" [title]="toolboxCollapsed() ? widget.label : 'Drag to canvas or press Enter to add'">
-                <i class="fa {{ widget.icon }}"></i>
-                @if (!toolboxCollapsed()) {
-                  <span>{{ widget.label }}</span>
-                }
-              </button>
-              }
-            }
-          </div>
+        <div class="card-body layers-body">
+          <ng-container *ngTemplateOutlet="layersContent"></ng-container>
         </div>
       </div>
     </div>
+    }
 
     <!-- Center - Canvas -->
     <div class="designer-panel-center">
@@ -202,6 +195,10 @@
               <div class="widget-container ai-widget" [ngStyle]="widgetStyles()[widget.id]">
                 <span class="widget-shell-label">{{ widget.type }}</span>
               </div>
+              }
+
+              @if (hoverOverlayStyle(); as hoverStyle) {
+                <div class="hover-overlay" [ngStyle]="hoverStyle"></div>
               }
 
               <!-- Selection overlay: lives on the canvas, never inside a grid cell -->
@@ -274,40 +271,11 @@
       </div>
     </div>
 
-    <!-- Right Panel - Widget Properties -->
+    <!-- Right Panel - Inspector: dashboard settings, or the selected widget -->
     <div class="designer-panel-right">
       <div class="card">
-        <div class="card-header">
-          <div class="custom-tab-bar" role="tablist" aria-label="Designer panels">
-            <button id="designerDashboardTab" type="button" class="tab-btn" [class.active]="activeTab() === 'dashboard'"
-              role="tab" [attr.aria-selected]="activeTab() === 'dashboard'" [attr.tabindex]="activeTab() === 'dashboard' ? 0 : -1"
-              aria-controls="designerDashboardPanel" (keydown)="onDesignerTabKeydown($event)"
-              (click)="activeTab.set('dashboard')"><i class="fa fa-cog" aria-hidden="true"></i>Settings</button>
-            <button id="designerWidgetsTab" type="button" class="tab-btn" [class.active]="activeTab() === 'widgets'"
-              role="tab" [attr.aria-selected]="activeTab() === 'widgets'" [attr.tabindex]="activeTab() === 'widgets' ? 0 : -1"
-              aria-controls="designerWidgetsPanel" (keydown)="onDesignerTabKeydown($event)"
-              (click)="activeTab.set('widgets')"><i class="fa fa-layer-group" aria-hidden="true"></i>Widgets <span class="tab-count">{{ layout().widgets.length }}</span></button>
-            <button id="designerPropertiesTab" type="button" class="tab-btn" [class.active]="activeTab() === 'properties'"
-              role="tab" [attr.aria-selected]="activeTab() === 'properties'" [attr.tabindex]="activeTab() === 'properties' ? 0 : -1"
-              aria-controls="designerPropertiesPanel" (keydown)="onDesignerTabKeydown($event)"
-              (click)="activeTab.set('properties')"><i class="fa fa-sliders" aria-hidden="true"></i>Properties</button>
-          </div>
-        </div>
-        <div class="card-body">
-          <!-- Dashboard Settings Tab -->
-          <div id="designerDashboardPanel" class="tab-pane" [class.active]="activeTab() === 'dashboard'" role="tabpanel" aria-labelledby="designerDashboardTab">
-            <ng-container *ngTemplateOutlet="dashboardSettingsContent"></ng-container>
-          </div>
-
-          <!-- Properties Tab -->
-          <div id="designerPropertiesPanel" class="tab-pane" [class.active]="activeTab() === 'properties'" role="tabpanel" aria-labelledby="designerPropertiesTab">
-            <ng-container *ngTemplateOutlet="propertiesContent"></ng-container>
-          </div>
-
-          <!-- Widgets List Tab -->
-          <div id="designerWidgetsPanel" class="widgets-list-pane" [class.active]="activeTab() === 'widgets'" role="tabpanel" aria-labelledby="designerWidgetsTab">
-            <ng-container *ngTemplateOutlet="widgetsListContent"></ng-container>
-          </div>
+        <div class="card-body inspector-body">
+          <ng-container *ngTemplateOutlet="inspectorContent"></ng-container>
         </div>
       </div>
     </div>
@@ -327,108 +295,188 @@
   (reload)="openRenderedPreview()">
 </app-rendered-preview-modal>
 
-<!-- Mobile FAB (Add Widget) -->
-@if (isMobile() && !isLoading()) {
-  <button type="button" class="mobile-fab" (click)="mobileWidgetDrawerOpen.set(true)" aria-label="Add widget">
-    <i class="fa fa-plus" aria-hidden="true"></i>
-  </button>
+<!-- Phone bottom bar -->
+@if (isMobile() && !isLoading() && dashboard()) {
+  <nav class="mobile-bottom-bar" aria-label="Designer">
+    <button type="button" [class.active]="layersDrawerOpen()" (click)="toggleLayers()">
+      <i class="fa fa-layer-group" aria-hidden="true"></i><span>Layers</span>
+    </button>
+    <button type="button" class="bottom-bar-primary" (click)="openPicker()">
+      <i class="fa fa-plus" aria-hidden="true"></i><span>Add</span>
+    </button>
+    <button type="button" [class.active]="inspectorDrawerOpen()" (click)="openInspector()">
+      <i class="fa fa-sliders" aria-hidden="true"></i><span>Inspector</span>
+    </button>
+  </nav>
 }
 
-<!-- Mobile Selection Toolbar -->
+<!-- Phone selection toolbar -->
 @if (isMobile() && mobileSelectionToolbar() && selectedWidget()) {
   <div class="mobile-selection-toolbar" role="toolbar" aria-label="Widget actions">
-    <button type="button" class="toolbar-btn" (click)="openMobileProperties()">
-      <i class="fa fa-sliders" aria-hidden="true"></i> Properties
+    <button type="button" class="toolbar-btn" (click)="openInspector()">
+      <i class="fa fa-sliders" aria-hidden="true"></i> Edit
     </button>
     @if (selectedWidgetSupportsElementEditing()) {
       <button type="button" class="toolbar-btn" (click)="toggleElementEditing(selectedWidget()!)" [disabled]="renderedCanvasLoading() || !selectedWidgetGeometry()">
-        <i class="fa fa-arrows-up-down-left-right" aria-hidden="true"></i> {{ elementEditingWidgetId() === selectedWidget()!.id ? 'Done' : 'Edit layout' }}
+        <i class="fa fa-arrows-up-down-left-right" aria-hidden="true"></i> {{ elementEditingWidgetId() === selectedWidget()!.id ? 'Done' : 'Layout' }}
       </button>
     }
     <button type="button" class="toolbar-btn toolbar-btn-danger" (click)="deleteWidget(selectedWidget()!); mobileSelectionToolbar.set(false)">
       <i class="fa fa-trash" aria-hidden="true"></i> Delete
     </button>
-    <button type="button" class="toolbar-btn" (click)="selectedWidget.set(null); mobileSelectionToolbar.set(false)" aria-label="Deselect widget">
+    <button type="button" class="toolbar-btn" (click)="clearSelection()" aria-label="Deselect widget">
       <i class="fa fa-xmark" aria-hidden="true"></i>
     </button>
   </div>
 }
 
-<!-- Mobile Bottom Sheet (Widget Picker) -->
-@if (isMobile() && mobileWidgetDrawerOpen()) {
-  <div class="mobile-bottom-sheet-backdrop" (click)="mobileWidgetDrawerOpen.set(false)"></div>
-  <div class="mobile-bottom-sheet" role="dialog" aria-modal="true" aria-label="Add widget"
-       cdkTrapFocus [cdkTrapFocusAutoCapture]="true"
-       (touchstart)="onBottomSheetTouchStart($event)" (touchend)="onBottomSheetTouchEnd($event)">
+<!-- Widget picker sheet (tablets and phones) -->
+@if (usesDrawer() && pickerOpen()) {
+  <div class="mobile-bottom-sheet-backdrop" (click)="pickerOpen.set(false)"></div>
+  <div class="mobile-bottom-sheet picker-sheet" role="dialog" aria-modal="true" aria-label="Add widget"
+       cdkTrapFocus (touchstart)="onBottomSheetTouchStart($event)" (touchend)="onBottomSheetTouchEnd($event)">
     <div class="bottom-sheet-handle"></div>
     <div class="bottom-sheet-header">
       <h2 class="h5 mb-0">Add widget</h2>
-      <button type="button" class="btn-close-sheet" (click)="mobileWidgetDrawerOpen.set(false)" aria-label="Close widget picker">
+      <button type="button" class="btn-close-sheet" (click)="pickerOpen.set(false)" aria-label="Close widget picker">
         <i class="fa fa-xmark" aria-hidden="true"></i>
       </button>
     </div>
-    <div class="bottom-sheet-body">
-      @for (category of allWidgetCategories; track category.type) {
-        <div class="widget-category-label w-100 text-uppercase text-muted fw-semibold mt-2">{{ category.label }}</div>
-        @for (widget of widgetsInCategory(category.type); track widget.type) {
-          <button type="button" class="widget-grid-item" (click)="addWidgetToFirstSlot(widget)">
-            <i class="fa {{ widget.icon }}" aria-hidden="true"></i>
-            <span>{{ widget.label }}</span>
+    <app-widget-picker [definitions]="availableWidgets" [recentTypes]="recentWidgetTypes()" [allowDrag]="false"
+      (pick)="addWidgetToFirstSlot($event)" />
+  </div>
+}
+
+<!-- Layers drawer (tablets and phones) -->
+@if (usesDrawer() && layersDrawerOpen()) {
+  <div class="mobile-drawer-backdrop" (click)="layersDrawerOpen.set(false)"></div>
+  <div class="mobile-drawer drawer-left" role="dialog" aria-modal="true" aria-label="Layers"
+       cdkTrapFocus [cdkTrapFocusAutoCapture]="true"
+       (touchstart)="onDrawerTouchStart($event)" (touchend)="onDrawerTouchEnd($event, 'left')">
+    <div class="drawer-header">
+      <h2 class="h5 mb-0">Layers <span class="tab-count">{{ layout().widgets.length }}</span></h2>
+      <button type="button" class="btn-close-drawer" (click)="layersDrawerOpen.set(false)" aria-label="Close layers">
+        <i class="fa fa-xmark" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="drawer-body layers-body">
+      <ng-container *ngTemplateOutlet="layersContent"></ng-container>
+    </div>
+  </div>
+}
+
+<!-- Inspector drawer (tablets and phones) -->
+@if (usesDrawer() && inspectorDrawerOpen()) {
+  <div class="mobile-drawer-backdrop" (click)="inspectorDrawerOpen.set(false)"></div>
+  <div class="mobile-drawer" role="dialog" aria-modal="true" aria-label="Inspector"
+       cdkTrapFocus [cdkTrapFocusAutoCapture]="true"
+       (touchstart)="onDrawerTouchStart($event)" (touchend)="onDrawerTouchEnd($event, 'right')">
+    <div class="drawer-header">
+      <h2 class="h5 mb-0">Inspector</h2>
+      <button type="button" class="btn-close-drawer" (click)="inspectorDrawerOpen.set(false)" aria-label="Close inspector">
+        <i class="fa fa-xmark" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="drawer-body inspector-body">
+      <ng-container *ngTemplateOutlet="inspectorContent"></ng-container>
+    </div>
+  </div>
+}
+
+<!-- ═══ Shared panel templates ═══ -->
+
+<ng-template #inspectorContent>
+  @if (selectedWidget(); as widget) {
+    <div class="inspector-header">
+      <button type="button" class="inspector-back" (click)="clearSelection()" title="Back to dashboard settings (Esc)">
+        <i class="fa fa-chevron-left" aria-hidden="true"></i> Dashboard
+      </button>
+      <div class="inspector-title-row">
+        <span class="inspector-icon"><i class="fa {{ widgetIcon(widget) }}" aria-hidden="true"></i></span>
+        <h2 class="inspector-title" [title]="widgetDisplayName(widget)">{{ widgetDisplayName(widget) }}</h2>
+        @if (selectedSourceSummary(); as summary) {
+          <button type="button" class="source-chip" [ngClass]="'source-chip-' + summary.tone"
+            (click)="sourceDetailsOpen.set(!sourceDetailsOpen())" [attr.aria-expanded]="sourceDetailsOpen()"
+            aria-controls="inspectorSourceDetails" title="Data sources">
+            <span class="source-dot" aria-hidden="true"></span>{{ summary.label }}
           </button>
         }
-      }
+      </div>
     </div>
-  </div>
-}
+    @if (sourceDetailsOpen() && selectedWidgetSourceStatuses().length > 0) {
+      <div id="inspectorSourceDetails" class="source-status-panel mb-2" aria-label="Widget data source status">
+        @for (source of selectedWidgetSourceStatuses(); track source.key) {
+          <div class="source-status-row small">
+            <span class="text-truncate" [title]="source.label">{{ source.label }}</span>
+            <span class="app-status-chip"
+              [ngClass]="source.status.state === 'ready' ? 'app-status-chip-success' : (source.status.state === 'error' ? 'app-status-chip-warning' : 'app-status-chip-muted')"
+              [title]="source.status.error || (source.status.fromCache ? 'Using recently cached data' : '')">
+              {{ source.status.state === 'ready' ? 'Ready' : (source.status.state === 'empty' ? 'No data' : 'Error') }}
+            </span>
+          </div>
+        }
+        <button type="button" class="btn btn-sm btn-link p-0 mt-1" (click)="refreshLivePreview()" [disabled]="renderedCanvasLoading()">
+          Refresh source data
+        </button>
+      </div>
+    }
+    <ng-container *ngTemplateOutlet="propertiesContent"></ng-container>
+  } @else {
+    <div class="inspector-header">
+      <div class="inspector-title-row">
+        <span class="inspector-icon"><i class="fa fa-display" aria-hidden="true"></i></span>
+        <h2 class="inspector-title">Dashboard</h2>
+      </div>
+      <p class="inspector-hint">Select a widget on the canvas or in Layers to edit it.</p>
+    </div>
+    <ng-container *ngTemplateOutlet="dashboardSettingsContent"></ng-container>
+  }
+</ng-template>
 
-<!-- Mobile Right Drawer (Properties / Settings) -->
-@if (usesDrawer() && mobilePropertiesOpen()) {
-  <div class="mobile-drawer-backdrop" (click)="mobilePropertiesOpen.set(false)"></div>
-  <div class="mobile-drawer" role="dialog" aria-modal="true" aria-label="Dashboard settings"
-       cdkTrapFocus [cdkTrapFocusAutoCapture]="true"
-       (touchstart)="onDrawerTouchStart($event)" (touchend)="onDrawerTouchEnd($event)">
-    <div class="drawer-header">
-      <h2 class="h5 mb-0">
-        @if (activeTab() === 'dashboard') { Dashboard settings }
-        @else if (activeTab() === 'widgets') { Widgets ({{ layout().widgets.length }}) }
-        @else { Widget properties }
-      </h2>
-      <button type="button" class="btn-close-drawer" (click)="mobilePropertiesOpen.set(false)" aria-label="Close settings">
-        <i class="fa fa-xmark" aria-hidden="true"></i>
+<ng-template #layersContent>
+  @if (layout().widgets.length === 0) {
+    <div class="layers-empty">
+      <p class="mb-2">No widgets yet.</p>
+      <button type="button" class="btn btn-sm btn-primary" (click)="openPicker()">
+        <i class="fa fa-plus me-1" aria-hidden="true"></i>Add widget
       </button>
     </div>
-    <div class="drawer-tabs" role="tablist" aria-label="Designer panels">
-      <button type="button" class="drawer-tab-btn" [class.active]="activeTab() === 'dashboard'"
-        (click)="activeTab.set('dashboard')" (keydown)="onDesignerTabKeydown($event)" role="tab"
-        [attr.aria-selected]="activeTab() === 'dashboard'" [attr.tabindex]="activeTab() === 'dashboard' ? 0 : -1">
-        <i class="fa fa-cog" aria-hidden="true"></i> Settings
-      </button>
-      <button type="button" class="drawer-tab-btn" [class.active]="activeTab() === 'widgets'"
-        (click)="activeTab.set('widgets')" (keydown)="onDesignerTabKeydown($event)" role="tab"
-        [attr.aria-selected]="activeTab() === 'widgets'" [attr.tabindex]="activeTab() === 'widgets' ? 0 : -1">
-        <i class="fa fa-layer-group" aria-hidden="true"></i> Widgets
-      </button>
-      <button type="button" class="drawer-tab-btn" [class.active]="activeTab() === 'properties'"
-        (click)="activeTab.set('properties')" (keydown)="onDesignerTabKeydown($event)" role="tab"
-        [attr.aria-selected]="activeTab() === 'properties'" [attr.tabindex]="activeTab() === 'properties' ? 0 : -1">
-        <i class="fa fa-sliders" aria-hidden="true"></i> Properties
-      </button>
-    </div>
-    <div class="drawer-body">
-      @if (activeTab() === 'dashboard') {
-        <ng-container *ngTemplateOutlet="dashboardSettingsContent"></ng-container>
+  } @else {
+    <ul class="layers-list" aria-label="Widgets, top-most first">
+      @for (w of layerWidgets(); track w.id) {
+        <li class="layer-row" [class.selected]="selectedWidget()?.id === w.id"
+          (mouseenter)="hoveredWidgetId.set(w.id)" (mouseleave)="hoveredWidgetId.set(null)">
+          <button type="button" class="layer-main" (click)="onLayerSelect(w)"
+            [attr.aria-current]="selectedWidget()?.id === w.id ? 'true' : null"
+            (focus)="hoveredWidgetId.set(w.id)" (blur)="hoveredWidgetId.set(null)">
+            <i class="fa {{ widgetIcon(w) }} layer-icon" aria-hidden="true"></i>
+            <span class="layer-name">{{ widgetDisplayName(w) }}</span>
+            <span class="layer-meta" [title]="'Column ' + (w.position.x + 1) + ', row ' + (w.position.y + 1) + ', ' + w.position.w + ' by ' + w.position.h">
+              {{ w.position.w }}×{{ w.position.h }}
+            </span>
+          </button>
+          <div class="layer-menu">
+            <button type="button" class="layer-menu-btn" (click)="toggleLayerMenu(w, $event)"
+              [attr.aria-label]="'Actions for ' + widgetDisplayName(w)" aria-haspopup="menu" [attr.aria-expanded]="layerMenuWidgetId() === w.id">
+              <i class="fa fa-ellipsis" aria-hidden="true"></i>
+            </button>
+            @if (layerMenuWidgetId() === w.id) {
+              <div class="layer-menu-dropdown" role="menu">
+                <button type="button" role="menuitem" (click)="duplicateWidget(w)"><i class="fa fa-clone" aria-hidden="true"></i>Duplicate</button>
+                <button type="button" role="menuitem" (click)="moveWidgetLayer(w, 'forward')" [disabled]="!canMoveWidgetLayer(w, 'forward')"><i class="fa fa-arrow-up" aria-hidden="true"></i>Bring forward</button>
+                <button type="button" role="menuitem" (click)="moveWidgetLayer(w, 'backward')" [disabled]="!canMoveWidgetLayer(w, 'backward')"><i class="fa fa-arrow-down" aria-hidden="true"></i>Send backward</button>
+                <button type="button" role="menuitem" class="text-danger" (click)="deleteWidget(w)"><i class="fa fa-trash" aria-hidden="true"></i>Delete</button>
+              </div>
+            }
+          </div>
+        </li>
       }
-      @if (activeTab() === 'properties') {
-        <ng-container *ngTemplateOutlet="propertiesContent"></ng-container>
-      }
-      @if (activeTab() === 'widgets') {
-        <ng-container *ngTemplateOutlet="widgetsListContent"></ng-container>
-      }
-    </div>
-  </div>
-}
-
-<!-- ═══ Shared tab content templates ═══ -->
+    </ul>
+    <button type="button" class="layers-add" (click)="openPicker()">
+      <i class="fa fa-plus" aria-hidden="true"></i> Add widget
+    </button>
+  }
+</ng-template>
 
 <ng-template #canvasTools>
   <div class="canvas-tools" role="toolbar" aria-label="Canvas view">
@@ -710,14 +758,7 @@
 </ng-template>
 
 <ng-template #propertiesContent>
-  @if (!selectedWidget()) {
-  <div class="app-empty-state py-4">
-    <span class="app-empty-state-icon"><i class="fa-solid fa-arrow-pointer" aria-hidden="true"></i></span>
-    <div><strong>Select a widget</strong><p class="small text-muted mb-0">Choose a widget on the canvas to edit its content and appearance.</p></div>
-  </div>
-  }
   @if (selectedWidget()) {
-  <h6>{{ selectedWidget()!.type | titlecase }}</h6>
   @if (selectedWidgetSupportsElementEditing()) {
     <button type="button" class="btn btn-sm w-100 mb-2"
       [ngClass]="elementEditingWidgetId() === selectedWidget()!.id ? 'btn-success' : 'btn-outline-primary'"
@@ -730,25 +771,6 @@
       <p class="small text-muted mb-2" role="status">Updating the preview before layout editing…</p>
     }
   }
-  @if (selectedWidgetSourceStatuses().length > 0) {
-    <div class="source-status-panel mb-2" aria-label="Widget data source status">
-      <div class="small fw-semibold mb-1">Data sources</div>
-      @for (source of selectedWidgetSourceStatuses(); track source.key) {
-        <div class="source-status-row small">
-          <span class="text-truncate" [title]="source.label">{{ source.label }}</span>
-          <span class="app-status-chip"
-            [ngClass]="source.status.state === 'ready' ? 'app-status-chip-success' : (source.status.state === 'error' ? 'app-status-chip-warning' : 'app-status-chip-muted')"
-            [title]="source.status.error || (source.status.fromCache ? 'Using recently cached data' : '')">
-            {{ source.status.state === 'ready' ? 'Ready' : (source.status.state === 'empty' ? 'No data' : 'Error') }}
-          </span>
-        </div>
-      }
-      <button type="button" class="btn btn-sm btn-link p-0 mt-1" (click)="refreshLivePreview()" [disabled]="renderedCanvasLoading()">
-        Refresh source data
-      </button>
-    </div>
-  }
-  <hr />
   <div class="collapsible-section" [class.collapsed]="widgetColorOverridesCollapsed()">
     <button type="button" class="collapsible-header collapsible-trigger" (click)="widgetColorOverridesCollapsed.set(!widgetColorOverridesCollapsed())"
       [attr.aria-expanded]="!widgetColorOverridesCollapsed()" aria-controls="widgetColorOverridesPanel">
@@ -787,31 +809,5 @@
     [colorScheme]="layout().colorScheme"
     (widgetChanged)="onWidgetConfigChanged($event)"
     [attr.key]="selectedWidget()!.id"></app-widget-config>
-  }
-</ng-template>
-
-<ng-template #widgetsListContent>
-  @if (layout().widgets.length === 0) {
-  <div class="text-muted text-center py-4">
-    <p>No widgets added yet.</p>
-    <small>Drag widgets from the toolbar or click to add them.</small>
-  </div>
-  } @else {
-  @for (w of layout().widgets; track w.id) {
-  <div class="widget-item" [class.active]="selectedWidget()?.id === w.id"
-    role="button" tabindex="0" [attr.aria-pressed]="selectedWidget()?.id === w.id"
-    (click)="onWidgetSelect(w)" (keydown.enter)="onWidgetSelect(w)" (keydown.space)="$event.preventDefault(); onWidgetSelect(w)">
-    <div class="widget-item-info">
-      <div class="fw-semibold text-truncate">{{ w.titleOverride || (w.type | titlecase) }}</div>
-      <small class="text-muted" [title]="'Column ' + (w.position.x + 1) + ', row ' + (w.position.y + 1)">
-        {{ w.position.x + 1 }},{{ w.position.y + 1 }} · {{ w.position.w }}×{{ w.position.h }}
-      </small>
-    </div>
-    <button class="btn btn-sm btn-danger btn-delete"
-      (click)="deleteWidget(w); $event.stopPropagation()" [attr.aria-label]="'Delete ' + w.type + ' widget'">
-      <i class="fa fa-trash"></i>
-    </button>
-  </div>
-  }
   }
 </ng-template>
