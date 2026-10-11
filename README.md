@@ -24,12 +24,13 @@
 - Drag-and-drop designer for custom layouts built from widgets
 - Connections that feed widgets with data from Home Assistant and Google Calendar & Tasks
 - Existing Home Assistant dashboards, captured by the optional rendering component
-- AI generated widget content from a plain-language prompt, using an OpenAI-compatible provider or a Home Assistant conversation agent
+- AI generated dashboards and widget content from a plain-language prompt, using an OpenAI-compatible provider or a Home Assistant conversation agent
 - E-paper optimized image processing
 - Configurable update schedules with deep sleep for long battery life
 - Secure device pairing and OTA firmware updates
 - Deploy as standalone Docker or Home Assistant Add-on
 - Multi-user support with administration (standalone mode)
+- LiteDB storage by default, or PostgreSQL for hosted deployments
 
 ## How It Works
 
@@ -47,7 +48,7 @@ izBoard has three components that work together:
 2. **Flash the firmware** to your ESP32 device with an e-paper display (see [Firmware README](firmware/README.md))
 3. **Pair the device** — scan the setup Wi-Fi QR, enter Wi-Fi and server details, then claim the display code from any network that can reach the server
 4. **Connect your data** on the Connections page, such as Home Assistant or Google Calendar & Tasks
-5. **Create a dashboard** — design a custom layout, or show a Home Assistant dashboard view (enable Rendering first)
+5. **Create a dashboard** — design a custom layout, or show a Home Assistant dashboard view (enable it first under **Settings → Rendering**)
 6. **Assign the dashboard** to your device and configure the update schedule
 
 See the individual component READMEs for detailed setup instructions.

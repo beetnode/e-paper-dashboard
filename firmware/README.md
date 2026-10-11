@@ -62,6 +62,10 @@ Using VS Code:
 1. Open the `firmware` folder in VS Code
 2. Click **Upload** in the PlatformIO toolbar
 
+## Versioning
+
+`FIRMWARE_VERSION` in `src/version.h` must match the release tag (for example `0.5.0` for `v0.5.0`). The server offers the firmware from the latest GitHub release, and a device updates over the air when that release is newer than its own version.
+
 ## Dependencies
 
 Managed automatically by PlatformIO — see `platformio.ini` for the full list.

@@ -28,13 +28,18 @@ jobs:
       base_version: ${{ steps.version.outputs.base_version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history so the build number can be derived from the commit count.
+          fetch-depth: 0
       - id: version
         name: Get version
         run: |
           base=$(sed -n 's/.*<Version>\([^<]*\)<\/Version>.*/\1/p' software/EPaperDashboard/EPaperDashboard.csproj | tr -d '[:space:]')
           [[ "$base" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
           echo "base_version=$base" >> "$GITHUB_OUTPUT"
-          echo "version=$base.$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+          # Commit count is shared by dev and release builds of the same commit, unlike the
+          # per-workflow run number, so a release continues the dev build sequence.
+          echo "version=$base.$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
 
   rendering-component:
     needs: version
