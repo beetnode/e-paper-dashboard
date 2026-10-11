@@ -40,7 +40,7 @@
     <div class="designer-toolbar-actions">
       <ng-container *ngTemplateOutlet="canvasTools"></ng-container>
       <span class="toolbar-divider" aria-hidden="true"></span>
-      <div class="ai-toggle-pill" [class.active]="aiEnabled()" [title]="aiConfigMode() === 'None' ? 'Configure an AI provider in AI Config or dashboard settings first' : 'AI generated widgets'">
+      <div class="ai-toggle-pill" [class.active]="aiEnabled()" [title]="aiConfigMode() === 'None' ? 'Set up an AI provider in Settings › AI provider or in the dashboard settings first' : 'AI generated widgets'">
         <div class="form-check form-switch mb-0">
           <input class="form-check-input" type="checkbox" id="aiEnabledHeader" role="switch"
             [checked]="aiEnabled()"

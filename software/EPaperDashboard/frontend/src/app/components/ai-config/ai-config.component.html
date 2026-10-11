@@ -1,51 +1,62 @@
 <div class="app-page">
   <div class="app-page-header">
     <div>
-      <h1 class="app-page-title">AI configuration</h1>
-      <p class="app-page-description">Choose the default provider used to generate dashboard content. A dashboard can override this provider when needed.</p>
+      <h1 class="app-page-title">AI provider</h1>
+      <p class="app-page-description">The default provider for AI generated widgets. A dashboard can use a Home Assistant conversation agent instead.</p>
     </div>
     @if (!isLoading() && !loadError()) {
-      <span class="app-status-chip" [ngClass]="isDirty() ? 'app-status-chip-warning' : 'app-status-chip-success'">
-        {{ isDirty() ? 'Unsaved changes' : 'Saved' }}
-      </span>
+      <div class="app-page-actions">
+        <span class="visually-hidden" aria-live="polite">{{ isDirty() ? 'Unsaved changes' : '' }}</span>
+        <!-- Shown only with unsaved changes, so it doubles as the change indicator. -->
+        @if (isDirty()) {
+          <button type="button" class="btn btn-outline-secondary" (click)="discardChanges()" [disabled]="isSaving()" title="Discard unsaved changes" aria-label="Discard unsaved changes">
+            <i class="fa-solid fa-rotate-left" aria-hidden="true"></i><span class="d-none d-sm-inline ms-1">Discard</span>
+          </button>
+        }
+        <button type="submit" form="aiConfigForm" class="btn btn-primary" [disabled]="!isDirty() || isSaving() || !isConfigValid()" aria-label="Save">
+          @if (isSaving()) {
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          } @else {
+            <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+          }
+          <span class="d-none d-sm-inline ms-1">Save</span>
+        </button>
+      </div>
     }
   </div>
 
     @if (isLoading()) {
       <div class="app-loading-state">
         <div class="spinner-border" role="status">
-          <span class="visually-hidden">Loading AI configuration</span>
+          <span class="visually-hidden">Loading AI provider</span>
         </div>
       </div>
     } @else if (loadError()) {
       <div class="app-empty-state" role="alert">
         <span class="app-empty-state-icon text-danger"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></span>
-        <div><h2 class="h5 mb-1">AI configuration could not be loaded</h2><p class="text-muted mb-0">{{ loadError() }}</p></div>
+        <div><h2 class="h5 mb-1">AI provider could not be loaded</h2><p class="text-muted mb-0">{{ loadError() }}</p></div>
         <button type="button" class="btn btn-outline-primary" (click)="loadConfig()">
           <i class="fa-solid fa-rotate-right me-1" aria-hidden="true"></i>Try again
         </button>
       </div>
     } @else {
-      <div class="card shadow-sm app-form-shell app-form-shell-wide">
-        <div class="card-body">
-          <form (ngSubmit)="save()">
-            <div class="mb-3">
-              <label class="form-label fw-semibold" for="aiConnectionMode">Connection mode</label>
+      <div class="app-form-shell app-form-shell-wide">
+        <section class="app-section-card">
+          <form id="aiConfigForm" (ngSubmit)="save()">
+            <div [class.mb-3]="aiConfig().connectionMode === 'Direct'">
+              <label class="form-label fw-semibold" for="aiConnectionMode">Provider</label>
               <select id="aiConnectionMode" class="form-select"
                 [ngModel]="aiConfig().connectionMode"
                 (ngModelChange)="onConnectionModeChange($event)"
                 [ngModelOptions]="{standalone: true}">
                 <option value="None">None (AI disabled)</option>
-                <option value="Direct">Direct (OpenAI-compatible API)</option>
+                <option value="Direct">OpenAI-compatible API</option>
               </select>
-              <small class="form-text text-muted">Choose a default AI provider. To use a Home Assistant conversation agent, configure it on the individual dashboard.</small>
             </div>
 
             @if (aiConfig().connectionMode === 'Direct') {
-              <hr>
-              <h2 class="h5 mb-3">Direct API settings</h2>
               <div class="mb-3">
-                <label class="form-label" for="aiEndpoint">API endpoint</label>
+                <label class="form-label fw-semibold" for="aiEndpoint">API endpoint</label>
                 <input id="aiEndpoint" type="url" class="form-control"
                   [value]="aiConfig().directEndpoint || ''"
                   (input)="updateField('directEndpoint', $any($event.target).value)"
@@ -54,7 +65,7 @@
                 <small class="form-text text-muted">OpenAI, Ollama, LM Studio, or any compatible endpoint</small>
               </div>
               <div class="mb-3">
-                <label class="form-label" for="aiApiKey">API key <span class="text-muted fw-normal">(optional for local providers)</span></label>
+                <label class="form-label fw-semibold" for="aiApiKey">API key <span class="text-muted fw-normal">(optional for local providers)</span></label>
                 <div class="input-group">
                   <input id="aiApiKey" [type]="showApiKey() ? 'text' : 'password'" class="form-control"
                     [value]="aiConfig().directApiKey || ''"
@@ -65,10 +76,9 @@
                     <i class="fa-solid" [ngClass]="showApiKey() ? 'fa-eye-slash' : 'fa-eye'" aria-hidden="true"></i>
                   </button>
                 </div>
-                <small class="form-text text-muted">Required for OpenAI, optional for local services like Ollama or LM Studio</small>
               </div>
               <div class="mb-3">
-                <label class="form-label" for="aiModel">Model</label>
+                <label class="form-label fw-semibold" for="aiModel">Model</label>
                 <div class="input-group">
                   @if (availableModels().length > 0) {
                     <select id="aiModel" class="form-select"
@@ -87,9 +97,11 @@
                       placeholder="gpt-4o-mini" required />
                   }
                 </div>
-                <small class="form-text text-muted">Select from available models or enter manually</small>
+                @if (availableModels().length === 0) {
+                  <small class="form-text text-muted">Test the connection to choose from the available models.</small>
+                }
               </div>
-              <div class="d-flex align-items-center flex-wrap gap-2 mb-3">
+              <div class="d-flex align-items-center flex-wrap gap-2">
                 <button type="button" class="btn btn-outline-primary" (click)="fetchModels()"
                   [disabled]="isLoadingModels() || !aiConfig().directEndpoint">
                   @if (isLoadingModels()) {
@@ -106,23 +118,11 @@
               </div>
             }
 
-            <hr>
-            @if (!isConfigValid()) {
-              <div class="alert alert-warning py-2" role="status">Enter both an API endpoint and model before saving.</div>
+            @if (isDirty() && !isConfigValid()) {
+              <div class="alert alert-warning py-2 mt-3 mb-0" role="status">Enter both an API endpoint and model before saving.</div>
             }
-            <div class="d-flex flex-column-reverse flex-sm-row justify-content-end gap-2">
-              <button type="button" class="btn btn-outline-secondary" (click)="discardChanges()" [disabled]="!isDirty() || isSaving()">
-                <i class="fa fa-rotate-left me-1" aria-hidden="true"></i>Discard
-              </button>
-              <button type="submit" class="btn btn-primary" [disabled]="!isDirty() || isSaving() || !isConfigValid()">
-                @if (isSaving()) {
-                  <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
-                }
-                Save configuration
-              </button>
-            </div>
           </form>
-        </div>
+        </section>
       </div>
     }
 </div>

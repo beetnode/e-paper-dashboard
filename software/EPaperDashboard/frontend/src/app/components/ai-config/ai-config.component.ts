@@ -110,11 +110,11 @@ export class AiConfigComponent implements OnInit, HasUnsavedChanges {
       next: (config) => {
         this.aiConfig.set(config);
         this.originalAiConfig = JSON.stringify(config);
-        this.toastService.success('AI configuration saved.');
+        this.toastService.success('AI provider saved.');
         this.isSaving.set(false);
       },
       error: (err) => {
-        this.toastService.error(err.error?.message || 'Failed to save AI configuration.');
+        this.toastService.error(err.error?.message || 'Failed to save AI provider.');
         this.isSaving.set(false);
       }
     });
