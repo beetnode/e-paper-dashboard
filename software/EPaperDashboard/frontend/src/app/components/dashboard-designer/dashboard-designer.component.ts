@@ -192,6 +192,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
 
   // Dirty tracking
   private savedSnapshot = signal('');
+  readonly isSaving = signal(false);
   readonly isDirty = computed(() => {
     const current = this.computeCurrentSnapshot();
     return current !== this.savedSnapshot();
@@ -1185,7 +1186,10 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
 
 
   saveDashboard(): void {
-    if (!this.dashboard()) return;
+    if (!this.dashboard() || this.isSaving()) return;
+    // Changes made while the request runs stay unsaved, so remember exactly what is sent.
+    const savedSnapshot = this.computeCurrentSnapshot();
+    this.isSaving.set(true);
 
     const layoutConfig = this.layout();
     const payload: any = { layoutConfig, orientation: this.orientation() };
@@ -1203,10 +1207,12 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
           aiPrompt: payload.aiPrompt,
           aiLeadTimeMinutes: payload.aiLeadTimeMinutes,
         } : d);
-        this.markAsPristine();
+        this.savedSnapshot.set(savedSnapshot);
+        this.isSaving.set(false);
         this.toastService.success('Dashboard saved.');
       },
       error: (err) => {
+        this.isSaving.set(false);
         if (err.status === 401 || err.status === 403) {
           this.toastService.error('Your session has expired. Sign in again to save.');
           this.router.navigate(['/login'], { queryParams: { returnUrl: this.router.url } });
