@@ -1,20 +1,22 @@
 # izBoard Software
 
-The server component of the izBoard system. An ASP.NET Core web application with an Angular frontend that renders dashboards into images optimized for E-Paper displays. Integrates with Home Assistant and provides a visual dashboard designer, device management, and scheduled updates.
+The server component of the izBoard system. An ASP.NET Core web application with an Angular frontend that renders dashboards into images optimized for E-Paper displays. It provides a visual dashboard designer, data connections to Home Assistant and Google Calendar & Tasks, device management, and scheduled updates.
 
 ## Features
 
-- Visual dashboard designer with multiple widget types
-- AI-powered dashboard generation — describe your ideal layout in natural language and have AI create it using your Home Assistant entities, calendars, weather, and more
-- Built-in data provider plugins: Home Assistant and Google Calendar / Tasks
-- Multiple named connections per user, shared across their dashboards
+- Two dashboard types: **Custom layout** (widgets edited in the designer) and **Home Assistant dashboard** (an existing dashboard view captured by the rendering component)
+- Visual designer with a layers panel, inspector, searchable widget picker, grid-snapped drag and resize, position fields, and per-widget font sizes
+- Provider-neutral widgets: every widget accepts compatible sources from any connection
+- Built-in data provider plugins: Home Assistant and Google Calendar & Tasks, with health shown wherever sources are chosen
+- Multiple named connections per user, shared across their dashboards, with Home Assistant sign-in or long-lived tokens
+- AI generation from a plain-language prompt, for whole dashboards or individual widgets, through an OpenAI-compatible provider or a Home Assistant conversation agent; content can be regenerated ahead of scheduled updates
 - E-Paper optimized image processing
-- Device management and pairing
+- Device management, claim-code pairing, and OTA firmware delivery
 - Configurable update schedules
-- OTA firmware delivery to devices
-- Multi-user authentication (standalone mode)
+- Multi-user accounts with one-time administrator setup (standalone mode)
+- LiteDB storage by default, or PostgreSQL for hosted deployments
 - Deployable as standalone Docker or Home Assistant Add-on
-- Optional Home Assistant dashboard screenshots through an on-demand rendering component
+- Optional Home Assistant dashboard screenshots through an on-demand, sandboxed rendering component
 
 ## Data providers
 
@@ -71,7 +73,7 @@ The add-on image `izdevdigital/izboard-addon` is built from the `addon` target o
 | `APP_MODE` | No | Deployment mode: `standalone` (default) or `addon` |
 | `DATABASE_PROVIDER` | No | `litedb` (default) or `postgresql`. Independent of `APP_MODE`. |
 | `DATABASE_CONNECTION_STRING` | PostgreSQL only | Npgsql connection string for an existing PostgreSQL database. |
-| `HOMEASSISTANT_HOST` | No | Home Assistant URL (auto-detected in add-on mode) |
+| `HOME_ASSISTANT_HOST` | No | Home Assistant URL (auto-detected in add-on mode) |
 | `RENDERING_COMPONENT_REPOSITORY` | No | GitHub repository that publishes the optional rendering component (default: `beetnode/e-paper-dashboard`) |
 | `RENDERING_COMPONENT_RELEASE_TAG` | No | Override the component release tag; normally set by the official image |
 | `RENDERING_COMPONENT_BASE_URL` | No | Direct component artifact source for manual deployment testing; bypasses GitHub release lookup |
@@ -79,6 +81,7 @@ The add-on image `izdevdigital/izboard-addon` is built from the `addon` target o
 | `RENDERING_LOG_WORKER_ERRORS` | No | Set to `1` on the renderer to log raw browser errors for troubleshooting. They can contain dashboard URLs and page text. Default: `0` |
 | `RENDERING_MAX_CONCURRENT_RENDERS` | No | Concurrent worker limit, 1–16 (default: 2); increase only after measuring memory use |
 | `RENDERING_MAX_QUEUED_RENDERS` | No | Waiting request limit, 0–1000 (default: 100) |
+| `RENDERING_MAX_QUEUED_RENDERS_PER_USER` | No | Waiting request limit per user, 0–100 (default: 5) |
 
 ### Ports
 
@@ -135,7 +138,7 @@ docker compose -f docker-compose.base.yml -f docker-compose.renderer.yml up -d -
 This uses the published application image, not a local rebuild. For unpublished source builds use the local component test
 stack below instead. The app and sidecar must use the same image build; set `IZBOARD_APP_IMAGE` to select a published image
 (preferably an immutable digest) for both. Update/recreate
-both containers together. A mismatched sidecar fails closed and System reports the component as not ready. Custom layouts do
+both containers together. A mismatched sidecar fails closed and **Settings → System** reports the component as not ready. Custom layouts do
 not require the sidecar. Home Assistant add-ons retain local execution for their single trusted user.
 
 The app writes component files into its existing persistent data volume. A one-shot storage initializer creates its `components`
@@ -156,7 +159,7 @@ users' Home Assistant servers: operators should restrict outbound access to appr
 and unrelated internal services. Container/browser isolation does not by itself provide an SSRF/network-access policy.
 
 The default image does not include the browser-rendering runtime or browser binaries. Custom layouts work without them.
-To render an existing Home Assistant dashboard, sign in with your own account, open **Rendering**, and select **Enable for my account**.
+To render an existing Home Assistant dashboard, sign in with your own account, open **Settings → Rendering**, and select **Enable for my account**.
 In add-on mode, open the same page through Home Assistant ingress; the control applies to the whole add-on.
 izBoard downloads the version-matched component for the current CPU architecture from the project's GitHub release, verifies its
 SHA-256 checksum, performs a browser readiness test, and activates it immediately. The component is stored in the persistent `/data` volume, so it survives image
@@ -183,7 +186,7 @@ docker compose -f docker-compose.base.yml -f docker-compose.rendering.yml up --b
 ```
 
 Set `CLIENT_URL=http://localhost:8128` in your local `.env` for this test. Open `http://localhost:8128`,
-complete administrator setup, then register a regular account. Open **Rendering** and select
+complete administrator setup, then register a regular account. Open **Settings → Rendering** and select
 **Enable for my account**, followed by **Test rendering**. Set `IZBOARD_VERSION` to override the default test version; the application
 and component builds always receive the same value.
 
@@ -207,7 +210,7 @@ Other replicas observe preference changes and account deletion through a one-sec
 its own matching runtime on the first render; the caller can retry once preparation completes. Replicas must have separate component
 directories and private renderer sockets. User preferences are shared through PostgreSQL; queue limits are per replica, not cluster-wide.
 
-The service administrator retains global component installation/removal and diagnostic controls under **System**. Removing a shared
+The service administrator retains global component installation/removal and diagnostic controls under **Settings → System**. Removing a shared
 component affects all users on that replica; an enabled user's next render can prepare it again. Use deployment configuration to take
 a renderer offline for maintenance. Users only enable/disable their own capability and cannot remove shared files.
 
