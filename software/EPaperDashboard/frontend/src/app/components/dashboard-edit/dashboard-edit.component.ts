@@ -52,7 +52,7 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
         </div>
       </div>
     } @else if (dashboard()) {
-      <form (ngSubmit)="onSubmit()" [formGroup]="dashboardForm" class="app-page app-form-shell app-form-shell-wide">
+      <form (ngSubmit)="onSubmit()" [formGroup]="dashboardForm" class="app-page">
         <div class="app-action-bar">
           <div class="action-bar-title">
             <button type="button" class="btn btn-sm btn-outline-secondary" (click)="onCancel()" aria-label="Back to dashboards" title="Back to dashboards">
@@ -85,72 +85,166 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
           </div>
         </div>
 
-        <div class="app-section-stack">
+        <div class="app-section-grid">
           @if (dashboard()!.hasLegacyConnection) {
-            <ng-container *ngTemplateOutlet="legacySettingsNotice" />
+            <div class="app-section-grid-full">
+              <ng-container *ngTemplateOutlet="legacySettingsNotice" />
+            </div>
           }
 
-          <section class="app-section-card" aria-labelledby="generalSettingsTitle">
-            <h2 id="generalSettingsTitle" class="app-section-title mb-3">General</h2>
-            <div class="mb-3">
-              <label class="form-label fw-semibold" for="editDashboardName">Name</label>
-              <input id="editDashboardName" type="text" class="form-control" formControlName="name" required
-                [class.is-invalid]="dashboardForm.get('name')?.touched && !dashboardForm.get('name')?.value?.trim()" />
-              @if (dashboardForm.get('name')?.touched && !dashboardForm.get('name')?.value?.trim()) {
-                <div class="invalid-feedback">Name is required.</div>
-              }
-            </div>
-            <div>
-              <label class="form-label fw-semibold" for="editDashboardDescription">Description <span class="text-muted fw-normal">(optional)</span></label>
-              <input id="editDashboardDescription" type="text" class="form-control" formControlName="description" />
-            </div>
-          </section>
-
-          @if (previewModeValue === 'homeassistant') {
-            <section class="app-section-card" aria-labelledby="contentSettingsTitle">
-              <h2 id="contentSettingsTitle" class="app-section-title">Home Assistant dashboard</h2>
-              <p class="app-section-description">The view captured and sent to the display.</p>
-              @if (!renderingEnabled() || !playwrightStatus()?.ready) {
-                <div class="alert alert-warning small" role="alert">
-                  <strong>Rendering is not ready.</strong> Home Assistant dashboards are captured by the rendering component.
-                  <a routerLink="/rendering" target="_blank" rel="noopener" class="alert-link">Enable it in Rendering settings.</a>
-                </div>
-              }
-              <div class="row g-3 mb-3">
-                <div class="col-12 col-sm-6">
-                  <label class="form-label fw-semibold" for="editScreenSize">Screen size</label>
-                  <select id="editScreenSize" class="form-select" [(ngModel)]="selectedSizeIndex" [ngModelOptions]="{standalone: true}" (change)="onSizeChange()">
-                    @for (size of sizePresets; track size.label; let i = $index) {
-                      <option [ngValue]="i">{{ size.label }}</option>
-                    }
-                  </select>
-                </div>
-                <div class="col-12 col-sm-6">
-                  <span class="form-label fw-semibold d-block" id="editOrientationLabel">Orientation</span>
-                  <div class="btn-group d-flex" role="group" aria-labelledby="editOrientationLabel">
-                    <input type="radio" class="btn-check" name="orientationMode" id="landscapeMode" value="Landscape" [(ngModel)]="orientationValue" [ngModelOptions]="{standalone: true}" (change)="onOrientationChange()" />
-                    <label class="btn btn-outline-secondary flex-grow-1" for="landscapeMode">
-                      <i class="fa-solid fa-display" aria-hidden="true"></i> Landscape
-                    </label>
-                    <input type="radio" class="btn-check" name="orientationMode" id="portraitMode" value="Portrait" [(ngModel)]="orientationValue" [ngModelOptions]="{standalone: true}" (change)="onOrientationChange()" />
-                    <label class="btn btn-outline-secondary flex-grow-1" for="portraitMode">
-                      <i class="fa-solid fa-mobile-screen" aria-hidden="true"></i> Portrait
-                    </label>
+          <div class="app-section-stack">
+            <section class="app-section-card" aria-labelledby="generalSettingsTitle">
+              <h2 id="generalSettingsTitle" class="app-section-title mb-3">General</h2>
+              <div class="mb-3">
+                <label class="form-label fw-semibold" for="editDashboardName">Name</label>
+                <input id="editDashboardName" type="text" class="form-control" formControlName="name" required
+                  [class.is-invalid]="dashboardForm.get('name')?.touched && !dashboardForm.get('name')?.value?.trim()" />
+                @if (dashboardForm.get('name')?.touched && !dashboardForm.get('name')?.value?.trim()) {
+                  <div class="invalid-feedback">Name is required.</div>
+                }
+              </div>
+              <div>
+                <label class="form-label fw-semibold" for="editDashboardDescription">Description <span class="text-muted fw-normal">(optional)</span></label>
+                <input id="editDashboardDescription" type="text" class="form-control" formControlName="description" />
+              </div>
+            </section>
+            @if (previewModeValue === 'homeassistant') {
+              <section class="app-section-card" aria-labelledby="contentSettingsTitle">
+                <h2 id="contentSettingsTitle" class="app-section-title">Home Assistant dashboard</h2>
+                <p class="app-section-description">The view captured and sent to the display.</p>
+                @if (!renderingEnabled() || !playwrightStatus()?.ready) {
+                  <div class="alert alert-warning small" role="alert">
+                    <strong>Rendering is not ready.</strong> Home Assistant dashboards are captured by the rendering component.
+                    <a routerLink="/rendering" target="_blank" rel="noopener" class="alert-link">Enable it in Rendering settings.</a>
+                  </div>
+                }
+                <div class="row g-3 mb-3">
+                  <div class="col-12 col-sm-6">
+                    <label class="form-label fw-semibold" for="editScreenSize">Screen size</label>
+                    <select id="editScreenSize" class="form-select" [(ngModel)]="selectedSizeIndex" [ngModelOptions]="{standalone: true}" (change)="onSizeChange()">
+                      @for (size of sizePresets; track size.label; let i = $index) {
+                        <option [ngValue]="i">{{ size.label }}</option>
+                      }
+                    </select>
+                  </div>
+                  <div class="col-12 col-sm-6">
+                    <span class="form-label fw-semibold d-block" id="editOrientationLabel">Orientation</span>
+                    <div class="btn-group d-flex" role="group" aria-labelledby="editOrientationLabel">
+                      <input type="radio" class="btn-check" name="orientationMode" id="landscapeMode" value="Landscape" [(ngModel)]="orientationValue" [ngModelOptions]="{standalone: true}" (change)="onOrientationChange()" />
+                      <label class="btn btn-outline-secondary flex-grow-1" for="landscapeMode">
+                        <i class="fa-solid fa-display" aria-hidden="true"></i> Landscape
+                      </label>
+                      <input type="radio" class="btn-check" name="orientationMode" id="portraitMode" value="Portrait" [(ngModel)]="orientationValue" [ngModelOptions]="{standalone: true}" (change)="onOrientationChange()" />
+                      <label class="btn btn-outline-secondary flex-grow-1" for="portraitMode">
+                        <i class="fa-solid fa-mobile-screen" aria-hidden="true"></i> Portrait
+                      </label>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <app-home-assistant-target-picker
-                [connectionId]="dashboardForm.controls.homeAssistantConnectionId.value"
-                (connectionIdChange)="onHomeAssistantConnectionChange($event)"
-                [path]="dashboardForm.controls.path.value"
-                (pathChange)="onHomeAssistantPathChange($event)"
-                [allowDashboardSettings]="!!dashboard()!.hasLegacyConnection"
-                dashboardSettingsLabel="Legacy dashboard settings"
-                [dashboardId]="dashboard()!.id"
-                [dashboardSettingsReady]="dashboardSettingsReady()" />
-            </section>
-          }
+                <app-home-assistant-target-picker
+                  [connectionId]="dashboardForm.controls.homeAssistantConnectionId.value"
+                  (connectionIdChange)="onHomeAssistantConnectionChange($event)"
+                  [path]="dashboardForm.controls.path.value"
+                  (pathChange)="onHomeAssistantPathChange($event)"
+                  [allowDashboardSettings]="!!dashboard()!.hasLegacyConnection"
+                  dashboardSettingsLabel="Legacy dashboard settings"
+                  [dashboardId]="dashboard()!.id"
+                  [dashboardSettingsReady]="dashboardSettingsReady()" />
+              </section>
+            } @else {
+              <ng-container *ngTemplateOutlet="scheduleSection" />
+            }
+          </div>
 
+          <div class="app-section-stack">
+            @if (previewModeValue === 'homeassistant') {
+              <ng-container *ngTemplateOutlet="scheduleSection" />
+            }
+            <section class="app-section-card" aria-labelledby="devicesSettingsTitle">
+              <div class="app-section-header mb-2">
+                <h2 id="devicesSettingsTitle" class="app-section-title mb-0">Devices</h2>
+                <a routerLink="/devices" class="btn btn-sm btn-outline-secondary">Manage devices</a>
+              </div>
+              @if (isLoadingDevices()) {
+                <div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading devices</span></div>
+              } @else if (devices().length > 0) {
+                <ul class="list-unstyled mb-0">
+                  @for (device of devices(); track device.id) {
+                    <li class="d-flex align-items-center gap-2 py-1">
+                      <i class="fa-solid fa-tablet-screen-button text-muted" aria-hidden="true"></i>
+                      <span>{{ device.name }}</span>
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <p class="text-muted small mb-0">Not shown on any device yet. Assign it from the Devices page.</p>
+              }
+            </section>
+
+            <section class="app-section-card" aria-labelledby="aiSettingsTitle">
+              <h2 id="aiSettingsTitle" class="app-section-title">AI provider</h2>
+              <p class="app-section-description">Used for AI generated widgets. Defaults to the <a routerLink="/ai/config">global AI provider</a>.</p>
+              <div [class.mb-3]="aiConfig().connectionMode === 'HomeAssistant'">
+                <label class="form-label fw-semibold" for="aiConnectionMode">Provider</label>
+                <select id="aiConnectionMode" class="form-select"
+                  [ngModel]="aiConfig().connectionMode"
+                  (ngModelChange)="onAiConnectionModeChange($event)"
+                  [ngModelOptions]="{standalone: true}">
+                  <option value="None">Global AI provider</option>
+                  <option value="HomeAssistant">Home Assistant conversation agent</option>
+                </select>
+              </div>
+
+              @if (aiConfig().connectionMode === 'HomeAssistant') {
+                <div class="row g-3">
+                  <div class="col-12 col-sm-6">
+                    <label class="form-label fw-semibold" for="aiHomeAssistantConnection">Connection</label>
+                    <select id="aiHomeAssistantConnection" class="form-select"
+                      [ngModel]="aiConfig().homeAssistantConnectionId || ''"
+                      (ngModelChange)="onAiHomeAssistantConnectionChange($event)"
+                      [ngModelOptions]="{standalone: true}">
+                      @if (isAddonMode()) {
+                        <option value="">Home Assistant add-on</option>
+                      } @else if (dashboard()!.hasLegacyConnection) {
+                        <option value="">Legacy dashboard settings</option>
+                      } @else {
+                        <option value="" disabled>Select a connection</option>
+                      }
+                      @for (connection of homeAssistantConnections(); track connection.id) {
+                        <option [value]="connection.id">{{ connection.name }}{{ connection.connected ? '' : ' (sign-in required)' }}</option>
+                      }
+                    </select>
+                    <small class="form-text text-muted"><a routerLink="/connections" target="_blank" rel="noopener">Manage connections</a></small>
+                  </div>
+                  <div class="col-12 col-sm-6">
+                    <label class="form-label fw-semibold" for="aiConversationAgent">Conversation agent</label>
+                    @if (isLoadingAgents()) {
+                      <div class="d-flex align-items-center gap-2 py-2" role="status">
+                        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                        <span class="text-muted">Loading agents…</span>
+                      </div>
+                    } @else {
+                      <select id="aiConversationAgent" class="form-select"
+                        [ngModel]="aiConfig().homeAssistantAgentId || ''"
+                        (ngModelChange)="updateAiField('homeAssistantAgentId', $event)"
+                        [ngModelOptions]="{standalone: true}">
+                        <option value="">Default agent</option>
+                        @for (agent of conversationAgents(); track agent.id) {
+                          <option [value]="agent.id">{{ agent.name }}</option>
+                        }
+                      </select>
+                      @if (conversationAgents().length === 0) {
+                        <small class="form-text text-muted">No agents found. Check that the connection is signed in.</small>
+                      }
+                    }
+                  </div>
+                </div>
+              }
+            </section>
+          </div>
+        </div>
+
+        <ng-template #scheduleSection>
           <section class="app-section-card" aria-labelledby="scheduleSettingsTitle">
             <h2 id="scheduleSettingsTitle" class="app-section-title">Update schedule</h2>
             <p class="app-section-description">Times when displays showing this dashboard refresh.</p>
@@ -174,89 +268,7 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
               }
             </div>
           </section>
-
-          <section class="app-section-card" aria-labelledby="devicesSettingsTitle">
-            <div class="app-section-header mb-2">
-              <h2 id="devicesSettingsTitle" class="app-section-title mb-0">Devices</h2>
-              <a routerLink="/devices" class="btn btn-sm btn-outline-secondary">Manage devices</a>
-            </div>
-            @if (isLoadingDevices()) {
-              <div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading devices</span></div>
-            } @else if (devices().length > 0) {
-              <ul class="list-unstyled mb-0">
-                @for (device of devices(); track device.id) {
-                  <li class="d-flex align-items-center gap-2 py-1">
-                    <i class="fa-solid fa-tablet-screen-button text-muted" aria-hidden="true"></i>
-                    <span>{{ device.name }}</span>
-                  </li>
-                }
-              </ul>
-            } @else {
-              <p class="text-muted small mb-0">Not shown on any device yet. Assign it from the Devices page.</p>
-            }
-          </section>
-
-          <section class="app-section-card" aria-labelledby="aiSettingsTitle">
-            <h2 id="aiSettingsTitle" class="app-section-title">AI provider</h2>
-            <p class="app-section-description">Used for AI generated widgets. Defaults to the <a routerLink="/ai/config">global AI provider</a>.</p>
-            <div [class.mb-3]="aiConfig().connectionMode === 'HomeAssistant'">
-              <label class="form-label fw-semibold" for="aiConnectionMode">Provider</label>
-              <select id="aiConnectionMode" class="form-select"
-                [ngModel]="aiConfig().connectionMode"
-                (ngModelChange)="onAiConnectionModeChange($event)"
-                [ngModelOptions]="{standalone: true}">
-                <option value="None">Global AI provider</option>
-                <option value="HomeAssistant">Home Assistant conversation agent</option>
-              </select>
-            </div>
-
-            @if (aiConfig().connectionMode === 'HomeAssistant') {
-              <div class="row g-3">
-                <div class="col-12 col-sm-6">
-                  <label class="form-label fw-semibold" for="aiHomeAssistantConnection">Connection</label>
-                  <select id="aiHomeAssistantConnection" class="form-select"
-                    [ngModel]="aiConfig().homeAssistantConnectionId || ''"
-                    (ngModelChange)="onAiHomeAssistantConnectionChange($event)"
-                    [ngModelOptions]="{standalone: true}">
-                    @if (isAddonMode()) {
-                      <option value="">Home Assistant add-on</option>
-                    } @else if (dashboard()!.hasLegacyConnection) {
-                      <option value="">Legacy dashboard settings</option>
-                    } @else {
-                      <option value="" disabled>Select a connection</option>
-                    }
-                    @for (connection of homeAssistantConnections(); track connection.id) {
-                      <option [value]="connection.id">{{ connection.name }}{{ connection.connected ? '' : ' (sign-in required)' }}</option>
-                    }
-                  </select>
-                  <small class="form-text text-muted"><a routerLink="/connections" target="_blank" rel="noopener">Manage connections</a></small>
-                </div>
-                <div class="col-12 col-sm-6">
-                  <label class="form-label fw-semibold" for="aiConversationAgent">Conversation agent</label>
-                  @if (isLoadingAgents()) {
-                    <div class="d-flex align-items-center gap-2 py-2" role="status">
-                      <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-                      <span class="text-muted">Loading agents…</span>
-                    </div>
-                  } @else {
-                    <select id="aiConversationAgent" class="form-select"
-                      [ngModel]="aiConfig().homeAssistantAgentId || ''"
-                      (ngModelChange)="updateAiField('homeAssistantAgentId', $event)"
-                      [ngModelOptions]="{standalone: true}">
-                      <option value="">Default agent</option>
-                      @for (agent of conversationAgents(); track agent.id) {
-                        <option [value]="agent.id">{{ agent.name }}</option>
-                      }
-                    </select>
-                    @if (conversationAgents().length === 0) {
-                      <small class="form-text text-muted">No agents found. Check that the connection is signed in.</small>
-                    }
-                  }
-                </div>
-              </div>
-            }
-          </section>
-        </div>
+        </ng-template>
 
         <ng-template #legacySettingsNotice>
           <div class="alert alert-secondary small mb-0" role="status">
