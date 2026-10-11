@@ -87,7 +87,9 @@ import { ToastService } from '../../services/toast.service';
               </div>
               <div class="app-list-item-actions">
                 @if (supportsSignIn(connection.pluginId) && !connection.connected) {
-                  <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="authorize(connection)">Sign in to {{ pluginName(connection.pluginId) }}</button>
+                  <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="authorize(connection)" [attr.aria-label]="'Sign in to ' + pluginName(connection.pluginId)">
+                    <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i><span class="d-none d-md-inline">Sign in to {{ pluginName(connection.pluginId) }}</span><span class="d-md-none">Sign in</span>
+                  </button>
                 }
                 <button type="button" class="btn btn-outline-secondary app-icon-button" [disabled]="busy() || !connection.connected" (click)="test(connection)"
                   [attr.aria-label]="'Test ' + connection.name" title="Test connection">
