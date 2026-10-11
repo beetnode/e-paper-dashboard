@@ -143,9 +143,9 @@ export class DashboardListComponent {
         try {
           await firstValueFrom(this.dashboardService.deleteDashboard(id));
           this.dashboards.update(list => list.filter(d => d.id !== id));
-          this.toastService.success('Dashboard deleted');
+          this.toastService.success('Dashboard deleted.');
         } catch (error: any) {
-          this.toastService.error(error.error?.message || 'Failed to delete dashboard');
+          this.toastService.httpError(error, 'Could not delete the dashboard.');
           this.loadDashboards();
         }
       }

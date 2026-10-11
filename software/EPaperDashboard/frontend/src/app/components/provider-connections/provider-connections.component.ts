@@ -229,5 +229,5 @@ export class ProviderConnectionsComponent implements OnInit {
       },
     });
   }
-  private fail(error: any) { this.toastService.error(error?.error?.message || 'Unable to update connections. Please try again.'); this.busy.set(false); this.loading.set(false); }
+  private fail(error: unknown) { this.toastService.httpError(error, 'Could not update connections.'); this.busy.set(false); this.loading.set(false); }
 }

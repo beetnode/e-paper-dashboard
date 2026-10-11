@@ -7,7 +7,7 @@ import { HttpClient } from '@angular/common/http';
 import { Subscription } from 'rxjs';
 import type { DataSourceStatus } from '../../services/dashboard-preview-data.service';
 import { DashboardService } from '../../services/dashboard.service';
-import { ToastService } from '../../services/toast.service';
+import { describeHttpError, ToastService } from '../../services/toast.service';
 import { DataProviderService, DataSource } from '../../services/data-provider.service';
 import { AiService } from '../../services/ai.service';
 import {
@@ -539,7 +539,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     const layout = this.layout();
     const slot = findFreeSlot(layout.widgets, layout.gridCols, layout.gridRows, widget.position.w, widget.position.h);
     if (!slot) {
-      this.toastService.show('No free space of the same size for a copy of this widget', 'error');
+      this.toastService.error('No free space of the same size for a copy of this widget.');
       return;
     }
     const copy: WidgetConfig = {
@@ -664,11 +664,11 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
         this.aiLastError.set(null);
         this.aiDataSummary.set(result.dataSummary ?? null);
         this.aiPromptTokenEstimate.set(result.promptTokenEstimate ?? null);
-        this.toastService.success(`AI generated ${result.widgets?.length ?? 0} widgets`);
+        this.toastService.success(`AI generated ${result.widgets?.length ?? 0} ${result.widgets?.length === 1 ? 'widget' : 'widgets'}.`);
         this.isGeneratingAi.set(false);
       },
       error: (err) => {
-        const errorMsg = err.error?.message || err.error || 'AI generation failed';
+        const errorMsg = describeHttpError(err, 'Could not generate AI widgets.');
         this.aiLastError.set(errorMsg);
         this.toastService.error(errorMsg);
         this.isGeneratingAi.set(false);
@@ -688,7 +688,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     if (this.selectedWidget()?.id === widget.id) this.clearSelection();
 
     this.toastService.showWithAction(
-      'Widget removed from the layout',
+      'Widget removed.',
       'Undo',
       () => {
         this.layout.update(layout => {
@@ -789,7 +789,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     const position = findFreeSlot(layout.widgets, layout.gridCols, layout.gridRows, w, h);
     this.pickerOpen.set(false);
     if (!position) {
-      this.toastService.show('No space available on the canvas for a new widget', 'error');
+      this.toastService.error('No free space on the canvas for a new widget.');
       return;
     }
 
@@ -1204,14 +1204,14 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
           aiLeadTimeMinutes: payload.aiLeadTimeMinutes,
         } : d);
         this.markAsPristine();
-        this.toastService.show('Dashboard saved successfully', 'success');
+        this.toastService.success('Dashboard saved.');
       },
       error: (err) => {
         if (err.status === 401 || err.status === 403) {
-          this.toastService.show('Authentication error. Please log in again.', 'error');
+          this.toastService.error('Your session has expired. Sign in again to save.');
           this.router.navigate(['/login'], { queryParams: { returnUrl: this.router.url } });
         } else {
-          this.toastService.show('Failed to save dashboard', 'error');
+          this.toastService.httpError(err, 'Could not save the dashboard.');
         }
       }
     });
@@ -1252,7 +1252,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
 
   previewServerSideRendered(): void {
     if (!this.dashboard()) {
-      this.toastService.show('No dashboard loaded', 'error');
+      this.toastService.error('The dashboard is not loaded yet.');
       return;
     }
 
@@ -1304,7 +1304,6 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
         }
 
         this.previewError.set(errorMessage);
-        this.toastService.show(errorMessage, 'error');
       }
     });
   }
@@ -1432,7 +1431,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     this.refreshSelectedWidget();
     if (fitted.changed === 0) return;
     this.toastService.showWithAction(
-      fitted.changed === 1 ? '1 widget was moved or resized to fit the grid' : `${fitted.changed} widgets were moved or resized to fit the grid`,
+      fitted.changed === 1 ? '1 widget was moved or resized to fit the grid.' : `${fitted.changed} widgets were moved or resized to fit the grid.`,
       'Undo',
       () => {
         if (undo) undo();

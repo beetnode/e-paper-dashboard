@@ -461,14 +461,14 @@ export class DeviceListComponent implements OnDestroy {
         );
         if (dashboardId) {
           const dashboard = this.dashboards().find(d => d.id === dashboardId);
-          this.toastService.success(`Device assigned to "${dashboard?.name || 'dashboard'}"`);
+          this.toastService.success(`${device.name} now shows ${dashboard?.name ?? 'the dashboard'}.`);
         } else {
-          this.toastService.success('Dashboard unassigned from device');
+          this.toastService.success(`${device.name} no longer shows a dashboard.`);
         }
       },
       error: (err) => {
         this.setDashboardAssignmentComplete(device.id);
-        this.toastService.error(err.error?.message || 'Failed to update device');
+        this.toastService.httpError(err, 'Could not change the dashboard on this device.');
       }
     });
   }
@@ -511,9 +511,9 @@ export class DeviceListComponent implements OnDestroy {
         try {
           await firstValueFrom(this.deviceService.deleteDevice(device.id));
           this.devices.update(list => list.filter(d => d.id !== device.id));
-          this.toastService.success('Device removed successfully');
+          this.toastService.success('Device removed.');
         } catch (error: any) {
-          this.toastService.error(error.error?.message || 'Failed to remove device');
+          this.toastService.httpError(error, 'Could not remove the device.');
         }
       }
     });
@@ -547,7 +547,7 @@ export class DeviceListComponent implements OnDestroy {
         this.pairingExpiresAt = new Date(response.expiresAt);
         this.startLegacyPairingTimers();
       },
-      error: () => this.toastService.error('Failed to start legacy pairing')
+      error: err => this.toastService.httpError(err, 'Could not start legacy pairing.')
     });
   }
 
@@ -588,7 +588,7 @@ export class DeviceListComponent implements OnDestroy {
       },
       error: (err) => {
         this.isClaiming.set(false);
-        this.toastService.error(err.error?.detail || 'The claim code is invalid, expired, or not announced yet.');
+        this.toastService.httpError(err, 'The claim code is invalid, expired, or not announced yet.');
       }
     });
   }
@@ -635,7 +635,7 @@ export class DeviceListComponent implements OnDestroy {
           if (response.status === 'completed') {
             this.cancelPairing();
             this.loadDevices();
-            this.toastService.success('Device paired successfully.');
+            this.toastService.success('Device paired.');
           }
         }
       });
@@ -655,7 +655,7 @@ export class DeviceListComponent implements OnDestroy {
           if (response.status === 'completed') {
             this.cancelPairing();
             this.loadDevices();
-            this.toastService.success('Device paired successfully.');
+            this.toastService.success('Device paired.');
           }
         },
         error: (err) => {

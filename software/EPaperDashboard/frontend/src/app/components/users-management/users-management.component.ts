@@ -72,7 +72,7 @@ export class UsersManagementComponent implements OnInit {
     this.http.post('/api/users/add', formValue).subscribe({
       next: (response: any) => {
         this.toastService.success(
-          response.message || `User "${formValue.username}" created successfully`
+          response.message || `User ${formValue.username} added.`
         );
         this.addUserForm.reset();
         this.showAddForm.set(false);
@@ -80,7 +80,7 @@ export class UsersManagementComponent implements OnInit {
         this.loadUsers();
       },
       error: (error: HttpErrorResponse) => {
-        this.handleError(error, `Failed to create user "${formValue.username}"`);
+        this.toastService.httpError(error, `Could not add user ${formValue.username}.`);
         this.isAddingUser.set(false);
       }
     });
@@ -94,9 +94,6 @@ export class UsersManagementComponent implements OnInit {
       cancelLabel: 'Keep user',
       isDangerous: true,
       onConfirm: () => this.performDelete(userId, username),
-      onCancel: () => {
-        this.toastService.info('User deletion cancelled');
-      }
     });
   }
 
@@ -108,7 +105,7 @@ export class UsersManagementComponent implements OnInit {
       this.http.delete(`/api/users/${userId}`).subscribe({
         next: (response: any) => {
           this.toastService.success(
-            response.message || `User "${username}" deleted successfully`
+            response.message || `User ${username} deleted.`
           );
           const state = this.isDeletingUser();
           this.isDeletingUser.set({ ...state, [userId]: false });
@@ -116,7 +113,7 @@ export class UsersManagementComponent implements OnInit {
           resolve();
         },
         error: (error: HttpErrorResponse) => {
-          this.handleError(error, `Failed to delete user "${username}"`);
+          this.toastService.httpError(error, `Could not delete user ${username}.`);
           const state = this.isDeletingUser();
           this.isDeletingUser.set({ ...state, [userId]: false });
           resolve();
@@ -141,35 +138,6 @@ export class UsersManagementComponent implements OnInit {
     const control = this.addUserForm.get(controlName);
     if (!control || !(control.touched || control.dirty) || !control.invalid) return false;
     return errorName ? control.hasError(errorName) : true;
-  }
-
-  private handleError(error: HttpErrorResponse, defaultMessage: string): void {
-    let message = defaultMessage;
-    let details = '';
-
-    if (error.error?.message) {
-      message = error.error.message;
-    } else if (error.status === 401) {
-      message = 'Unauthorized';
-      details = 'You are not authorized to perform this action';
-    } else if (error.status === 403) {
-      message = 'Access Denied';
-      details = 'You do not have permission to perform this action';
-    } else if (error.status === 400) {
-      message = 'Invalid Request';
-      details = error.error?.message || 'Please check your input and try again';
-    } else if (error.status === 409) {
-      message = 'User Already Exists';
-      details = error.error?.message || 'A user with this name already exists';
-    } else if (error.status === 0) {
-      message = 'Connection Error';
-      details = 'Unable to reach the server. Please check your network connection.';
-    } else if (error.status >= 500) {
-      message = 'Server Error';
-      details = 'An unexpected error occurred. Please try again later.';
-    }
-
-    this.toastService.error(details ? `${message}: ${details}` : message);
   }
 
   private getErrorMessage(error: HttpErrorResponse, fallback: string): string {

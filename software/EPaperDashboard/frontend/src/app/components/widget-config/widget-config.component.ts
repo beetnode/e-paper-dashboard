@@ -170,11 +170,11 @@ export class WidgetConfigComponent implements OnChanges {
     this.aiService.generateWidgetContent(this.dashboard.id, this.widget.id).subscribe({
       next: () => {
         this.generatingAiContent.set(false);
-        this.toastService.success('AI content generated and cached.');
+        this.toastService.success('AI content generated.');
       },
       error: (err) => {
         this.generatingAiContent.set(false);
-        this.toastService.error(err.error?.message || 'Failed to generate AI content.');
+        this.toastService.httpError(err, 'Could not generate AI content.');
       }
     });
   }

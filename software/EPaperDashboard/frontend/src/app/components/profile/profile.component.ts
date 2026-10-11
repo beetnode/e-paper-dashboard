@@ -61,8 +61,8 @@ export class ProfileComponent {
     this.http.post('/api/users/change-nickname', request).subscribe({
       next: () => {
         const message = this.newNickname().trim()
-          ? 'Nickname changed successfully.'
-          : 'Nickname cleared.';
+          ? 'Display name saved.'
+          : 'Display name cleared.';
         this.toastService.success(message);
         this.newNickname.set('');
         this.isChangingNickname.set(false);
@@ -70,7 +70,7 @@ export class ProfileComponent {
         this.authService.getCurrentUser().subscribe();
       },
       error: (err) => {
-        this.toastService.error(err.error?.message || 'Nickname change failed.');
+        this.toastService.httpError(err, 'Could not save the display name.');
         this.isChangingNickname.set(false);
       }
     });
@@ -80,12 +80,12 @@ export class ProfileComponent {
     this.toastService.clear();
 
     if (!this.currentPassword() || !this.newPassword() || !this.confirmNewPassword()) {
-      this.toastService.error('All password fields are required.');
+      this.toastService.error('Fill in all password fields.');
       return;
     }
 
     if (this.newPassword() !== this.confirmNewPassword()) {
-      this.toastService.error('New password and confirmation do not match.');
+      this.toastService.error('The new passwords do not match.');
       return;
     }
 
@@ -99,7 +99,7 @@ export class ProfileComponent {
 
     this.http.post('/api/users/change-password', request).subscribe({
       next: () => {
-        this.toastService.success('Password changed successfully. Please log in again.');
+        this.toastService.success('Password changed. Sign in again with the new password.');
         this.clearPasswordFields();
         this.isChangingPassword.set(false);
         // Log out after password change
@@ -110,7 +110,7 @@ export class ProfileComponent {
         }, 2000);
       },
       error: (err) => {
-        this.toastService.error(err.error?.message || 'Password change failed.');
+        this.toastService.httpError(err, 'Could not change the password.');
         this.isChangingPassword.set(false);
       }
     });
@@ -126,11 +126,11 @@ export class ProfileComponent {
         this.isDeletingProfile.set(true);
         try {
           await firstValueFrom(this.http.delete('/api/users/delete-profile'));
-          this.toastService.success('Profile deleted');
+          this.toastService.success('Profile deleted.');
           await firstValueFrom(this.authService.logout());
           this.router.navigate(['/home']);
         } catch (err: any) {
-          this.toastService.error(err.error?.message || 'Failed to delete profile');
+          this.toastService.httpError(err, 'Could not delete the profile.');
           this.isDeletingProfile.set(false);
         }
       }

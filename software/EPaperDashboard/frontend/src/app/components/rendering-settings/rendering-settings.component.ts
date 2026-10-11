@@ -82,7 +82,7 @@ export class RenderingSettingsComponent implements OnInit, OnDestroy {
     this.busy.set(true);
     this.http.put<UserRenderingStatus>('/api/rendering', { enabled }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: status => { this.busy.set(false); this.accept(status); },
-      error: err => { this.busy.set(false); this.toastService.error(err.error?.message || 'Could not update rendering settings.'); }
+      error: err => { this.busy.set(false); this.toastService.httpError(err, 'Could not update rendering.'); }
     });
   }
 
@@ -90,7 +90,7 @@ export class RenderingSettingsComponent implements OnInit, OnDestroy {
     this.busy.set(true);
     this.http.post<{ message: string }>('/api/rendering/test', {}).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: result => { this.busy.set(false); this.toastService.success(result.message); },
-      error: err => { this.busy.set(false); this.toastService.error(err.error?.message || 'Rendering test failed.'); }
+      error: err => { this.busy.set(false); this.toastService.httpError(err, 'Could not render the test page.'); }
     });
   }
 

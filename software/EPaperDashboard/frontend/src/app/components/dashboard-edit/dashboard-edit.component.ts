@@ -495,7 +495,7 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
     const formValue = this.dashboardForm.getRawValue();
     if (!this.dashboardForm.valid || !formValue.name.trim()) {
       this.dashboardForm.markAllAsTouched();
-      this.toastService.error('Please fill in all required fields.');
+      this.toastService.error('Enter a name for the dashboard.');
       return;
     }
 
@@ -533,11 +533,11 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
         const savedConfig = updated.aiConfig ?? { connectionMode: 'None' as AiConnectionMode };
         this.aiConfig.set(savedConfig);
         this.originalAiConfig = JSON.parse(JSON.stringify(savedConfig));
-        this.toastService.success('Dashboard saved');
+        this.toastService.success('Dashboard saved.');
         this.isSaving.set(false);
       },
       error: (error) => {
-        this.toastService.error(error.error?.message || 'Failed to save dashboard.');
+        this.toastService.httpError(error, 'Could not save the dashboard.');
         this.isSaving.set(false);
       }
     });
@@ -606,9 +606,9 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
           next: updated => {
             this.dashboard.set(updated);
             this.originalDashboard = JSON.parse(JSON.stringify(updated));
-            this.toastService.success('Legacy settings removed');
+            this.toastService.success('Legacy settings removed.');
           },
-          error: error => this.toastService.error(error.error?.message || 'Failed to remove legacy settings.'),
+          error: error => this.toastService.httpError(error, 'Could not remove the legacy settings.'),
         });
       }
     });
@@ -707,7 +707,7 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
   private openSsrPreview(): void {
     const currentDashboard = this.dashboard();
     if (!currentDashboard?.layoutConfig) {
-      this.toastService.error('Please configure the dashboard layout in the designer first');
+      this.toastService.error('Add widgets in the designer before previewing.');
       return;
     }
 
@@ -755,7 +755,6 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
         }
 
         this.previewError.set(errorMessage);
-        this.toastService.error(errorMessage);
       }
     });
   }
@@ -765,7 +764,7 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
     if (!currentDashboard) return;
 
     if (this.disablePreviewButton()) {
-      this.toastService.error('Preview requires a Home Assistant connection and a dashboard path.');
+      this.toastService.error('Select a Home Assistant connection and dashboard before previewing.');
       return;
     }
 
@@ -819,7 +818,6 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
         }
 
         this.previewError.set(errorMessage);
-        this.toastService.error(errorMessage);
       }
     });
   }
@@ -836,7 +834,7 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
       },
       error: () => {
         this.isLoadingDevices.set(false);
-        this.toastService.error('Failed to load devices');
+        this.toastService.error('Could not load the devices showing this dashboard.');
       }
     });
   }
