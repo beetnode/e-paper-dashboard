@@ -165,7 +165,9 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   private resizeTimer: any = null;
   private renderPreviewTimer: ReturnType<typeof setTimeout> | null = null;
   private renderPreviewRevision = 0;
-  private renderedLayoutSignature = '';
+  /** Signature of the layout behind the current preview image, and of the last requested render. */
+  private renderedLayoutSignature = signal('');
+  private requestedLayoutSignature = '';
   private forceRefreshOnNextRender = false;
   private viewportWidth = signal(typeof window !== 'undefined' ? window.innerWidth : 1280);
   /** Tablet widths: properties and settings open in the drawer instead of a fixed column. */
@@ -744,12 +746,12 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     this.activeTab.set('properties');
   }
 
-  getSelectedWidgetGeometry(): WidgetRenderGeometry | undefined {
-    if (this.renderedCanvasLoading()
-        || this.renderedLayoutSignature !== JSON.stringify(this.getCompleteRenderLayout())) return undefined;
+  /** Renderer geometry for the selection, only while the preview matches the current layout. */
+  readonly selectedWidgetGeometry = computed<WidgetRenderGeometry | undefined>(() => {
+    if (this.renderedCanvasLoading() || this.renderedLayoutSignature() !== this.renderLayoutSignature()) return undefined;
     const selected = this.selectedWidget();
     return selected ? this.renderedWidgetGeometry()[selected.id] : undefined;
-  }
+  });
 
   selectedWidgetSupportsElementEditing(): boolean {
     const selected = this.selectedWidget();
@@ -763,7 +765,9 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     if (source) return source.connectionName ? `${source.connectionName} · ${source.friendlyName || sourceId}` : source.friendlyName || sourceId;
     return sourceId.startsWith('source:') ? 'Unavailable source' : sourceId;
   }
-  selectedWidgetSourceStatuses(): Array<{ key: string; label: string; status: DataSourceStatus }> {
+  readonly selectedWidgetSourceStatuses = computed(() => this.buildSelectedWidgetSourceStatuses());
+
+  private buildSelectedWidgetSourceStatuses(): Array<{ key: string; label: string; status: DataSourceStatus }> {
     const widget = this.selectedWidget();
     if (!widget) return [];
     const config = widget.config as any;
@@ -1399,10 +1403,14 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   }
 
   private renderRenderedCanvas(): void {
-    const revision = ++this.renderPreviewRevision;
     const refreshData = this.forceRefreshOnNextRender;
-    const renderLayout = this.getCompleteRenderLayout();
-    const renderLayoutSignature = JSON.stringify(renderLayout);
+    const renderLayout = this.renderLayout();
+    const renderLayoutSignature = this.renderLayoutSignature();
+    // Selecting, saving or no-op drags re-emit an identical layout; the preview already shows it.
+    if (!refreshData && renderLayoutSignature === this.requestedLayoutSignature) return;
+
+    const revision = ++this.renderPreviewRevision;
+    this.requestedLayoutSignature = renderLayoutSignature;
     this.forceRefreshOnNextRender = false;
 
     this.renderPreviewSubscription?.unsubscribe();
@@ -1415,7 +1423,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
           if (preview.revision !== this.renderPreviewRevision) return;
 
           this.renderedCanvasImageUrl.set(this.renderPreviewService.toImageUrl(preview));
-          this.renderedLayoutSignature = renderLayoutSignature;
+          this.renderedLayoutSignature.set(renderLayoutSignature);
           this.renderedCanvasAt.set(preview.renderedAt);
           this.renderedWidgetGeometry.set(Object.fromEntries(
             preview.widgets.map(widget => [widget.id, widget]),
@@ -1431,17 +1439,33 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
 
           this.renderedCanvasLoading.set(false);
           this.renderedCanvasError.set(message);
+          this.requestedLayoutSignature = '';
         },
       });
   }
 
-  private getCompleteRenderLayout(): DashboardLayout {
+  /** Complete transient layout sent to the renderer, including generated widgets. */
+  private readonly renderLayout = computed<DashboardLayout>(() => {
     const layout = this.layout();
     const generatedWidgets = this.aiEnabled() ? this.aiGeneratedWidgets() : [];
     return generatedWidgets.length === 0
       ? layout
       : { ...layout, widgets: [...layout.widgets, ...generatedWidgets] };
-  }
+  });
+  private readonly renderLayoutSignature = computed(() => JSON.stringify(this.renderLayout()));
+
+  // Template styles are memoised so change detection during drags does not rebuild them.
+  readonly canvasStyle = computed(() => this.buildCanvasStyle());
+  readonly canvasScaleStyle = computed(() => this.buildCanvasScaleStyle());
+  readonly gridOverlayStyle = computed(() => this.buildGridOverlayStyle());
+  readonly selectionOverlayStyle = computed(() => this.buildSelectionOverlayStyle());
+  readonly widgetStyles = computed(() => {
+    const styles: Record<string, Record<string, unknown>> = {};
+    for (const widget of [...this.layout().widgets, ...this.aiGeneratedWidgets()]) {
+      styles[widget.id] = this.buildWidgetStyle(widget);
+    }
+    return styles;
+  });
 
   private async getRenderErrorMessage(error: any): Promise<string> {
     if (error?.error instanceof Blob) {
@@ -1461,7 +1485,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       || 'Failed to render dashboard preview';
   }
 
-  getCanvasStyle(): any {
+  private buildCanvasStyle(): any {
     const layout = this.layout();
     return {
       width: `${layout.width}px`,
@@ -1485,7 +1509,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     };
   }
 
-  getGridOverlayStyle(): any {
+  private buildGridOverlayStyle(): any {
     const layout = this.layout();
     const padding = layout.canvasPadding ?? 0;
     const gap = layout.widgetGap ?? 0;
@@ -1520,7 +1544,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     };
   }
 
-  getWidgetStyle(widget: WidgetConfig): any {
+  private buildWidgetStyle(widget: WidgetConfig): any {
     const layout = this.layout();
     const borderColor = widget.colorOverrides?.widgetBorderColor || layout.colorScheme.widgetBorderColor || layout.colorScheme.foreground;
     const backgroundColor = widget.colorOverrides?.widgetBackgroundColor || layout.colorScheme.widgetBackgroundColor || layout.colorScheme.background;
@@ -1539,7 +1563,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     };
   }
 
-  getSelectionOverlayStyle(): any {
+  private buildSelectionOverlayStyle(): any {
     const widget = this.selectedWidget();
     if (!widget) return { display: 'none' };
     const layout = this.layout();
@@ -1719,7 +1743,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
 
 
   /** The wrapper occupies the scaled footprint so scrolling and centring see the visual size. */
-  getCanvasScaleStyle(): any {
+  private buildCanvasScaleStyle(): any {
     const scale = this.canvasScale();
     const layout = this.layout();
     return {

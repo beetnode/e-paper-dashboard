@@ -162,7 +162,7 @@
       <div class="card">
         <div class="card-body canvas-card-body">
           <div class="canvas-wrapper" #canvasViewport>
-            <div class="canvas-scale-wrapper" [ngStyle]="getCanvasScaleStyle()">
+            <div class="canvas-scale-wrapper" [ngStyle]="canvasScaleStyle()">
             @if (renderedCanvasLoading() && !renderedCanvasImageUrl()) {
               <div class="rendered-canvas-status rendered-canvas-status-loading">
                 <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
@@ -181,14 +181,14 @@
                 Preview unavailable — showing the last available view
               </div>
             }
-            <div class="dashboard-canvas" [class.backend-preview-active]="!!renderedCanvasImageUrl()" [ngStyle]="getCanvasStyle()" (pointerdown)="onCanvasPointerDown($event)">
+            <div class="dashboard-canvas" [class.backend-preview-active]="!!renderedCanvasImageUrl()" [ngStyle]="canvasStyle()" (pointerdown)="onCanvasPointerDown($event)">
               @if (renderedCanvasImageUrl()) {
                 <img class="rendered-canvas-image" [src]="renderedCanvasImageUrl()"
                   alt="Backend-rendered dashboard preview" draggable="false" />
               }
-              <div class="grid-overlay" [ngStyle]="getGridOverlayStyle()"></div>
+              <div class="grid-overlay" [ngStyle]="gridOverlayStyle()"></div>
               @for (widget of layout().widgets; track widget.id) {
-              <div class="widget-container" [ngStyle]="getWidgetStyle(widget)"
+              <div class="widget-container" [ngStyle]="widgetStyles()[widget.id]"
                 role="button" tabindex="0" [attr.aria-label]="widget.type + ' widget. Use arrow keys to move.'"
                 [attr.aria-pressed]="selectedWidget()?.id === widget.id"
                 (pointerdown)="onWidgetPointerDown($event, widget)"
@@ -199,7 +199,7 @@
 
               <!-- AI-generated widgets (read-only overlay) -->
               @for (widget of aiGeneratedWidgets(); track widget.id) {
-              <div class="widget-container ai-widget" [ngStyle]="getWidgetStyle(widget)">
+              <div class="widget-container ai-widget" [ngStyle]="widgetStyles()[widget.id]">
                 <span class="widget-shell-label">{{ widget.type }}</span>
               </div>
               }
@@ -209,7 +209,7 @@
                 <div class="sel-overlay"
                      [class.long-press-active]="longPressActive()"
                      [class.element-editing]="elementEditingWidgetId() === selectedWidget()!.id"
-                     [ngStyle]="getSelectionOverlayStyle()"
+                     [ngStyle]="selectionOverlayStyle()"
                      (pointerdown)="onWidgetPointerDown($event, selectedWidget()!)">
 
                   @if (elementEditingWidgetId() !== selectedWidget()!.id) {
@@ -226,7 +226,7 @@
                   @if (selectedWidgetSupportsElementEditing()) {
                       <button class="widget-edit-toggle-btn"
                         [class.active]="elementEditingWidgetId() === selectedWidget()!.id"
-                        [disabled]="renderedCanvasLoading() || !getSelectedWidgetGeometry()"
+                        [disabled]="renderedCanvasLoading() || !selectedWidgetGeometry()"
                         (pointerdown)="$event.stopPropagation()"
                         (click)="toggleElementEditing(selectedWidget()!)"
                         [title]="elementEditingWidgetId() === selectedWidget()!.id ? 'Finish editing widget elements' : 'Edit widget elements'">
@@ -238,7 +238,7 @@
                       </button>
                   }
 
-                  @if (getSelectedWidgetGeometry(); as geometry) {
+                  @if (selectedWidgetGeometry(); as geometry) {
                     @if (elementEditingWidgetId() === selectedWidget()!.id) {
                       @if (geometry.elements.length > 0) {
                         <app-widget-element-overlay [geometry]="geometry"
@@ -341,7 +341,7 @@
       <i class="fa fa-sliders" aria-hidden="true"></i> Properties
     </button>
     @if (selectedWidgetSupportsElementEditing()) {
-      <button type="button" class="toolbar-btn" (click)="toggleElementEditing(selectedWidget()!)" [disabled]="renderedCanvasLoading() || !getSelectedWidgetGeometry()">
+      <button type="button" class="toolbar-btn" (click)="toggleElementEditing(selectedWidget()!)" [disabled]="renderedCanvasLoading() || !selectedWidgetGeometry()">
         <i class="fa fa-arrows-up-down-left-right" aria-hidden="true"></i> {{ elementEditingWidgetId() === selectedWidget()!.id ? 'Done' : 'Edit layout' }}
       </button>
     }
@@ -721,7 +721,7 @@
   @if (selectedWidgetSupportsElementEditing()) {
     <button type="button" class="btn btn-sm w-100 mb-2"
       [ngClass]="elementEditingWidgetId() === selectedWidget()!.id ? 'btn-success' : 'btn-outline-primary'"
-      [disabled]="renderedCanvasLoading() || !getSelectedWidgetGeometry()"
+      [disabled]="renderedCanvasLoading() || !selectedWidgetGeometry()"
       (click)="toggleElementEditing(selectedWidget()!)">
       <i class="fa-solid me-1" [ngClass]="elementEditingWidgetId() === selectedWidget()!.id ? 'fa-check' : 'fa-arrows-up-down-left-right'" aria-hidden="true"></i>
       {{ elementEditingWidgetId() === selectedWidget()!.id ? 'Finish editing layout' : 'Edit widget layout' }}
