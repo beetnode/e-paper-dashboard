@@ -283,7 +283,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     if (this.layerMenuWidgetId() && !target.closest('.layer-menu')) {
       this.layerMenuWidgetId.set(null);
     }
-    if (this.pickerOpen() && !this.usesDrawer() && !target.closest('.picker-popover, .add-widget-button')) {
+    if (this.pickerOpen() && !this.usesDrawer() && !target.closest('.picker-popover, [data-opens-picker]')) {
       this.pickerOpen.set(false);
     }
   }
