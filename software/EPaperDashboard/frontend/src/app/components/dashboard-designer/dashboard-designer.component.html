@@ -482,15 +482,15 @@
 <ng-template #canvasTools>
   <div class="canvas-tools" role="toolbar" aria-label="Canvas view">
     <div class="btn-group btn-group-sm" role="group" aria-label="Zoom">
-      <button type="button" class="btn btn-outline-secondary" (click)="zoomCanvas(-1)" aria-label="Zoom out" title="Zoom out">
+      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="zoomCanvas(-1)" aria-label="Zoom out" title="Zoom out">
         <i class="fa-solid fa-minus" aria-hidden="true"></i>
       </button>
-      <button type="button" class="btn btn-outline-secondary canvas-zoom-value" (click)="setCanvasZoom(canvasZoom() === 'fit' ? 1 : 'fit')"
+      <button type="button" class="btn btn-sm btn-outline-secondary canvas-zoom-value" (click)="setCanvasZoom(canvasZoom() === 'fit' ? 1 : 'fit')"
         [attr.aria-label]="canvasZoom() === 'fit' ? 'Zoom to actual size' : 'Fit canvas to view'"
         [title]="canvasZoom() === 'fit' ? 'Fitted to view — click for actual size' : 'Click to fit to view'">
         @if (canvasZoom() === 'fit') {<i class="fa-solid fa-expand me-1" aria-hidden="true"></i>}{{ canvasZoomLabel() }}
       </button>
-      <button type="button" class="btn btn-outline-secondary" (click)="zoomCanvas(1)" aria-label="Zoom in" title="Zoom in">
+      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="zoomCanvas(1)" aria-label="Zoom in" title="Zoom in">
         <i class="fa-solid fa-plus" aria-hidden="true"></i>
       </button>
     </div>
