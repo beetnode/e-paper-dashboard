@@ -16,7 +16,7 @@ import { ToastService } from '../../services/toast.service';
         <p class="app-page-description">Capture Home Assistant dashboards for your displays. Custom layouts work without it.</p>
       </div></div>
       @if (status(); as value) {
-        <div class="app-form-shell app-form-shell-wide"><section class="app-section-card" aria-labelledby="renderingTitle">
+        <section class="app-section-card" aria-labelledby="renderingTitle">
           <div class="app-section-header">
             <div>
               <h2 id="renderingTitle" class="app-section-title">{{ isAddonMode() ? 'Add-on rendering' : 'Rendering for your account' }}</h2>
@@ -43,7 +43,7 @@ import { ToastService } from '../../services/toast.service';
               </button>
             }
           </div>
-        </section></div>
+        </section>
       } @else if (loadFailed()) {
         <div class="app-empty-state" role="alert">
           <span class="app-empty-state-icon text-danger"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></span>

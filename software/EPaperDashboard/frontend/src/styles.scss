@@ -68,9 +68,6 @@ body {
   margin-inline: auto;
 }
 
-.app-form-shell-wide {
-  --app-form-max-width: 46rem;
-}
 
 .app-loading-state {
   display: grid;
@@ -127,7 +124,25 @@ body {
 
 .app-section-stack {
   display: grid;
+  align-content: start;
   gap: 1rem;
+}
+
+/* Two columns of sections on wide screens, one on narrow ones. */
+.app-section-grid {
+  display: grid;
+  align-items: start;
+  gap: 1rem;
+
+  > .app-section-grid-full {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 992px) {
+  .app-section-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* Page-level actions: Discard appears only with unsaved changes, so it doubles as the change indicator. */
