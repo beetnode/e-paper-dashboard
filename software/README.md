@@ -60,6 +60,8 @@ PostgreSQL upgrades require the maintenance migration described below; it record
 
 Install via the [izBoard Home Assistant Add-on repository](https://github.com/izdev-digital/hass-add-ons/tree/master/e-paper-dashboard). Configure `CLIENT_URL` as a device-reachable endpoint, normally `http://homeassistant.local:8129`. Remote URLs work through a direct port, VPN, or reverse proxy; ingress URLs do not.
 
+The add-on image `izdevdigital/izboard-addon` is built from the `addon` target of `EPaperDashboard/Dockerfile` alongside the standalone image. It differs only in running as root (Supervisor mounts `/data` root-owned) and carrying Home Assistant labels.
+
 ### Environment Variables
 
 | Variable | Required | Description |
