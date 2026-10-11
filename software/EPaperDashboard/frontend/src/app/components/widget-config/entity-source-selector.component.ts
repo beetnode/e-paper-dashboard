@@ -45,12 +45,9 @@ export function groupByConnection<T extends { connectionName?: string }>(sources
           searchPlaceholder="Search sources…" ariaLabel="Data source"
           (selectionChange)="valueChange.emit($event)" />
         @if (selectedEntity(); as selected) {
-          <div class="d-flex align-items-center flex-wrap gap-2 mt-2 small">
-            <span class="app-status-chip app-status-chip-success"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Available</span>
-            @if (selected.state != null && selected.state !== '') {
-              <span class="text-muted">Current value: <strong class="text-body">{{ selected.state }}{{ selected.unit_of_measurement ? ' ' + selected.unit_of_measurement : '' }}</strong></span>
-            }
-          </div>
+          @if (selected.state != null && selected.state !== '') {
+            <div class="mt-2 small text-muted">Current value: <strong class="text-body">{{ selected.state }}{{ selected.unit_of_measurement ? ' ' + selected.unit_of_measurement : '' }}</strong></div>
+          }
         }
       }
     </div>

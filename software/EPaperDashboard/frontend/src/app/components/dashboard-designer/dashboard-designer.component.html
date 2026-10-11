@@ -386,7 +386,7 @@
        cdkTrapFocus [cdkTrapFocusAutoCapture]="true"
        (touchstart)="onDrawerTouchStart($event)" (touchend)="onDrawerTouchEnd($event, 'right')">
     <div class="drawer-header">
-      <h2 class="h5 mb-0">Inspector</h2>
+      <h2 class="visually-hidden">Inspector</h2>
       <button type="button" class="btn-close-drawer" (click)="inspectorDrawerOpen.set(false)" aria-label="Close inspector">
         <i class="fa-solid fa-xmark" aria-hidden="true"></i>
       </button>
@@ -417,7 +417,6 @@
         <span class="inspector-icon"><i class="fa-solid fa-display" aria-hidden="true"></i></span>
         <h2 class="inspector-title">Dashboard</h2>
       </div>
-      <p class="inspector-hint">Select a widget on the canvas or in Layers to edit it.</p>
     </div>
     <ng-container *ngTemplateOutlet="dashboardSettingsContent"></ng-container>
   }
@@ -452,9 +451,6 @@
               @if (needsSource(w)) {
                 <i class="fa-solid fa-triangle-exclamation layer-warning" title="No data source selected" aria-label="No data source selected"></i>
               }
-              <span class="layer-meta" [title]="'Column ' + (w.position.x + 1) + ', row ' + (w.position.y + 1) + ', ' + w.position.w + ' by ' + w.position.h">
-                {{ w.position.w }}×{{ w.position.h }}
-              </span>
             </button>
           }
           <div class="layer-menu">
@@ -497,11 +493,7 @@
       </button>
     </div>
     <button type="button" class="btn btn-sm btn-outline-secondary" (click)="refreshLivePreview()" [disabled]="renderedCanvasLoading()" aria-label="Refresh device preview and source data" title="Refresh preview and source data">
-      @if (renderedCanvasLoading()) {
-      <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-      } @else {
       <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
-      }
     </button>
   </div>
 </ng-template>
@@ -534,7 +526,6 @@
             <option [ngValue]="i">{{ size.label }}</option>
           }
         </select>
-        <small class="form-text text-muted">{{ layout().width }} × {{ layout().height }} px</small>
       </div>
     </div>
   </details>
@@ -558,14 +549,13 @@
           </div>
         </label>
         <label class="designer-field">
-          <span class="form-label fw-semibold">Margin</span>
+          <span class="form-label fw-semibold" title="Space between the screen edge and the grid">Margin</span>
           <div class="input-group">
             <input type="number" class="form-control" [value]="layout().canvasPadding" (change)="updateCanvasPadding($event)" min="0" max="128" />
             <span class="input-group-text">px</span>
           </div>
         </label>
       </div>
-      <small class="form-text text-muted">Margin is the space between the screen edge and the grid.</small>
     </div>
   </details>
   <details class="inspector-section" [open]="isSectionOpen('dashboard-frame')" (toggle)="onSectionToggle('dashboard-frame', $event)">
@@ -622,19 +612,12 @@
           </select>
         </label>
       </div>
-      <small class="form-text text-muted">Default body text for all widgets; a widget can override sizes in its Text section.</small>
     </div>
   </details>
   @if (aiEnabled()) {
   <details class="inspector-section" [open]="isSectionOpen('dashboard-ai')" (toggle)="onSectionToggle('dashboard-ai', $event)">
     <summary class="inspector-section-summary">AI generation</summary>
     <div class="inspector-section-body">
-      @if (aiConfigMode() === 'None') {
-        <div class="alert alert-warning py-2 small mb-3">
-          <i class="fa-solid fa-triangle-exclamation me-1"></i>
-          AI provider not configured. <a routerLink="/ai/config">Set up global AI provider</a> or <a [routerLink]="['/dashboards', dashboardId, 'edit']">use a Home Assistant agent</a>
-        </div>
-      }
       <div class="mb-3">
         <label class="form-label fw-semibold">Prompt</label>
         <textarea class="form-control" rows="4"
@@ -643,7 +626,7 @@
           placeholder="e.g. 'Show today's weather, calendar events, and a motivational quote'"></textarea>
       </div>
       <div class="mb-3">
-        <label class="form-label fw-semibold">Pre-generation Lead Time</label>
+        <label class="form-label fw-semibold">Lead time</label>
         <div class="input-group">
           <input type="number" class="form-control"
             [value]="aiLeadTimeMinutes()"
@@ -802,16 +785,6 @@
         </label>
       </div>
       @if (selectedWidgetSupportsElementEditing()) {
-      <button type="button" class="btn w-100 mb-2"
-        [ngClass]="elementEditingWidgetId() === selectedWidget()!.id ? 'btn-success' : 'btn-outline-primary'"
-        [disabled]="renderedCanvasLoading() || !selectedWidgetGeometry()"
-        (click)="toggleElementEditing(selectedWidget()!)">
-        <i class="fa-solid me-1" [ngClass]="elementEditingWidgetId() === selectedWidget()!.id ? 'fa-check' : 'fa-arrows-up-down-left-right'" aria-hidden="true"></i>
-        {{ elementEditingWidgetId() === selectedWidget()!.id ? 'Done' : 'Edit layout' }}
-      </button>
-      @if (renderedCanvasLoading()) {
-        <p class="small text-muted mb-2" role="status">Updating the preview before layout editing…</p>
-      }
       <div class="designer-field-grid align-items-end">
         <div class="form-check form-switch mb-2">
           <input class="form-check-input" type="checkbox" id="layoutGuides" [checked]="getSelectedWidgetShowGuides()"
@@ -828,7 +801,7 @@
           </select>
         </label>
       </div>
-      <small class="form-text text-muted">Drag elements inside the widget on the canvas while layout editing is on.</small>
+      <small class="form-text text-muted">Used while editing the widget layout on the canvas.</small>
       }
     </div>
   </details>
