@@ -180,11 +180,6 @@ import { RouterModule } from '@angular/router';
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08) !important;
     }
     
-    .feature-item:active {
-      transform: translateY(0);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08) !important;
-    }
-    
     .hero-title {
       color: var(--bs-body-color);
     }
@@ -192,10 +187,6 @@ import { RouterModule } from '@angular/router';
     .hero-subtitle {
       color: var(--bs-body-color);
       font-weight: 500;
-    }
-    
-    .hero-description {
-      color: var(--bs-secondary-color);
     }
     
     .hero-logo {
