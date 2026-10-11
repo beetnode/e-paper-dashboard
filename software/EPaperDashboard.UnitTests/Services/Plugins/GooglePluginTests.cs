@@ -24,6 +24,8 @@ public sealed class GooglePluginTests : IDisposable
     private readonly MemoryCache cache = new(new MemoryCacheOptions());
     private readonly Handler handler = new();
     private readonly GoogleOAuthService oauth;
+    private readonly IDataProtectionProvider protection = new EphemeralDataProtectionProvider();
+    private readonly Microsoft.Extensions.Time.Testing.FakeTimeProvider time = new(DateTimeOffset.Parse("2026-10-11T12:00:00Z"));
     private readonly GooglePlugin plugin;
     private readonly ProviderConnection connection = new() { UserId = UserId.New(), PluginId = "google", Name = "Google account" };
     private readonly Dictionary<string, string> credentials = new()
@@ -39,7 +41,7 @@ public sealed class GooglePluginTests : IDisposable
         store = new(new LiteDbProviderConnectionRepository(db), new EphemeralDataProtectionProvider());
         store.Create(connection, credentials);
         var factory = new Mock<IHttpClientFactory>(); factory.Setup(f => f.CreateClient("provider-google")).Returns(() => new HttpClient(handler, false));
-        oauth = new(store, factory.Object, cache);
+        oauth = new(store, factory.Object, cache, protection, time);
         plugin = new(oauth, factory.Object, TimeProvider.System);
     }
 
@@ -78,6 +80,21 @@ public sealed class GooglePluginTests : IDisposable
         store.Credentials(store.Find(connection.Id, connection.UserId)!)["refreshToken"].Should().Be("refresh");
         (await oauth.CompleteAsync(state, state, "code", default)).IsFailure.Should().BeTrue();
         handler.Requests.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task AuthorizationStateSurvivesARestartButExpires()
+    {
+        var (_, state) = oauth.Start(connection);
+        var restarted = new GoogleOAuthService(store, new Mock<IHttpClientFactory>().Object, new MemoryCache(new MemoryCacheOptions()), protection, time);
+        time.Advance(TimeSpan.FromMinutes(11));
+        (await restarted.CompleteAsync(state, state, "code", default)).IsFailure.Should().BeTrue();
+
+        var (_, fresh) = oauth.Start(connection);
+        var factory = new Mock<IHttpClientFactory>(); factory.Setup(f => f.CreateClient("provider-google")).Returns(() => new HttpClient(handler, false));
+        Token();
+        (await new GoogleOAuthService(store, factory.Object, new MemoryCache(new MemoryCacheOptions()), protection, time)
+            .CompleteAsync(fresh, fresh, "code", default)).IsSuccess.Should().BeTrue();
     }
 
     [Fact]

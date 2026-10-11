@@ -13,7 +13,6 @@ public class StandaloneStrategyTests
     {
         var config = new Mock<IEnvironmentConfiguration>();
         config.SetupGet(c => c.ClientUri).Returns(new Uri("https://example.com"));
-        config.SetupGet(c => c.StateSigningKey).Returns("signing-key");
         return config;
     }
 
@@ -53,19 +52,6 @@ public class StandaloneStrategyTests
         var sut = CreateSut(config.Object);
 
         sut.ValidateConfiguration().IsFailure.Should().BeTrue();
-    }
-
-    [Fact]
-    public void ValidateConfiguration_MissingStateSigningKey_ReturnsFailureNamingIt()
-    {
-        var config = CreateValidConfig();
-        config.SetupGet(c => c.StateSigningKey).Returns((string?)null);
-        var sut = CreateSut(config.Object);
-
-        var result = sut.ValidateConfiguration();
-
-        result.IsFailure.Should().BeTrue();
-        result.Error.Should().Contain("STATE_SIGNING_KEY");
     }
 
     [Fact]

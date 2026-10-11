@@ -1,17 +1,17 @@
 import { Component, inject, OnInit, OnDestroy, signal, computed, ChangeDetectorRef, ViewChild, HostListener } from '@angular/core';
-import { CommonModule, Location } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { DashboardService } from '../../services/dashboard.service';
-import { HomeAssistantService } from '../../services/home-assistant.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { DialogService } from '../../services/dialog.service';
 import { DeviceService, Device } from '../../services/device.service';
 import { AiService } from '../../services/ai.service';
 import { Dashboard, DashboardOrientation, DashboardSizePreset, DASHBOARD_SIZE_PRESETS, DEFAULT_DASHBOARD_SIZE, AiConfig, AiConnectionMode, ConversationAgent } from '../../models/types';
-import { HomeAssistantTargetPickerComponent } from '../home-assistant-target-picker/home-assistant-target-picker.component';
+import { HOME_ASSISTANT_PLUGIN_ID, HomeAssistantTargetPickerComponent } from '../home-assistant-target-picker/home-assistant-target-picker.component';
+import { DataProviderService, ProviderConnection } from '../../services/data-provider.service';
 import { RenderedPreviewModalComponent } from '../rendered-preview-modal/rendered-preview-modal.component';
 import { HasUnsavedChanges } from '../../guards/unsaved-changes.guard';
 import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../services/playwright-component.service';
@@ -197,13 +197,13 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
                   (connectionIdChange)="onHomeAssistantConnectionChange($event)"
                   [path]="dashboardForm.controls.path.value"
                   (pathChange)="onHomeAssistantPathChange($event)"
-                  [allowDashboardSettings]="true"
-                  [dashboardSettingsLabel]="isAddonMode() ? 'Home Assistant add-on (dashboard token)' : 'Dashboard settings (host and token)'"
+                  [allowDashboardSettings]="!!dashboard()!.hasLegacyConnection"
+                  dashboardSettingsLabel="Legacy dashboard settings"
                   [dashboardId]="dashboard()!.id"
                   [dashboardSettingsReady]="dashboardSettingsReady()" />
 
-                @if (!dashboardForm.controls.homeAssistantConnectionId.value) {
-                  <ng-container *ngTemplateOutlet="dashboardConnectionSettings" />
+                @if (dashboard()!.hasLegacyConnection) {
+                  <ng-container *ngTemplateOutlet="legacySettingsNotice" />
                 }
                 } @else {
                   <div class="mb-3">
@@ -219,12 +219,8 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
                       @if (isAddonMode()) { Home Assistant is also connected through the add-on. }
                     </small>
                   </div>
-                  @if (!isAddonMode() && (dashboard()!.host || dashboard()!.hasAccessToken)) {
-                    <details class="mb-3">
-                      <summary class="fw-semibold">Dashboard Home Assistant connection (legacy)</summary>
-                      <small class="form-text text-muted d-block my-2">Existing widgets keep using these settings. New widgets can use a named connection instead.</small>
-                      <ng-container *ngTemplateOutlet="dashboardConnectionSettings" />
-                    </details>
+                  @if (dashboard()!.hasLegacyConnection) {
+                    <ng-container *ngTemplateOutlet="legacySettingsNotice" />
                   }
                 }
 
@@ -278,6 +274,27 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
               <hr>
               <h3 class="h6 mb-3">Home Assistant settings</h3>
               <div class="mb-3">
+                <label class="form-label" for="aiHomeAssistantConnection">Home Assistant connection</label>
+                <select id="aiHomeAssistantConnection" class="form-select"
+                  [ngModel]="aiConfig().homeAssistantConnectionId || ''"
+                  (ngModelChange)="onAiHomeAssistantConnectionChange($event)"
+                  [ngModelOptions]="{standalone: true}">
+                  @if (isAddonMode()) {
+                    <option value="">Home Assistant add-on</option>
+                  } @else if (dashboard()!.hasLegacyConnection) {
+                    <option value="">Legacy dashboard settings</option>
+                  } @else {
+                    <option value="" disabled>Select a connection</option>
+                  }
+                  @for (connection of homeAssistantConnections(); track connection.id) {
+                    <option [value]="connection.id">{{ connection.name }}{{ connection.connected ? '' : ' (sign-in required)' }}</option>
+                  }
+                </select>
+                <small class="form-text text-muted">
+                  <a routerLink="/connections" target="_blank" rel="noopener">Manage connections</a>; this list refreshes when you return.
+                </small>
+              </div>
+              <div class="mb-3">
                 <label class="form-label">Conversation agent</label>
                 @if (isLoadingAgents()) {
                   <div class="d-flex align-items-center gap-2 mb-2">
@@ -295,7 +312,7 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
                     }
                   </select>
                   @if (conversationAgents().length === 0) {
-                    <small class="form-text text-muted">No agents found. Make sure this dashboard is connected to Home Assistant.</small>
+                    <small class="form-text text-muted">No agents found. Make sure the selected connection is signed in.</small>
                   } @else {
                     <small class="form-text text-muted">Select a conversation agent or leave as default</small>
                   }
@@ -305,63 +322,24 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
           </div>
         </details>
 
-        <ng-template #dashboardConnectionSettings>
-          @if (!hideHostField()) {
-            <div class="mb-3">
-              <label class="form-label fw-semibold" for="dashboardHost">Dashboard host</label>
-              <input 
-                id="dashboardHost"
-                type="text" 
-                class="form-control" 
-                formControlName="host"
-                placeholder="https://your-ha-instance.com" 
-              />
-            </div>
-          }
-
-          <div class="mb-3">
-            <label class="form-label fw-semibold" for="dashboardAccessToken">Access token</label>
-            @if (isAddonMode()) {
-              <small class="form-text text-muted d-block mb-2">
-                <i class="fa-solid fa-info-circle"></i> The "Home Assistant Dashboard" mode requires an Access Token.
-                Paste a <strong>Long-Lived Access Token</strong> below.
-              </small>
+        <ng-template #legacySettingsNotice>
+          <div class="alert alert-secondary small mb-3" role="status">
+            <strong>Legacy Home Assistant settings.</strong>
+            @if (previewModeValue === 'homeassistant') {
+              @if (dashboardForm.controls.homeAssistantConnectionId.value) {
+                This dashboard no longer uses them. Remove them once you no longer need to switch back.
+              } @else {
+                This dashboard still renders with its retired host and token. Select a connection above to replace them.
+              }
+            } @else {
+              Widgets created before connections may still read data through them. Reselect their sources from a connection, then remove these settings.
             }
-            <div class="input-group">
-              <input 
-                id="dashboardAccessToken"
-                type="password" 
-                class="form-control" 
-                formControlName="accessToken"
-                [placeholder]="isAddonMode() ? 'Paste a long-lived access token…' : 'Paste a token or select Fetch…'"
-              />
-              @if (!isAddonMode()) {
-                <button 
-                  type="button" 
-                  class="btn btn-outline-primary" 
-                  (click)="authenticateWithHomeAssistant()"
-                  [disabled]="isAuthenticating()"
-                  title="Authenticate via Home Assistant"
-                >
-                  <i class="fa-solid fa-key" aria-hidden="true"></i> {{ isAuthenticating() ? 'Authenticating…' : 'Fetch' }}
-                </button>
-              }
-              @if (dashboard()?.hasAccessToken || dashboardForm.get('accessToken')?.value) {
-                <button 
-                  type="button" 
-                  class="btn btn-outline-danger" 
-                  (click)="clearAccessToken()"
-                  title="Clear the access token"
-                >
-                  <i class="fa-solid fa-trash"></i> Clear
-                </button>
-              }
+            <a routerLink="/connections" target="_blank" rel="noopener" class="alert-link">Manage connections</a>
+            <div class="mt-2">
+              <button type="button" class="btn btn-sm btn-outline-danger" (click)="clearLegacySettings()" [disabled]="isSaving()">
+                <i class="fa-solid fa-trash" aria-hidden="true"></i> Remove legacy settings
+              </button>
             </div>
-            <small class="form-text text-muted d-block mt-2">
-              @if (dashboard()?.hasAccessToken) {
-                <span class="d-block mt-1 text-success">Token is configured</span>
-              }
-            </small>
           </div>
         </ng-template>
 
@@ -382,7 +360,6 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
 })
 export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChanges {
   private readonly dashboardService = inject(DashboardService);
-  private readonly homeAssistantService = inject(HomeAssistantService);
   protected readonly authService = inject(AuthService);
   private readonly deviceService = inject(DeviceService);
   private readonly aiService = inject(AiService);
@@ -392,23 +369,20 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly toastService = inject(ToastService);
   private readonly dialogService = inject(DialogService);
-  private readonly location = inject(Location);
   private readonly playwrightComponentService = inject(PlaywrightComponentService);
+  private readonly dataProviderService = inject(DataProviderService);
 
   readonly isAddonMode = this.authService.isAddonMode;
-  readonly isHostMode = this.authService.isHostMode;
-  readonly hideHostField = computed(() => this.isAddonMode() || this.isHostMode());
+  readonly hideHostField = computed(() => this.isAddonMode() || this.authService.isHostMode());
 
   readonly dashboard = signal<Dashboard | null>(null);
   readonly isLoading = signal(false);
   readonly isSaving = signal(false);
-  readonly isAuthenticating = signal(false);
   readonly updateTimes = signal<string[]>([]);
   readonly showPreviewModal = signal(false);
   readonly previewLoading = signal(false);
   readonly previewError = signal('');
   readonly previewImageUrl = signal('');
-  readonly shouldClearAccessToken = signal(false);
   readonly previewMode = signal<'ssr' | 'homeassistant'>('ssr');
   readonly renderingEnabled = signal(false);
   readonly playwrightStatus = signal<UserRenderingComponentStatus | null>(null);
@@ -419,14 +393,13 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
   readonly aiConfig = signal<AiConfig>({ connectionMode: 'None' });
   readonly conversationAgents = signal<ConversationAgent[]>([]);
   readonly isLoadingAgents = signal(false);
+  readonly homeAssistantConnections = signal<ProviderConnection[]>([]);
   private originalAiConfig: AiConfig = { connectionMode: 'None' };
 
   readonly dashboardForm = new FormGroup({
     name: new FormControl('', { validators: Validators.required, nonNullable: true }),
     description: new FormControl('', { nonNullable: true }),
-    host: new FormControl('', { nonNullable: true }),
     path: new FormControl('', { nonNullable: true }),
-    accessToken: new FormControl('', { nonNullable: true }),
     homeAssistantConnectionId: new FormControl('', { nonNullable: true }),
   });
 
@@ -436,23 +409,15 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
   sizePresets: DashboardSizePreset[] = DASHBOARD_SIZE_PRESETS;
   selectedSizeIndex = 0;
   private previewObjectUrl: string | null = null;
-  private oauthProcessed = false;
-  private oauthToken: string | null = null;
   private originalDashboard: Dashboard | null = null;
   private originalUpdateTimes: string[] = [];
 
   ngOnInit(): void {
     this.loadPlaywrightStatus();
+    this.loadHomeAssistantConnections();
     const id = this.route.snapshot.paramMap.get('id');
 
     if (id) {
-      this.route.queryParams.subscribe(params => {
-        if (params['access_token'] && params['auth_callback'] === 'true' && !this.oauthProcessed) {
-          this.oauthProcessed = true;
-          this.oauthToken = params['access_token'];
-        }
-      });
-
       this.loadDashboard(id);
     }
   }
@@ -460,6 +425,14 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
   @HostListener('window:focus')
   onWindowFocus(): void {
     this.loadPlaywrightStatus();
+    this.loadHomeAssistantConnections();
+  }
+
+  private loadHomeAssistantConnections(): void {
+    this.dataProviderService.connections().subscribe({
+      next: connections => this.homeAssistantConnections.set(connections.filter(c => c.pluginId === HOME_ASSISTANT_PLUGIN_ID)),
+      error: () => this.homeAssistantConnections.set([]),
+    });
   }
 
   private loadPlaywrightStatus(): void {
@@ -481,9 +454,7 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
         this.dashboardForm.reset({
           name: dashboard.name || '',
           description: dashboard.description || '',
-          host: dashboard.host || '',
           path: dashboard.path || '',
-          accessToken: '',
           homeAssistantConnectionId: dashboard.homeAssistantConnectionId || '',
         });
 
@@ -520,10 +491,6 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
 
         this.isLoading.set(false);
 
-        if (this.oauthToken) {
-          this.saveOAuthToken(id);
-        }
-
         this.loadDevices();
 
         const config = dashboard.aiConfig ?? { connectionMode: 'None' as AiConnectionMode };
@@ -540,40 +507,6 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
       }
     });
   }
-
-  private saveOAuthToken(dashboardId: string): void {
-    if (!this.oauthToken) {
-      return;
-    }
-
-    const updatePayload: any = {
-      accessToken: this.oauthToken
-    };
-
-    const hostValue = this.dashboardForm.get('host')?.value;
-    if (hostValue) {
-      updatePayload.host = hostValue;
-    }
-
-    this.dashboardService.updateDashboard(dashboardId, updatePayload).subscribe({
-      next: (updated) => {
-        this.dashboard.set(updated);
-        this.toastService.success('Home Assistant token saved successfully!');
-
-        setTimeout(() => {
-          this.location.replaceState(`/dashboards/${dashboardId}/edit`);
-        }, 500);
-
-        this.oauthToken = null;
-      },
-      error: (error) => {
-        this.toastService.error('Failed to save Home Assistant token. Please try again.');
-        this.oauthToken = null;
-      }
-    });
-  }
-
-
 
   addUpdateTime(): void {
     if (this.newUpdateTime) {
@@ -602,45 +535,6 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
     }
   }
 
-  authenticateWithHomeAssistant(): void {
-    if (this.isAddonMode()) {
-      this.toastService.error('Token fetching is not available in add-on mode. Please paste a Long-Lived Access Token manually.');
-      return;
-    }
-
-    const currentDashboard = this.dashboard();
-    if (!currentDashboard) {
-      return;
-    }
-
-    const hostValue = this.dashboardForm.get('host')?.value;
-    if (!this.hideHostField() && !hostValue) {
-      this.toastService.error('Please enter Home Assistant host first.');
-      return;
-    }
-
-    this.isAuthenticating.set(true);
-
-    const host = this.hideHostField() ? window.location.origin : (hostValue || '');
-    this.homeAssistantService.startAuth(host, currentDashboard.id).subscribe({
-      next: (response: any) => {
-        if (response.directAuth) {
-          this.isAuthenticating.set(false);
-          this.loadDashboard(currentDashboard.id);
-          this.toastService.success('Access token fetched successfully!');
-        } else {
-          this.isAuthenticating.set(false);
-          window.location.href = response.authUrl;
-        }
-      },
-      error: (error) => {
-        this.isAuthenticating.set(false);
-        const errorMsg = 'Failed to start authentication: ' + (error.error?.error || error.error?.message || 'Unknown error');
-        this.toastService.error(errorMsg);
-      }
-    });
-  }
-
   onSubmit(): void {
     const currentDashboard = this.dashboard();
     if (!currentDashboard) {
@@ -660,7 +554,6 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
     const updatePayload: any = {
       name: formValue.name.trim(),
       description: formValue.description?.trim() || undefined,
-      host: formValue.host?.trim() || undefined,
       path: formValue.path?.trim() || undefined,
       updateTimes: this.updateTimes().length > 0 ? this.updateTimes() : undefined,
       // Only Home Assistant mode edits the connection; an empty value selects the dashboard settings.
@@ -671,24 +564,13 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
       aiConfig: this.aiConfig(),
     };
 
-    if (formValue.accessToken?.trim().length > 0) {
-      updatePayload.accessToken = formValue.accessToken;
-    }
-
-    if (this.shouldClearAccessToken()) {
-      updatePayload.clearAccessToken = true;
-      this.shouldClearAccessToken.set(false);
-    }
-
     this.dashboardService.updateDashboard(currentDashboard.id, updatePayload).subscribe({
       next: (updated) => {
         this.dashboard.set(updated);
         this.dashboardForm.patchValue({
           name: updated.name || '',
           description: updated.description || '',
-          host: updated.host || '',
           path: updated.path || '',
-          accessToken: '',
           homeAssistantConnectionId: updated.homeAssistantConnectionId || '',
         });
         this.dashboardForm.markAsPristine();
@@ -725,9 +607,7 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
     this.dashboardForm.reset({
       name: dashboard.name || '',
       description: dashboard.description || '',
-      host: dashboard.host || '',
       path: dashboard.path || '',
-      accessToken: '',
       homeAssistantConnectionId: dashboard.homeAssistantConnectionId || '',
     });
 
@@ -750,7 +630,6 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
     const config = JSON.parse(JSON.stringify(this.originalAiConfig));
     this.aiConfig.set(config);
 
-    this.shouldClearAccessToken.set(false);
   }
 
   openDesigner(): void {
@@ -760,16 +639,26 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
     }
   }
 
-  async clearAccessToken(): Promise<void> {
+  async clearLegacySettings(): Promise<void> {
+    const currentDashboard = this.dashboard();
+    if (!currentDashboard) return;
+    const stillRendering = this.previewModeValue === 'homeassistant' && !this.dashboardForm.controls.homeAssistantConnectionId.value;
     await this.dialogService.confirm({
-      title: 'Clear Access Token',
-      message: 'Are you sure you want to clear the Home Assistant access token? The dashboard will no longer be able to render until you authenticate again.',
-      confirmLabel: 'Clear token',
+      title: 'Remove legacy settings',
+      message: stillRendering
+        ? 'This dashboard still renders with these settings. After removing them it cannot render until you select a connection. Remove them?'
+        : 'Remove the retired Home Assistant host and token from this dashboard? Widgets that still read data through them will show unavailable data.',
+      confirmLabel: 'Remove',
       isDangerous: true,
       onConfirm: () => {
-        this.shouldClearAccessToken.set(true);
-        this.dashboardForm.markAsDirty();
-        this.onSubmit();
+        this.dashboardService.updateDashboard(currentDashboard.id, { clearAccessToken: true }).subscribe({
+          next: updated => {
+            this.dashboard.set(updated);
+            this.originalDashboard = JSON.parse(JSON.stringify(updated));
+            this.toastService.success('Legacy settings removed');
+          },
+          error: error => this.toastService.error(error.error?.message || 'Failed to remove legacy settings.'),
+        });
       }
     });
   }
@@ -786,11 +675,24 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
     this.aiConfig.update(c => ({ ...c, connectionMode: mode }));
     this.dashboardForm.markAsDirty();
     if (mode === 'HomeAssistant') {
+      // Without the add-on or legacy settings, a named connection is required; start with a signed-in one.
       const currentDashboard = this.dashboard();
+      if (!this.aiConfig().homeAssistantConnectionId && !this.isAddonMode() && !currentDashboard?.hasLegacyConnection) {
+        const connection = this.homeAssistantConnections().find(c => c.connected);
+        if (connection) this.aiConfig.update(c => ({ ...c, homeAssistantConnectionId: connection.id }));
+      }
       if (currentDashboard) {
         this.loadConversationAgents(currentDashboard.id);
       }
     }
+  }
+
+  onAiHomeAssistantConnectionChange(connectionId: string): void {
+    // Agents differ per server, so a previously chosen agent no longer applies.
+    this.aiConfig.update(c => ({ ...c, homeAssistantConnectionId: connectionId || undefined, homeAssistantAgentId: undefined }));
+    this.dashboardForm.markAsDirty();
+    const currentDashboard = this.dashboard();
+    if (currentDashboard) this.loadConversationAgents(currentDashboard.id);
   }
 
   updateAiField(field: keyof AiConfig, value: string): void {
@@ -800,7 +702,7 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
 
   private loadConversationAgents(dashboardId: string): void {
     this.isLoadingAgents.set(true);
-    this.aiService.getConversationAgents(dashboardId).subscribe({
+    this.aiService.getConversationAgents(dashboardId, this.aiConfig().homeAssistantConnectionId).subscribe({
       next: (agents) => {
         this.conversationAgents.set(agents);
         this.isLoadingAgents.set(false);
@@ -823,11 +725,11 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
     return !this.dashboardForm.controls.homeAssistantConnectionId.value && !this.dashboardSettingsReady();
   }
 
-  /** Whether the dashboard's own host/token settings can reach Home Assistant. */
+  /** Whether the dashboard's retired host/token settings can still reach Home Assistant. */
   dashboardSettingsReady(): boolean {
-    const hasToken = !!this.dashboard()?.hasAccessToken || !!this.dashboardForm.controls.accessToken.value;
+    const dashboard = this.dashboard();
     // The add-on and host modes manage the host; Home Assistant rendering still needs a long-lived token.
-    return hasToken && (this.hideHostField() || !!this.dashboardForm.controls.host.value);
+    return !!dashboard?.hasLegacyConnection && dashboard.hasAccessToken && (this.hideHostField() || !!dashboard.host);
   }
 
   onHomeAssistantConnectionChange(connectionId: string): void {
@@ -912,7 +814,7 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
     if (!currentDashboard) return;
 
     if (this.disablePreviewButton()) {
-      this.toastService.error('Preview requires a Home Assistant connection (or host and access token) and a dashboard path.');
+      this.toastService.error('Preview requires a Home Assistant connection and a dashboard path.');
       return;
     }
 

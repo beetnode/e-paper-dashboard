@@ -52,11 +52,6 @@ public class StandaloneStrategy : IDeploymentStrategy
             missingConfigs.Add(clientUrlError);
         }
 
-        if (string.IsNullOrWhiteSpace(_environmentConfiguration.StateSigningKey))
-        {
-            missingConfigs.Add("STATE_SIGNING_KEY");
-        }
-
         if (missingConfigs.Count > 0)
         {
             var message = $"""

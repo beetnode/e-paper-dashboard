@@ -21,13 +21,6 @@ export interface HassEntity {
 export class HomeAssistantService {
   private readonly http = inject(HttpClient);
 
-  startAuth(host: string, dashboardId: string): Observable<{ authUrl: string; state: string }> {
-    return this.http.post<{ authUrl: string; state: string }>('/api/homeassistant/start-auth', {
-      host: host,
-      dashboardId: dashboardId
-    });
-  }
-
   getDashboards(dashboardId: string): Observable<any[]> {
     return this.http.get<{ data: any[] }>(`/api/dashboards/${dashboardId}/homeassistant/dashboards`).pipe(
       map(response => response.data || [])

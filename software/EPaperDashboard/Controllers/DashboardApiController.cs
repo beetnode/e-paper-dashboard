@@ -36,7 +36,10 @@ public class DashboardApiController(DashboardService dashboardService, UserServi
             userId = user.Value.Id;
         }
 
-        var dashboards = _dashboardService.GetDashboardsForUser(userId);
+        // Never return persisted dashboards directly: they contain Home Assistant access tokens.
+        var dashboards = _dashboardService.GetDashboardsForUser(userId)
+            .Select(dashboard => DashboardResponseDto.FromDashboard(dashboard, _deploymentStrategy.IsAutoConnected, ResolveEffectiveAiConfigMode(dashboard)))
+            .ToList();
         return Ok(dashboards);
     }
 
@@ -138,6 +141,13 @@ public class DashboardApiController(DashboardService dashboardService, UserServi
             return Forbid();
         }
 
+        // Dashboard-level Home Assistant settings are retired in favour of named connections. Existing
+        // values keep working until their owner switches to a connection and clears them.
+        if (!string.IsNullOrEmpty(request.AccessToken) || !string.IsNullOrEmpty(request.Host))
+        {
+            return BadRequest(new { message = "Dashboard Home Assistant settings can no longer be changed. Use a Home Assistant connection instead." });
+        }
+
         var updatedDashboard = dashboard.Value;
         if (request.Name != null) updatedDashboard.Name = request.Name;
         if (request.Description != null) updatedDashboard.Description = request.Description;
@@ -145,13 +155,9 @@ public class DashboardApiController(DashboardService dashboardService, UserServi
         if (request.ClearAccessToken == true)
         {
             updatedDashboard.AccessToken = null;
+            updatedDashboard.Host = null;
         }
-        else if (request.AccessToken != null)
-        {
-            updatedDashboard.AccessToken = request.AccessToken;
-        }
-        
-        if (request.Host != null) updatedDashboard.Host = request.Host;
+
         if (request.Path != null) updatedDashboard.Path = request.Path;
         var connectionError = ApplyHomeAssistantConnection(updatedDashboard, request.HomeAssistantConnectionId);
         if (connectionError != null)
@@ -318,6 +324,7 @@ public record DashboardResponseDto(
     string Description,
     string UserId,
     bool HasAccessToken,
+    bool HasLegacyConnection,
     string? Host,
     string? Path,
     string? HomeAssistantConnectionId,
@@ -342,6 +349,8 @@ public record DashboardResponseDto(
         Description: dashboard.Description,
         UserId: dashboard.UserId.ToString(),
         HasAccessToken: isAutoConnected || !string.IsNullOrWhiteSpace(dashboard.AccessToken),
+        // Retired dashboard-level settings that the owner can still clear.
+        HasLegacyConnection: !string.IsNullOrWhiteSpace(dashboard.AccessToken) || !string.IsNullOrWhiteSpace(dashboard.Host),
         Host: dashboard.Host,
         Path: dashboard.Path,
         HomeAssistantConnectionId: dashboard.HomeAssistantConnectionId,

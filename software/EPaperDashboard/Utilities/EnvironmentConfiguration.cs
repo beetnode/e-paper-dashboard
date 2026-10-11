@@ -9,7 +9,6 @@ public static class EnvironmentConfiguration
 	private const string DatabaseConnectionStringKey = "DATABASE_CONNECTION_STRING";
 	private const string ClientUrlKey = "CLIENT_URL";
 	private const string HomeAssistantHostKey = "HOME_ASSISTANT_HOST";
-	private const string StateSigningKeyKey = "STATE_SIGNING_KEY";
 	private const string DashboardScheduleCheckIntervalMinutesKey = "DASHBOARD_SCHEDULE_CHECK_INTERVAL_MINUTES";
 	private const string DashboardMissedScheduleToleranceMinutesKey = "DASHBOARD_MISSED_SCHEDULE_TOLERANCE_MINUTES";
 	private const string FirmwareUpdateEnabledKey = "FIRMWARE_UPDATE_ENABLED";
@@ -44,9 +43,6 @@ public static class EnvironmentConfiguration
 
 	private static readonly Lazy<string?> _homeAssistantHost = new(() =>
 		GetStringFromEnvOrConfig(HomeAssistantHostKey));
-
-	private static readonly Lazy<string?> _stateSigningKey = new(() =>
-		GetStringFromEnvOrConfig(StateSigningKeyKey));
 
 	private static readonly Lazy<TimeSpan> _dashboardScheduleCheckInterval = new(() =>
 		TimeSpan.FromMinutes(GetIntFromEnvOrConfig(DashboardScheduleCheckIntervalMinutesKey, 720)));
@@ -85,8 +81,6 @@ public static class EnvironmentConfiguration
 	public static Uri? ClientUri => _clientUri.Value;
 
 
-
-	public static string? StateSigningKey => _stateSigningKey.Value;
 
 	public static TimeSpan DashboardScheduleCheckInterval => _dashboardScheduleCheckInterval.Value;
 

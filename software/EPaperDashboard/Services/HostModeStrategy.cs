@@ -52,9 +52,6 @@ public class HostModeStrategy : IDeploymentStrategy
         if (clientUrlError is not null)
             missingConfigs.Add(clientUrlError);
 
-        if (string.IsNullOrWhiteSpace(_environmentConfiguration.StateSigningKey))
-            missingConfigs.Add("STATE_SIGNING_KEY");
-
         if (missingConfigs.Count > 0)
         {
             return UnitResult.Failure(

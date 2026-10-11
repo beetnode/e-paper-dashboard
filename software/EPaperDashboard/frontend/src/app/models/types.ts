@@ -44,6 +44,8 @@ export interface Dashboard {
   name: string;
   description: string;
   hasAccessToken: boolean;
+  /** Retired dashboard-level Home Assistant host/token are still stored and can be removed. */
+  hasLegacyConnection?: boolean;
   host?: string;
   path?: string;
   /** Named Home Assistant connection used by 'HomeAssistant' rendering; null uses the dashboard host/token. */
@@ -79,9 +81,8 @@ export interface CreateDashboardRequest {
 export interface UpdateDashboardRequest {
   name?: string;
   description?: string;
-  accessToken?: string;
+  /** Removes the retired dashboard-level Home Assistant host and token. */
   clearAccessToken?: boolean;
-  host?: string;
   path?: string;
   /** Empty string switches back to the dashboard host/token settings. */
   homeAssistantConnectionId?: string;
@@ -502,9 +503,9 @@ export interface AiConfig {
   directApiKey?: string;
   directModel?: string;
   homeAssistantAgentId?: string;
-}
   /** Named Home Assistant connection for conversation agents; empty uses the add-on or legacy settings. */
   homeAssistantConnectionId?: string;
+}
 
 export interface AiGenerationResult {
   widgets: WidgetConfig[];

@@ -44,13 +44,15 @@ public class DashboardApiControllerTests
     {
         var userId = UserId.New();
         _userRepository.Setup(r => r.FindById(userId)).Returns(new User { Id = userId });
-        _dashboardRepository.Setup(r => r.FindByUserId(userId)).Returns([new Dashboard { UserId = userId }]);
+        _dashboardRepository.Setup(r => r.FindByUserId(userId)).Returns([new Dashboard { UserId = userId, AccessToken = "secret-dashboard-token" }]);
         var sut = CreateSut().WithUser(userId);
 
         var result = sut.GetDashboards();
 
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
-        ok.Value.Should().BeAssignableTo<List<Dashboard>>().Which.Should().ContainSingle();
+        ok.Value.Should().BeAssignableTo<List<DashboardResponseDto>>().Which.Should().ContainSingle()
+            .Which.HasAccessToken.Should().BeTrue();
+        System.Text.Json.JsonSerializer.Serialize(ok.Value).Should().NotContain("secret-dashboard-token");
     }
 
     [Fact]
@@ -254,19 +256,36 @@ public class DashboardApiControllerTests
         result.Should().BeOfType<OkObjectResult>();
     }
 
+    [Theory]
+    [InlineData("token", null)]
+    [InlineData(null, "http://ha.example.test")]
+    public void UpdateDashboard_SettingRetiredHomeAssistantSettings_ReturnsBadRequest(string? token, string? host)
+    {
+        var userId = UserId.New();
+        var dashboardId = DashboardId.New();
+        _dashboardRepository.Setup(r => r.FindById(dashboardId)).Returns(new Dashboard { Id = dashboardId, UserId = userId });
+        var sut = CreateSut().WithUser(userId);
+
+        var result = sut.UpdateDashboard(dashboardId.Value, new UpdateDashboardRequest(
+            null, null, token, null, host, null, null, null, null, null, null, null, null, null, null, null));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+        _dashboardRepository.Verify(r => r.Update(It.IsAny<Dashboard>()), Times.Never);
+    }
+
     [Fact]
     public void UpdateDashboard_ClearAccessTokenTrue_SetsAccessTokenNull()
     {
         var userId = UserId.New();
         var dashboardId = DashboardId.New();
-        var dashboard = new Dashboard { Id = dashboardId, UserId = userId, AccessToken = "old-token" };
+        var dashboard = new Dashboard { Id = dashboardId, UserId = userId, AccessToken = "old-token", Host = "http://old.test" };
         _dashboardRepository.Setup(r => r.FindById(dashboardId)).Returns(dashboard);
         var sut = CreateSut().WithUser(userId);
 
         sut.UpdateDashboard(dashboardId.Value, new UpdateDashboardRequest(
             null, null, null, ClearAccessToken: true, null, null, null, null, null, null, null, null, null, null, null, null));
 
-        _dashboardRepository.Verify(r => r.Update(It.Is<Dashboard>(d => d.AccessToken == null)), Times.Once);
+        _dashboardRepository.Verify(r => r.Update(It.Is<Dashboard>(d => d.AccessToken == null && d.Host == null)), Times.Once);
     }
 
     [Fact]
