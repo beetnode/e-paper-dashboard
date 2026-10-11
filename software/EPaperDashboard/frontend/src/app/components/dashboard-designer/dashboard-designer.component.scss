@@ -475,6 +475,33 @@
   overflow: hidden;
 }
 
+/* Touch screens: finger-sized hit areas without changing the compact visuals. */
+@media (pointer: coarse) {
+  .panel-icon-btn,
+  .layer-menu-btn {
+    width: var(--designer-hit-size);
+    height: var(--designer-hit-size);
+  }
+
+  .layer-main {
+    min-height: var(--designer-hit-size);
+  }
+
+  .swatch {
+    position: relative;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: -0.375rem;
+    }
+  }
+
+  .inspector-back {
+    min-height: var(--designer-hit-size);
+  }
+}
+
 .hover-overlay {
   outline: 2px dashed var(--designer-accent-strong);
   outline-offset: -2px;
@@ -758,6 +785,8 @@
   position: absolute;
   box-sizing: border-box;
   cursor: grab;
+  outline: 2px solid var(--designer-accent);
+  outline-offset: -1px;
   /* The selected widget drags directly on touch, so it must not start a page pan. */
   touch-action: none;
 

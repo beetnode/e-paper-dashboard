@@ -309,6 +309,8 @@ html[data-bs-theme="dark"] & {
     }
 
     .btn-close-sheet {
+      min-width: var(--designer-hit-size);
+      min-height: var(--designer-hit-size);
       background: none;
       border: none;
       font-size: 1.25rem;
@@ -377,6 +379,8 @@ html[data-bs-theme="dark"] & {
     }
 
     .btn-close-drawer {
+      min-width: var(--designer-hit-size);
+      min-height: var(--designer-hit-size);
       background: none;
       border: none;
       font-size: 1.25rem;

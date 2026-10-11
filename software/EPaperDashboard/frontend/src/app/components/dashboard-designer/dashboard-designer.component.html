@@ -169,9 +169,9 @@
               </div>
             }
             @if (renderedCanvasError()) {
-              <div class="rendered-canvas-status rendered-canvas-status-error" [title]="renderedCanvasError()">
-                <i class="fa-solid fa-triangle-exclamation"></i>
-                Preview unavailable — showing the last available view
+              <div class="rendered-canvas-status rendered-canvas-status-error" role="status" [title]="renderedCanvasError() + ' — showing the last available view'">
+                <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                Preview unavailable
               </div>
             }
             <div class="dashboard-canvas" [class.backend-preview-active]="!!renderedCanvasImageUrl()" [ngStyle]="canvasStyle()" (pointerdown)="onCanvasPointerDown($event)">
