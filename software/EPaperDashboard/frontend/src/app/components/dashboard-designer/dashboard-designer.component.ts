@@ -160,7 +160,6 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   mobileOverflowOpen = signal(false);
   mobileSelectionToolbar = signal(false);
   longPressActive = signal(false);
-  mobileDragging = signal(false);
   private mobileBreakpoint = 768;
   private isTouchDevice = false;
   private resizeTimer: any = null;
@@ -485,8 +484,14 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     );
   }
 
-  onToolboxWidgetMouseDown(event: MouseEvent | PointerEvent, widget: WidgetDefinition): void {
+  onToolboxWidgetPointerDown(event: PointerEvent, widget: WidgetDefinition): void {
+    if (event.button !== 0) return;
     event.preventDefault();
+    // Dragging from a scrollable list is unreliable on touch; a tap places the widget instead.
+    if (event.pointerType === 'touch') {
+      this.addWidgetToFirstSlot(widget);
+      return;
+    }
     const layout = this.layout();
     const canvas = document.querySelector('.dashboard-canvas') as HTMLElement;
     if (!canvas) return;
@@ -501,13 +506,13 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     preview.innerHTML = `<i class='fa ${widget.icon}'></i> ${widget.label}`;
     document.body.appendChild(preview);
 
-    const movePreview = (e: PointerEvent | MouseEvent) => {
+    const movePreview = (e: PointerEvent) => {
       preview.style.left = e.clientX + 8 + 'px';
       preview.style.top = e.clientY + 8 + 'px';
     };
     movePreview(event);
 
-    const onPointerMove = (e: PointerEvent | MouseEvent) => {
+    const onPointerMove = (e: PointerEvent) => {
       movePreview(e);
 
       const rect = canvas.getBoundingClientRect();
@@ -536,11 +541,6 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     };
 
     const onPointerUp = () => {
-      document.removeEventListener('pointermove', onPointerMove);
-      document.removeEventListener('pointerup', onPointerUp);
-      document.removeEventListener('pointercancel', onPointerUp);
-      document.removeEventListener('mousemove', onPointerMove);
-      document.removeEventListener('mouseup', onPointerUp);
       preview.remove();
 
       const g = this.ghost();
@@ -556,12 +556,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       this.ghost.set(null);
     };
 
-    document.addEventListener('pointermove', onPointerMove);
-    document.addEventListener('pointerup', onPointerUp);
-    document.addEventListener('pointercancel', onPointerUp);
-    // Fallback for environments where pointer events aren't fully supported
-    document.addEventListener('mousemove', onPointerMove);
-    document.addEventListener('mouseup', onPointerUp);
+    this.trackPointer(event, onPointerMove, onPointerUp);
   }
 
   onToolboxWidgetKeyDown(event: KeyboardEvent, widget: WidgetDefinition): void {
@@ -639,7 +634,8 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   }
 
 
-  onWidgetMouseDown(event: MouseEvent | PointerEvent, widget: WidgetConfig): void {
+  onWidgetPointerDown(event: PointerEvent, widget: WidgetConfig): void {
+    if (event.button !== 0) return;
     event.stopPropagation();
     if (this.elementEditingWidgetId() === widget.id) return;
     if (this.elementEditingWidgetId()) this.elementEditingWidgetId.set(null);
@@ -660,8 +656,13 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       }
     }
 
-    // On touch devices, use long-press to initiate drag
-    const isTouch = 'pointerType' in event && (event as PointerEvent).pointerType === 'touch';
+    // On touch, an already selected widget drags immediately (its overlay disables panning);
+    // other widgets need a long press so a swipe across the canvas still scrolls the page.
+    const isTouch = event.pointerType === 'touch';
+    if (isTouch && target.closest('.sel-overlay')) {
+      this.startDrag(event, widget);
+      return;
+    }
     if (isTouch) {
       this.pointerMoved = false;
       this.longPressActive.set(true);
@@ -838,9 +839,32 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     this.selectedWidget.set(updated);
   }
 
-  private startDrag(event: MouseEvent | PointerEvent, widget: WidgetConfig): void {
+  /**
+   * Follows the pointer that started a gesture until it is released or cancelled. While the
+   * gesture runs, touch scrolling is suppressed so the browser does not pan instead of dragging.
+   */
+  private trackPointer(start: PointerEvent, onMove: (event: PointerEvent) => void, onEnd: () => void): void {
+    const pointerId = start.pointerId;
+    const blockScroll = (event: TouchEvent) => event.preventDefault();
+    const move = (event: PointerEvent) => {
+      if (event.pointerId === pointerId) onMove(event);
+    };
+    const end = (event: PointerEvent) => {
+      if (event.pointerId !== pointerId) return;
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', end);
+      document.removeEventListener('pointercancel', end);
+      document.removeEventListener('touchmove', blockScroll);
+      onEnd();
+    };
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', end);
+    document.addEventListener('pointercancel', end);
+    document.addEventListener('touchmove', blockScroll, { passive: false });
+  }
+
+  private startDrag(event: PointerEvent, widget: WidgetConfig): void {
     let isDragging = true;
-    this.mobileDragging.set(true);
     this.dragStartPos = { x: event.clientX, y: event.clientY };
     this.dragStartWidget = { ...widget.position };
 
@@ -860,7 +884,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
 
     this.ghost.set({ id: widget.id, position: { ...widget.position } });
 
-    const onPointerMove = (e: PointerEvent | MouseEvent) => {
+    const onPointerMove = (e: PointerEvent) => {
       if (!isDragging) return;
 
       const deltaX = e.clientX - this.dragStartPos.x;
@@ -875,7 +899,6 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
 
     const onPointerUp = () => {
       isDragging = false;
-      this.mobileDragging.set(false);
       const g = this.ghost();
       if (g) {
         this.layout.update(l => ({
@@ -886,24 +909,14 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
         if (updated) this.selectedWidget.set(updated);
       }
       this.ghost.set(null);
-      document.removeEventListener('pointermove', onPointerMove);
-      document.removeEventListener('pointerup', onPointerUp);
-      document.removeEventListener('pointercancel', onPointerUp);
-      document.removeEventListener('mousemove', onPointerMove);
-      document.removeEventListener('mouseup', onPointerUp);
     };
 
-    document.addEventListener('pointermove', onPointerMove);
-    document.addEventListener('pointerup', onPointerUp);
-    document.addEventListener('pointercancel', onPointerUp);
-    document.addEventListener('mousemove', onPointerMove);
-    document.addEventListener('mouseup', onPointerUp);
+    this.trackPointer(event, onPointerMove, onPointerUp);
   }
 
-  private startResize(event: MouseEvent | PointerEvent, widget: WidgetConfig, direction: 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'): void {
+  private startResize(event: PointerEvent, widget: WidgetConfig, direction: 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'): void {
     event.stopPropagation();
     let isResizing = true;
-    this.mobileDragging.set(true);
     this.dragStartPos = { x: event.clientX, y: event.clientY };
     this.dragStartWidget = { ...widget.position };
     const canvas = document.querySelector('.dashboard-canvas') as HTMLElement;
@@ -922,7 +935,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
 
     this.ghost.set({ id: widget.id, position: { ...widget.position } });
 
-    const onPointerMove = (e: PointerEvent | MouseEvent) => {
+    const onPointerMove = (e: PointerEvent) => {
       if (!isResizing) return;
       const deltaX = e.clientX - this.dragStartPos.x;
       const deltaY = e.clientY - this.dragStartPos.y;
@@ -983,7 +996,6 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
 
     const onPointerUp = () => {
       isResizing = false;
-      this.mobileDragging.set(false);
       const g = this.ghost();
       if (g) {
         this.layout.update(l => ({
@@ -994,18 +1006,9 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
         if (updated) this.selectedWidget.set(updated);
       }
       this.ghost.set(null);
-      document.removeEventListener('pointermove', onPointerMove);
-      document.removeEventListener('pointerup', onPointerUp);
-      document.removeEventListener('pointercancel', onPointerUp);
-      document.removeEventListener('mousemove', onPointerMove);
-      document.removeEventListener('mouseup', onPointerUp);
     };
 
-    document.addEventListener('pointermove', onPointerMove);
-    document.addEventListener('pointerup', onPointerUp);
-    document.addEventListener('pointercancel', onPointerUp);
-    document.addEventListener('mousemove', onPointerMove);
-    document.addEventListener('mouseup', onPointerUp);
+    this.trackPointer(event, onPointerMove, onPointerUp);
   }
 
 
@@ -1764,7 +1767,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     this.activeTab.set('properties');
   }
 
-  onCanvasMouseDown(event: MouseEvent): void {
+  onCanvasPointerDown(event: PointerEvent): void {
     const target = event.target as HTMLElement;
     if (target.classList.contains('dashboard-canvas') || target.classList.contains('grid-overlay')) {
       this.selectedWidget.set(null);

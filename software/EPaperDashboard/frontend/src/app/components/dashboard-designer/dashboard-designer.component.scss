@@ -654,6 +654,8 @@ html[data-bs-theme="dark"] .canvas-wrapper {
   position: absolute;
   box-sizing: border-box;
   cursor: grab;
+  /* The selected widget drags directly on touch, so it must not start a page pan. */
+  touch-action: none;
 
   &.element-editing {
     cursor: default;
@@ -703,7 +705,31 @@ $h-cor-off: -10px; /* corner square offset */
   background: rgba(0, 123, 255, 0.8);
   border-radius: 2px;
   pointer-events: auto;
+  touch-action: none;
   z-index: 40;
+}
+
+/* Finger-sized hit area around each handle without changing how it looks. */
+@media (pointer: coarse) {
+  .resize-handle::before {
+    content: '';
+    position: absolute;
+    inset: -12px;
+  }
+
+  .resize-handle.resize-se,
+  .resize-handle.resize-ne,
+  .resize-handle.resize-nw,
+  .resize-handle.resize-sw {
+    width: 18px;
+    height: 18px;
+  }
+
+  .widget-delete-btn,
+  .widget-edit-toggle-btn {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
 }
 
 .resize-handle.resize-e {
@@ -872,10 +898,6 @@ $h-cor-off: -10px; /* corner square offset */
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Canvas touch-action: only disable during active drag to preserve normal scroll */
-  &.mobile-dragging .dashboard-canvas {
-    touch-action: none;
-  }
 
 }
 .designer-menu-label {

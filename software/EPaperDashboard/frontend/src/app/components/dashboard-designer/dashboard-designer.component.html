@@ -117,7 +117,7 @@
   }
 
   @if (!isLoading() && dashboard()) {
-  <div class="designer-grid-container" [class.toolbox-collapsed]="toolboxCollapsed()" [class.panel-drawer]="panelAsDrawer()" [class.mobile-dragging]="mobileDragging()" [class.mobile-layout]="isMobile()">
+  <div class="designer-grid-container" [class.toolbox-collapsed]="toolboxCollapsed()" [class.panel-drawer]="panelAsDrawer()" [class.mobile-layout]="isMobile()">
     <!-- Left Panel - Widget Toolbar -->
     <div class="designer-panel-left">
       <div class="card">
@@ -142,7 +142,7 @@
               }
               @for (widget of widgetsInCategory(category.type); track widget.type) {
               <button type="button" class="widget-item toolbox-drag-item" [class.icon-only]="toolboxCollapsed()"
-                (mousedown)="onToolboxWidgetMouseDown($event, widget)"
+                (pointerdown)="onToolboxWidgetPointerDown($event, widget)"
                 (keydown)="onToolboxWidgetKeyDown($event, widget)"
                 [attr.aria-label]="'Add ' + widget.label + ' widget'" [title]="toolboxCollapsed() ? widget.label : 'Drag to canvas or press Enter to add'">
                 <i class="fa {{ widget.icon }}"></i>
@@ -181,7 +181,7 @@
                 Preview unavailable — showing the last available view
               </div>
             }
-            <div class="dashboard-canvas" [class.backend-preview-active]="!!renderedCanvasImageUrl()" [ngStyle]="getCanvasStyle()" (mousedown)="onCanvasMouseDown($event)">
+            <div class="dashboard-canvas" [class.backend-preview-active]="!!renderedCanvasImageUrl()" [ngStyle]="getCanvasStyle()" (pointerdown)="onCanvasPointerDown($event)">
               @if (renderedCanvasImageUrl()) {
                 <img class="rendered-canvas-image" [src]="renderedCanvasImageUrl()"
                   alt="Backend-rendered dashboard preview" draggable="false" />
@@ -191,7 +191,7 @@
               <div class="widget-container" [ngStyle]="getWidgetStyle(widget)"
                 role="button" tabindex="0" [attr.aria-label]="widget.type + ' widget. Use arrow keys to move.'"
                 [attr.aria-pressed]="selectedWidget()?.id === widget.id"
-                (mousedown)="onWidgetMouseDown($event, widget)"
+                (pointerdown)="onWidgetPointerDown($event, widget)"
                 (keydown)="onWidgetKeyDown($event, widget)">
                 <span class="widget-shell-label">{{ widget.type }}</span>
               </div>
@@ -210,7 +210,7 @@
                      [class.long-press-active]="longPressActive()"
                      [class.element-editing]="elementEditingWidgetId() === selectedWidget()!.id"
                      [ngStyle]="getSelectionOverlayStyle()"
-                     (mousedown)="onWidgetMouseDown($event, selectedWidget()!)">
+                     (pointerdown)="onWidgetPointerDown($event, selectedWidget()!)">
 
                   @if (elementEditingWidgetId() !== selectedWidget()!.id) {
                     <div class="resize-handle resize-n" data-direction="n"></div>
@@ -227,7 +227,7 @@
                       <button class="widget-edit-toggle-btn"
                         [class.active]="elementEditingWidgetId() === selectedWidget()!.id"
                         [disabled]="renderedCanvasLoading() || !getSelectedWidgetGeometry()"
-                        (mousedown)="$event.stopPropagation()"
+                        (pointerdown)="$event.stopPropagation()"
                         (click)="toggleElementEditing(selectedWidget()!)"
                         [title]="elementEditingWidgetId() === selectedWidget()!.id ? 'Finish editing widget elements' : 'Edit widget elements'">
                         @if (elementEditingWidgetId() === selectedWidget()!.id) {
@@ -255,7 +255,7 @@
                   <!-- Delete widget button -->
                   @if (elementEditingWidgetId() !== selectedWidget()!.id) {
                     <button type="button" class="widget-delete-btn"
-                      (mousedown)="$event.stopPropagation()"
+                      (pointerdown)="$event.stopPropagation()"
                       (click)="deleteWidget(selectedWidget()!)"
                       aria-label="Delete selected widget">
                       <i class="fa fa-trash" aria-hidden="true"></i>
