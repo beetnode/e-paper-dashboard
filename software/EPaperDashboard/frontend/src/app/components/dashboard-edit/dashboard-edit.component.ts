@@ -21,22 +21,10 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
   standalone: true,
   imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterModule, RenderedPreviewModalComponent, HomeAssistantTargetPickerComponent],
   styles: [`
-    .btn-group[role="group"] {
-      display: grid !important;
-      grid-template-columns: 1fr 1fr;
-      gap: 0;
-    }
-
-    .btn-group[role="group"] .btn {
-      flex: none !important;
-    }
-
-    .d-flex.align-items-center.gap-3 {
-      min-width: 0;
-    }
-
-    .action-bar-title,
-    .min-width-0 {
+    .action-bar-title {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
       min-width: 0;
     }
 
@@ -44,11 +32,15 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
       width: 9.375rem;
     }
 
-    h2 {
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    .update-time-chip {
+      padding-right: 0.25rem;
+    }
+
+    .update-time-chip .btn-close {
+      width: 0.5rem;
+      height: 0.5rem;
+      padding: 0.25rem;
+      background-size: 0.5rem;
     }
   `],
   template: `
@@ -60,115 +52,72 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
         </div>
       </div>
     } @else if (dashboard()) {
-      <form (ngSubmit)="onSubmit()" [formGroup]="dashboardForm" class="app-page">
+      <form (ngSubmit)="onSubmit()" [formGroup]="dashboardForm" class="app-page app-form-shell app-form-shell-wide">
         <div class="app-action-bar">
-          <div class="action-bar-title d-flex align-items-center gap-2 gap-sm-3">
-            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="onCancel()" aria-label="Back to dashboards">
-              <i class="fa-solid fa-arrow-left"></i><span class="d-none d-sm-inline"> Back</span>
+          <div class="action-bar-title">
+            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="onCancel()" aria-label="Back to dashboards" title="Back to dashboards">
+              <i class="fa-solid fa-arrow-left" aria-hidden="true"></i><span class="d-none d-lg-inline"> Back</span>
             </button>
-            <div class="min-width-0">
-              <h1 class="h4 mb-0 text-truncate">{{ dashboard()!.name }}</h1>
-              <span class="small" [ngClass]="dashboardForm.dirty ? 'text-warning' : 'text-muted'">
-                {{ dashboardForm.dirty ? 'Unsaved changes' : 'All changes saved' }}
-              </span>
-            </div>
+            <h1 class="h4 mb-0 text-truncate" [title]="dashboard()!.name">{{ dashboard()!.name }}</h1>
+            <span class="visually-hidden" aria-live="polite">{{ dashboardForm.dirty ? 'Unsaved changes' : '' }}</span>
           </div>
-          <div class="d-flex gap-1 gap-sm-2 flex-shrink-0">
-            <button type="button" class="btn btn-sm btn-success" (click)="openPreview()" 
+          <div class="app-page-actions flex-nowrap">
+            @if (previewModeValue === 'ssr') {
+              <button type="button" class="btn btn-sm btn-outline-primary" (click)="openDesigner()" title="Edit the layout in the designer" aria-label="Open designer">
+                <i class="fa-solid fa-paintbrush" aria-hidden="true"></i><span class="d-none d-sm-inline ms-1">Designer</span>
+              </button>
+            }
+            <button type="button" class="btn btn-sm btn-success" (click)="openPreview()"
               [disabled]="disablePreviewButton() || dashboardForm.dirty"
-              [title]="dashboardForm.dirty ? 'Save your changes before previewing' : (previewMode() === 'ssr' ? 'Open custom layout preview' : 'Open Home Assistant dashboard preview')">
-              <i class="fa-solid fa-eye"></i><span class="d-none d-sm-inline"> Preview</span>
+              [title]="dashboardForm.dirty ? 'Save your changes before previewing' : 'Preview the device image'" aria-label="Preview">
+              <i class="fa-solid fa-eye" aria-hidden="true"></i><span class="d-none d-sm-inline ms-1">Preview</span>
             </button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="discardChanges()" [disabled]="!dashboardForm.dirty || isSaving()">
-              <i class="fa-solid fa-rotate-left"></i><span class="d-none d-sm-inline"> Discard</span>
-            </button>
-            <button type="submit" class="btn btn-sm btn-primary"
+            <!-- Shown only with unsaved changes, so it doubles as the change indicator. -->
+            @if (dashboardForm.dirty) {
+              <button type="button" class="btn btn-sm btn-outline-secondary" (click)="discardChanges()" [disabled]="isSaving()" title="Discard unsaved changes" aria-label="Discard unsaved changes">
+                <i class="fa-solid fa-rotate-left" aria-hidden="true"></i><span class="d-none d-md-inline ms-1">Discard</span>
+              </button>
+            }
+            <button type="submit" class="btn btn-sm btn-primary" title="Save changes" aria-label="Save changes"
               [disabled]="!dashboardForm.dirty || isSaving() || dashboardForm.invalid || !dashboardForm.get('name')?.value?.trim()">
-              <i class="fa-solid fa-floppy-disk"></i><span class="d-none d-sm-inline"> Save</span>
+              <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i><span class="d-none d-sm-inline ms-1">Save</span>
             </button>
           </div>
         </div>
-        <div class="card shadow-sm mb-3" aria-labelledby="generalSettingsTitle">
-          <div class="card-body">
-            <h2 id="generalSettingsTitle" class="app-section-title">Dashboard configuration</h2>
-            <p class="app-section-description">Manage the dashboard identity, content source, display, and update schedule.</p>
-            <div class="row g-4">
-              <div class="col-12 col-lg-6">
-                <h3 class="h6 text-uppercase text-muted mb-3">General</h3>
-                <div class="mb-3">
-                  <label class="form-label fw-semibold" for="editDashboardName">Name</label>
-                  <input 
-                    id="editDashboardName"
-                    type="text" 
-                    class="form-control" 
-                    formControlName="name"
-                    [class.is-invalid]="dashboardForm.get('name')?.touched && !dashboardForm.get('name')?.value?.trim()"
-                    required 
-                  />
-                  @if (dashboardForm.get('name')?.touched && !dashboardForm.get('name')?.value?.trim()) {
-                    <div class="invalid-feedback">Name is required.</div>
-                  }
-                </div>
-                <div class="mb-3">
-                  <label class="form-label fw-semibold" for="editDashboardDescription">Description</label>
-                  <input 
-                    id="editDashboardDescription"
-                    type="text" 
-                    class="form-control" 
-                    formControlName="description"
-                  />
-                </div>
-                
-                <div class="mb-3">
-                  <span class="form-label fw-semibold d-block">Displayed on</span>
 
-                  @if (isLoadingDevices()) {
-                    <div class="text-center py-3">
-                      <div class="spinner-border spinner-border-sm" role="status">
-                        <span class="visually-hidden">Loading devices</span>
-                      </div>
-                    </div>
-                  } @else if (devices().length > 0) {
-                    <div class="mb-2">
-                      @for (device of devices(); track device.id) {
-                        <div class="d-flex align-items-center gap-2 py-1">
-                          <i class="fa-solid fa-display text-muted"></i>
-                          <span>{{ device.name }}</span>
-                          <code class="small text-muted">{{ device.deviceIdentifier }}</code>
-                        </div>
-                      }
-                    </div>
-                  } @else {
-                    <div class="text-muted small mb-2">
-                      <i class="fa-solid fa-info-circle"></i> Not assigned to any device yet. Go to <a routerLink="/devices">Devices</a> to assign this dashboard.
-                    </div>
-                  }
-                </div>
-              </div>
+        <div class="app-section-stack">
+          @if (dashboard()!.hasLegacyConnection) {
+            <ng-container *ngTemplateOutlet="legacySettingsNotice" />
+          }
 
-              <div class="col-12 col-lg-6">
-                <h3 class="h6 text-uppercase text-muted mb-3">Content and display</h3>
-                <div class="mb-3">
-                  <span class="form-label fw-semibold d-block">Dashboard type</span>
-                  <!-- The type is chosen when the dashboard is created and cannot be changed afterwards. -->
-                  <span class="badge text-bg-secondary">
-                    <i class="fa-solid me-1" [ngClass]="previewModeValue === 'homeassistant' ? 'fa-house-signal' : 'fa-table-cells-large'" aria-hidden="true"></i>
-                    {{ previewModeValue === 'homeassistant' ? 'Home Assistant dashboard' : 'Custom layout' }}
-                  </span>
-                </div>
+          <section class="app-section-card" aria-labelledby="generalSettingsTitle">
+            <h2 id="generalSettingsTitle" class="app-section-title mb-3">General</h2>
+            <div class="mb-3">
+              <label class="form-label fw-semibold" for="editDashboardName">Name</label>
+              <input id="editDashboardName" type="text" class="form-control" formControlName="name" required
+                [class.is-invalid]="dashboardForm.get('name')?.touched && !dashboardForm.get('name')?.value?.trim()" />
+              @if (dashboardForm.get('name')?.touched && !dashboardForm.get('name')?.value?.trim()) {
+                <div class="invalid-feedback">Name is required.</div>
+              }
+            </div>
+            <div>
+              <label class="form-label fw-semibold" for="editDashboardDescription">Description <span class="text-muted fw-normal">(optional)</span></label>
+              <input id="editDashboardDescription" type="text" class="form-control" formControlName="description" />
+            </div>
+          </section>
 
-                @if (previewModeValue === 'homeassistant') {
-                @if (!renderingEnabled() || !playwrightStatus()?.ready) {
-                <div class="alert alert-warning d-flex align-items-start gap-2" role="alert">
-                  <i class="fa-solid fa-puzzle-piece mt-1" aria-hidden="true"></i>
-                  <div>
-                    <strong>Rendering is not ready.</strong>
-                    Enable rendering for your account and wait for preparation to complete.
-                    <a routerLink="/rendering" target="_blank" class="alert-link">Enable it in your Rendering settings.</a>
-                  </div>
+          @if (previewModeValue === 'homeassistant') {
+            <section class="app-section-card" aria-labelledby="contentSettingsTitle">
+              <h2 id="contentSettingsTitle" class="app-section-title">Home Assistant dashboard</h2>
+              <p class="app-section-description">The view captured and sent to the display.</p>
+              @if (!renderingEnabled() || !playwrightStatus()?.ready) {
+                <div class="alert alert-warning small" role="alert">
+                  <strong>Rendering is not ready.</strong> Home Assistant dashboards are captured by the rendering component.
+                  <a routerLink="/rendering" target="_blank" rel="noopener" class="alert-link">Enable it in Rendering settings.</a>
                 </div>
-                }
-                <div class="mb-3">
+              }
+              <div class="row g-3 mb-3">
+                <div class="col-12 col-sm-6">
                   <label class="form-label fw-semibold" for="editScreenSize">Screen size</label>
                   <select id="editScreenSize" class="form-select" [(ngModel)]="selectedSizeIndex" [ngModelOptions]="{standalone: true}" (change)="onSizeChange()">
                     @for (size of sizePresets; track size.label; let i = $index) {
@@ -176,160 +125,147 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
                     }
                   </select>
                 </div>
-
-                <div class="mb-3">
-                  <span class="form-label fw-semibold d-block">Orientation</span>
-                  <div class="btn-group d-flex" role="group">
+                <div class="col-12 col-sm-6">
+                  <span class="form-label fw-semibold d-block" id="editOrientationLabel">Orientation</span>
+                  <div class="btn-group d-flex" role="group" aria-labelledby="editOrientationLabel">
                     <input type="radio" class="btn-check" name="orientationMode" id="landscapeMode" value="Landscape" [(ngModel)]="orientationValue" [ngModelOptions]="{standalone: true}" (change)="onOrientationChange()" />
                     <label class="btn btn-outline-secondary flex-grow-1" for="landscapeMode">
-                      <i class="fa-solid fa-display"></i> Landscape
+                      <i class="fa-solid fa-display" aria-hidden="true"></i> Landscape
                     </label>
-
                     <input type="radio" class="btn-check" name="orientationMode" id="portraitMode" value="Portrait" [(ngModel)]="orientationValue" [ngModelOptions]="{standalone: true}" (change)="onOrientationChange()" />
                     <label class="btn btn-outline-secondary flex-grow-1" for="portraitMode">
-                      <i class="fa-solid fa-mobile-screen"></i> Portrait
+                      <i class="fa-solid fa-mobile-screen" aria-hidden="true"></i> Portrait
                     </label>
                   </div>
                 </div>
-
-                <app-home-assistant-target-picker
-                  [connectionId]="dashboardForm.controls.homeAssistantConnectionId.value"
-                  (connectionIdChange)="onHomeAssistantConnectionChange($event)"
-                  [path]="dashboardForm.controls.path.value"
-                  (pathChange)="onHomeAssistantPathChange($event)"
-                  [allowDashboardSettings]="!!dashboard()!.hasLegacyConnection"
-                  dashboardSettingsLabel="Legacy dashboard settings"
-                  [dashboardId]="dashboard()!.id"
-                  [dashboardSettingsReady]="dashboardSettingsReady()" />
-
-                @if (dashboard()!.hasLegacyConnection) {
-                  <ng-container *ngTemplateOutlet="legacySettingsNotice" />
-                }
-                } @else {
-                  <div class="mb-3">
-                    <span class="form-label fw-semibold d-block">Layout</span>
-                    <button type="button" class="btn btn-success w-100" (click)="openDesigner()">
-                      <i class="fa-solid fa-paint-brush"></i> Open Layout Designer
-                    </button>
-                  </div>
-                  <div class="mb-3">
-                    <span class="form-label fw-semibold d-block">Data</span>
-                    <small class="form-text text-muted d-block">
-                      Widgets use data from your <a routerLink="/connections" target="_blank" rel="noopener">connections</a>.
-                      @if (isAddonMode()) { Home Assistant is also connected through the add-on. }
-                    </small>
-                  </div>
-                  @if (dashboard()!.hasLegacyConnection) {
-                    <ng-container *ngTemplateOutlet="legacySettingsNotice" />
-                  }
-                }
-
-                <div class="mb-3">
-                  <label class="form-label fw-semibold" for="newUpdateTime">Update times</label>
-                  <div class="d-flex align-items-center mb-2">
-                    <input 
-                      type="time" 
-                      class="form-control me-2 update-time-input"
-                      [(ngModel)]="newUpdateTime"
-                      [ngModelOptions]="{standalone: true}"
-                      name="newUpdateTime"
-                      id="newUpdateTime"
-                    />
-                    <button type="button" class="btn btn-outline-primary" (click)="addUpdateTime()">Add</button>
-                  </div>
-                  <div id="updateTimesList" class="mb-2 d-flex flex-wrap gap-2">
-                    @for (time of updateTimes(); track $index) {
-                      <span class="badge bg-secondary">
-                        {{ time }}
-                        <button type="button" class="btn-close btn-close-white ms-2" (click)="removeUpdateTime($index)" [attr.aria-label]="'Remove update time ' + time"></button>
-                      </span>
-                    } @empty {
-                      <span class="text-muted">No update times configured</span>
-                    }
-                  </div>
-                  <small class="form-text text-muted">Add one or more times. Example: 06:00, 12:00, 18:00</small>
-                </div>
               </div>
-            </div>
-          </div>
-        </div>
+              <app-home-assistant-target-picker
+                [connectionId]="dashboardForm.controls.homeAssistantConnectionId.value"
+                (connectionIdChange)="onHomeAssistantConnectionChange($event)"
+                [path]="dashboardForm.controls.path.value"
+                (pathChange)="onHomeAssistantPathChange($event)"
+                [allowDashboardSettings]="!!dashboard()!.hasLegacyConnection"
+                dashboardSettingsLabel="Legacy dashboard settings"
+                [dashboardId]="dashboard()!.id"
+                [dashboardSettingsReady]="dashboardSettingsReady()" />
+            </section>
+          }
 
-        <details class="card shadow-sm mb-3">
-          <summary class="card-header bg-transparent py-3 px-3 px-sm-4 fw-semibold">Advanced provider settings</summary>
-          <div class="card-body">
-            <h2 class="h5 mb-3">AI provider override</h2>
-            <p class="text-muted small mb-3">By default, this dashboard uses the <a routerLink="/ai/config">global AI provider</a>. You can override it to use a Home Assistant conversation agent for this dashboard.</p>
-            <div class="mb-3">
-                <label class="form-label fw-semibold">AI provider</label>
-              <select class="form-select"
+          <section class="app-section-card" aria-labelledby="scheduleSettingsTitle">
+            <h2 id="scheduleSettingsTitle" class="app-section-title">Update schedule</h2>
+            <p class="app-section-description">Times when displays showing this dashboard refresh.</p>
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <label class="visually-hidden" for="newUpdateTime">New update time</label>
+              <input type="time" class="form-control update-time-input" id="newUpdateTime" name="newUpdateTime"
+                [(ngModel)]="newUpdateTime" [ngModelOptions]="{standalone: true}"
+                (keydown.enter)="$event.preventDefault(); addUpdateTime()" />
+              <button type="button" class="btn btn-outline-primary" (click)="addUpdateTime()" [disabled]="!newUpdateTime">
+                <i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add
+              </button>
+            </div>
+            <div class="d-flex flex-wrap gap-2" aria-label="Update times">
+              @for (time of updateTimes(); track time) {
+                <span class="app-status-chip app-status-chip-info update-time-chip">
+                  {{ time }}
+                  <button type="button" class="btn-close" (click)="removeUpdateTime($index)" [attr.aria-label]="'Remove update time ' + time"></button>
+                </span>
+              } @empty {
+                <span class="text-muted small">No update times yet.</span>
+              }
+            </div>
+          </section>
+
+          <section class="app-section-card" aria-labelledby="devicesSettingsTitle">
+            <div class="app-section-header mb-2">
+              <h2 id="devicesSettingsTitle" class="app-section-title mb-0">Devices</h2>
+              <a routerLink="/devices" class="btn btn-sm btn-outline-secondary">Manage devices</a>
+            </div>
+            @if (isLoadingDevices()) {
+              <div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading devices</span></div>
+            } @else if (devices().length > 0) {
+              <ul class="list-unstyled mb-0">
+                @for (device of devices(); track device.id) {
+                  <li class="d-flex align-items-center gap-2 py-1">
+                    <i class="fa-solid fa-tablet-screen-button text-muted" aria-hidden="true"></i>
+                    <span>{{ device.name }}</span>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="text-muted small mb-0">Not shown on any device yet. Assign it from the Devices page.</p>
+            }
+          </section>
+
+          <section class="app-section-card" aria-labelledby="aiSettingsTitle">
+            <h2 id="aiSettingsTitle" class="app-section-title">AI provider</h2>
+            <p class="app-section-description">Used for AI generated widgets. Defaults to the <a routerLink="/ai/config">global AI provider</a>.</p>
+            <div [class.mb-3]="aiConfig().connectionMode === 'HomeAssistant'">
+              <label class="form-label fw-semibold" for="aiConnectionMode">Provider</label>
+              <select id="aiConnectionMode" class="form-select"
                 [ngModel]="aiConfig().connectionMode"
                 (ngModelChange)="onAiConnectionModeChange($event)"
                 [ngModelOptions]="{standalone: true}">
-                <option value="None">Default (use global AI provider)</option>
+                <option value="None">Global AI provider</option>
                 <option value="HomeAssistant">Home Assistant conversation agent</option>
               </select>
             </div>
 
             @if (aiConfig().connectionMode === 'HomeAssistant') {
-              <hr>
-              <h3 class="h6 mb-3">Home Assistant settings</h3>
-              <div class="mb-3">
-                <label class="form-label" for="aiHomeAssistantConnection">Home Assistant connection</label>
-                <select id="aiHomeAssistantConnection" class="form-select"
-                  [ngModel]="aiConfig().homeAssistantConnectionId || ''"
-                  (ngModelChange)="onAiHomeAssistantConnectionChange($event)"
-                  [ngModelOptions]="{standalone: true}">
-                  @if (isAddonMode()) {
-                    <option value="">Home Assistant add-on</option>
-                  } @else if (dashboard()!.hasLegacyConnection) {
-                    <option value="">Legacy dashboard settings</option>
-                  } @else {
-                    <option value="" disabled>Select a connection</option>
-                  }
-                  @for (connection of homeAssistantConnections(); track connection.id) {
-                    <option [value]="connection.id">{{ connection.name }}{{ connection.connected ? '' : ' (sign-in required)' }}</option>
-                  }
-                </select>
-                <small class="form-text text-muted">
-                  <a routerLink="/connections" target="_blank" rel="noopener">Manage connections</a>; this list refreshes when you return.
-                </small>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Conversation agent</label>
-                @if (isLoadingAgents()) {
-                  <div class="d-flex align-items-center gap-2 mb-2">
-                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                    <span class="text-muted">Loading agents…</span>
-                  </div>
-                } @else {
-                  <select class="form-select"
-                    [ngModel]="aiConfig().homeAssistantAgentId || ''"
-                    (ngModelChange)="updateAiField('homeAssistantAgentId', $event)"
+              <div class="row g-3">
+                <div class="col-12 col-sm-6">
+                  <label class="form-label fw-semibold" for="aiHomeAssistantConnection">Connection</label>
+                  <select id="aiHomeAssistantConnection" class="form-select"
+                    [ngModel]="aiConfig().homeAssistantConnectionId || ''"
+                    (ngModelChange)="onAiHomeAssistantConnectionChange($event)"
                     [ngModelOptions]="{standalone: true}">
-                    <option value="">Default conversation agent</option>
-                    @for (agent of conversationAgents(); track agent.id) {
-                      <option [value]="agent.id">{{ agent.name }}</option>
+                    @if (isAddonMode()) {
+                      <option value="">Home Assistant add-on</option>
+                    } @else if (dashboard()!.hasLegacyConnection) {
+                      <option value="">Legacy dashboard settings</option>
+                    } @else {
+                      <option value="" disabled>Select a connection</option>
+                    }
+                    @for (connection of homeAssistantConnections(); track connection.id) {
+                      <option [value]="connection.id">{{ connection.name }}{{ connection.connected ? '' : ' (sign-in required)' }}</option>
                     }
                   </select>
-                  @if (conversationAgents().length === 0) {
-                    <small class="form-text text-muted">No agents found. Make sure the selected connection is signed in.</small>
+                  <small class="form-text text-muted"><a routerLink="/connections" target="_blank" rel="noopener">Manage connections</a></small>
+                </div>
+                <div class="col-12 col-sm-6">
+                  <label class="form-label fw-semibold" for="aiConversationAgent">Conversation agent</label>
+                  @if (isLoadingAgents()) {
+                    <div class="d-flex align-items-center gap-2 py-2" role="status">
+                      <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                      <span class="text-muted">Loading agents…</span>
+                    </div>
                   } @else {
-                    <small class="form-text text-muted">Select a conversation agent or leave as default</small>
+                    <select id="aiConversationAgent" class="form-select"
+                      [ngModel]="aiConfig().homeAssistantAgentId || ''"
+                      (ngModelChange)="updateAiField('homeAssistantAgentId', $event)"
+                      [ngModelOptions]="{standalone: true}">
+                      <option value="">Default agent</option>
+                      @for (agent of conversationAgents(); track agent.id) {
+                        <option [value]="agent.id">{{ agent.name }}</option>
+                      }
+                    </select>
+                    @if (conversationAgents().length === 0) {
+                      <small class="form-text text-muted">No agents found. Check that the connection is signed in.</small>
+                    }
                   }
-                }
+                </div>
               </div>
             }
-          </div>
-        </details>
+          </section>
+        </div>
 
         <ng-template #legacySettingsNotice>
-          <div class="alert alert-secondary small mb-3" role="status">
+          <div class="alert alert-secondary small mb-0" role="status">
             <strong>Legacy Home Assistant settings.</strong>
             @if (previewModeValue === 'homeassistant') {
               @if (dashboardForm.controls.homeAssistantConnectionId.value) {
                 This dashboard no longer uses them. Remove them once you no longer need to switch back.
               } @else {
-                This dashboard still renders with its retired host and token. Select a connection above to replace them.
+                This dashboard still renders with its retired host and token. Select a connection below to replace them.
               }
             } @else {
               Widgets created before connections may still read data through them. Reselect their sources from a connection, then remove these settings.
@@ -347,7 +283,7 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
 
       <!-- Preview Modal -->
       <app-rendered-preview-modal
-        title="Dashboard Preview"
+        title="Preview"
         [isOpen]="showPreviewModal"
         [isLoading]="previewLoading"
         [error]="previewError"
@@ -582,11 +518,11 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
         const savedConfig = updated.aiConfig ?? { connectionMode: 'None' as AiConnectionMode };
         this.aiConfig.set(savedConfig);
         this.originalAiConfig = JSON.parse(JSON.stringify(savedConfig));
-        this.toastService.success('Dashboard updated successfully!');
+        this.toastService.success('Dashboard saved');
         this.isSaving.set(false);
       },
       error: (error) => {
-        this.toastService.error(error.error?.message || 'Failed to update dashboard.');
+        this.toastService.error(error.error?.message || 'Failed to save dashboard.');
         this.isSaving.set(false);
       }
     });
