@@ -40,10 +40,10 @@
         </button>
       </div>
     } @else {
-      <div class="app-form-shell app-form-shell-wide">
-        <section class="app-section-card">
-          <form id="aiConfigForm" (ngSubmit)="save()">
-            <div [class.mb-3]="aiConfig().connectionMode === 'Direct'">
+      <section class="app-section-card">
+        <form id="aiConfigForm" (ngSubmit)="save()">
+          <div class="row g-3" [class.mb-3]="aiConfig().connectionMode === 'Direct'">
+            <div class="col-12 col-md-6">
               <label class="form-label fw-semibold" for="aiConnectionMode">Provider</label>
               <select id="aiConnectionMode" class="form-select"
                 [ngModel]="aiConfig().connectionMode"
@@ -53,76 +53,77 @@
                 <option value="Direct">OpenAI-compatible API</option>
               </select>
             </div>
-
             @if (aiConfig().connectionMode === 'Direct') {
-              <div class="mb-3">
-                <label class="form-label fw-semibold" for="aiEndpoint">API endpoint</label>
-                <input id="aiEndpoint" type="url" class="form-control"
-                  [value]="aiConfig().directEndpoint || ''"
-                  (input)="updateField('directEndpoint', $any($event.target).value)"
-                  autocomplete="url"
-                  placeholder="https://api.openai.com" required />
-                <small class="form-text text-muted">OpenAI, Ollama, LM Studio, or any compatible endpoint</small>
-              </div>
-              <div class="mb-3">
-                <label class="form-label fw-semibold" for="aiApiKey">API key <span class="text-muted fw-normal">(optional for local providers)</span></label>
-                <div class="input-group">
-                  <input id="aiApiKey" [type]="showApiKey() ? 'text' : 'password'" class="form-control"
-                    [value]="aiConfig().directApiKey || ''"
-                    (input)="updateField('directApiKey', $any($event.target).value)"
-                    autocomplete="off" placeholder="sk-..." />
-                  <button type="button" class="btn btn-outline-secondary app-icon-button"
-                    (click)="toggleApiKeyVisibility()" [attr.aria-label]="showApiKey() ? 'Hide API key' : 'Show API key'">
-                    <i class="fa-solid" [ngClass]="showApiKey() ? 'fa-eye-slash' : 'fa-eye'" aria-hidden="true"></i>
-                  </button>
-                </div>
-              </div>
-              <div class="mb-3">
-                <label class="form-label fw-semibold" for="aiModel">Model</label>
-                <div class="input-group">
-                  @if (availableModels().length > 0) {
-                    <select id="aiModel" class="form-select"
-                      [ngModel]="aiConfig().directModel || ''"
-                      (ngModelChange)="updateField('directModel', $event)"
-                      [ngModelOptions]="{standalone: true}" required>
-                      <option value="" disabled>Select a model</option>
-                      @for (model of availableModels(); track model.id) {
-                        <option [value]="model.id">{{ model.id }}</option>
-                      }
-                    </select>
-                  } @else {
-                    <input id="aiModel" type="text" class="form-control"
-                      [value]="aiConfig().directModel || ''"
-                      (input)="updateField('directModel', $any($event.target).value)"
-                      placeholder="gpt-4o-mini" required />
-                  }
-                </div>
-                @if (availableModels().length === 0) {
-                  <small class="form-text text-muted">Test the connection to choose from the available models.</small>
-                }
-              </div>
-              <div class="d-flex align-items-center flex-wrap gap-2">
-                <button type="button" class="btn btn-outline-primary" (click)="fetchModels()"
-                  [disabled]="isLoadingModels() || !aiConfig().directEndpoint">
-                  @if (isLoadingModels()) {
-                    <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Testing…
-                  } @else {
-                    <i class="fa-solid fa-plug-circle-check me-1" aria-hidden="true"></i> Test connection and load models
-                  }
+            <div class="col-12 col-md-6">
+              <label class="form-label fw-semibold" for="aiEndpoint">API endpoint</label>
+              <input id="aiEndpoint" type="url" class="form-control"
+                [value]="aiConfig().directEndpoint || ''"
+                (input)="updateField('directEndpoint', $any($event.target).value)"
+                autocomplete="url"
+                placeholder="https://api.openai.com" required />
+              <small class="form-text text-muted">OpenAI, Ollama, LM Studio, or any compatible endpoint</small>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label fw-semibold" for="aiApiKey">API key <span class="text-muted fw-normal">(optional for local providers)</span></label>
+              <div class="input-group">
+                <input id="aiApiKey" [type]="showApiKey() ? 'text' : 'password'" class="form-control"
+                  [value]="aiConfig().directApiKey || ''"
+                  (input)="updateField('directApiKey', $any($event.target).value)"
+                  autocomplete="off" placeholder="sk-..." />
+                <button type="button" class="btn btn-outline-secondary app-icon-button"
+                  (click)="toggleApiKeyVisibility()" [attr.aria-label]="showApiKey() ? 'Hide API key' : 'Show API key'">
+                  <i class="fa-solid" [ngClass]="showApiKey() ? 'fa-eye-slash' : 'fa-eye'" aria-hidden="true"></i>
                 </button>
-                @if (connectionStatus()) {
-                  <span class="small" role="status" [ngClass]="connectionStatus() === 'success' ? 'text-success' : 'text-danger'">
-                    <i class="fa-solid me-1" [ngClass]="connectionStatus() === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'" aria-hidden="true"></i>{{ connectionMessage() }}
-                  </span>
+              </div>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label fw-semibold" for="aiModel">Model</label>
+              <div class="input-group">
+                @if (availableModels().length > 0) {
+                  <select id="aiModel" class="form-select"
+                    [ngModel]="aiConfig().directModel || ''"
+                    (ngModelChange)="updateField('directModel', $event)"
+                    [ngModelOptions]="{standalone: true}" required>
+                    <option value="" disabled>Select a model</option>
+                    @for (model of availableModels(); track model.id) {
+                      <option [value]="model.id">{{ model.id }}</option>
+                    }
+                  </select>
+                } @else {
+                  <input id="aiModel" type="text" class="form-control"
+                    [value]="aiConfig().directModel || ''"
+                    (input)="updateField('directModel', $any($event.target).value)"
+                    placeholder="gpt-4o-mini" required />
                 }
               </div>
+              @if (availableModels().length === 0) {
+                <small class="form-text text-muted">Test the connection to choose from the available models.</small>
+              }
+            </div>
             }
+          </div>
+          @if (aiConfig().connectionMode === 'Direct') {
+            <div class="d-flex align-items-center flex-wrap gap-2">
+              <button type="button" class="btn btn-outline-primary" (click)="fetchModels()"
+                [disabled]="isLoadingModels() || !aiConfig().directEndpoint">
+                @if (isLoadingModels()) {
+                  <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Testing…
+                } @else {
+                  <i class="fa-solid fa-plug-circle-check me-1" aria-hidden="true"></i> Test connection and load models
+                }
+              </button>
+              @if (connectionStatus()) {
+                <span class="small" role="status" [ngClass]="connectionStatus() === 'success' ? 'text-success' : 'text-danger'">
+                  <i class="fa-solid me-1" [ngClass]="connectionStatus() === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'" aria-hidden="true"></i>{{ connectionMessage() }}
+                </span>
+              }
+            </div>
+          }
 
-            @if (isDirty() && !isConfigValid()) {
-              <div class="alert alert-warning py-2 mt-3 mb-0" role="status">Enter both an API endpoint and model before saving.</div>
-            }
-          </form>
-        </section>
-      </div>
+          @if (isDirty() && !isConfigValid()) {
+            <div class="alert alert-warning py-2 mt-3 mb-0" role="status">Enter both an API endpoint and model before saving.</div>
+          }
+        </form>
+      </section>
     }
 </div>
