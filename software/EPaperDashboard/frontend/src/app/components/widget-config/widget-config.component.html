@@ -8,6 +8,9 @@
 @switch (renderType) {
 
 @case ('header') {
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Title</summary>
+  <div class="inspector-section-body">
 <div class="mb-3">
   <label class="form-label fw-semibold small" [for]="'headerTitle-' + widget.id">Widget title</label>
   <div class="form-check form-switch mb-2">
@@ -19,12 +22,16 @@
   <input type="text" class="form-control" [id]="'headerTitle-' + widget.id" [(ngModel)]="headerConfig.title" placeholder="Enter title"
     (ngModelChange)="onPropertyChanged()" />
 </div>
-<hr class="my-2" />
+  </div>
+</details>
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Icon</summary>
+  <div class="inspector-section-body">
 <div class="row g-2 mb-2">
   <div class="col">
     <label class="form-label small mb-1">Position</label>
     <select class="form-select form-select-sm" [(ngModel)]="headerConfig.iconPosition" (ngModelChange)="onPropertyChanged()">
-      <option [ngValue]="'left'">Left (Default)</option>
+      <option [ngValue]="'left'">Left (default)</option>
       <option [ngValue]="'right'">Right</option>
     </select>
   </div>
@@ -42,8 +49,11 @@
 </div>
 <small class="form-text text-muted">Apply dithering to map icon shades to the color palette.</small>
 
-<hr class="my-2" />
-<label class="form-label fw-semibold small">Badges</label>
+  </div>
+</details>
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Badges</summary>
+  <div class="inspector-section-body">
 <small class="form-text text-muted d-block mb-2">
   Configure badge content here; drag to position them in the layout editor on the canvas.
 </small>
@@ -57,17 +67,17 @@
         </span>
         <button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0 py-0 px-1" (click)="removeBadge(i)"
           [attr.aria-label]="'Remove badge ' + (getBadgeEntityLabel(badge) || (i + 1))">
-          <i class="fa fa-trash" aria-hidden="true"></i>
+          <i class="fa-solid fa-trash" aria-hidden="true"></i>
         </button>
       </div>
       <div class="d-flex align-items-center gap-2 mt-1">
-        <i class="fa fa-icons text-muted flex-shrink-0 widget-config-icon" aria-hidden="true"></i>
+        <i class="fa-solid fa-icons text-muted flex-shrink-0 widget-config-icon" aria-hidden="true"></i>
         <input type="text" class="form-control form-control-sm flex-grow-1 widget-config-grow"
           placeholder="Icon (e.g., fa-thermometer)"
           [(ngModel)]="badge.icon" (ngModelChange)="onPropertyChanged()" />
       </div>
       <div class="d-flex align-items-center gap-2 mt-1">
-        <i class="fa fa-link text-muted flex-shrink-0 widget-config-icon" aria-hidden="true"></i>
+        <i class="fa-solid fa-link text-muted flex-shrink-0 widget-config-icon" aria-hidden="true"></i>
         <select class="form-select form-select-sm flex-grow-1 widget-config-grow"
           [(ngModel)]="badge.entityId" (ngModelChange)="onPropertyChanged()">
           <option [ngValue]="undefined">No source</option>
@@ -87,11 +97,14 @@
   }
 </div>
 <button type="button" class="btn btn-sm btn-outline-primary w-100 mt-2" (click)="addBadge()">
-  <i class="fa fa-plus"></i> Add Badge
+  <i class="fa-solid fa-plus"></i> Add badge
 </button>
 
-<hr class="my-2" />
-<label class="form-label fw-semibold small">Layout Editor</label>
+  </div>
+</details>
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Layout editor</summary>
+  <div class="inspector-section-body">
 <div class="d-flex gap-3 align-items-center">
   <div class="form-check form-switch mb-0">
     <input class="form-check-input" type="checkbox" id="showGuides-{{widget.id}}"
@@ -100,7 +113,7 @@
     <label class="form-check-label" for="showGuides-{{widget.id}}">Smart guides</label>
   </div>
   <div class="d-flex align-items-center gap-2">
-    <label class="form-label mb-0 text-nowrap">Snap</label>
+    <label class="form-label small mb-0 text-nowrap">Snap</label>
     <select class="form-select form-select-sm w-auto" [(ngModel)]="headerConfig.snapStep"
       (ngModelChange)="onPropertyChanged()">
       <option [ngValue]="0">Off</option>
@@ -110,20 +123,34 @@
     </select>
   </div>
 </div>
-<small class="form-text text-muted">Applied when you click <em>Edit Layout</em> on the canvas.</small>
+<small class="form-text text-muted">Applied when you click <em>Edit layout</em> on the canvas.</small>
+  </div>
+</details>
 }
 
 @case ('markdown') {
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Content</summary>
+  <div class="inspector-section-body">
 <textarea class="form-control" rows="6" [(ngModel)]="markdownConfig.content"
   (ngModelChange)="onPropertyChanged()"
   placeholder="# Markdown content here"></textarea>
+  </div>
+</details>
 }
 
 @case ('calendar') {
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Content</summary>
+  <div class="inspector-section-body">
 <app-widget-title-config [widget]="widget" (widgetChange)="applyWidgetChange($event)" />
 <app-entity-source-selector [value]="calendarConfig.entityId" [entities]="getFilteredEntities()"
   [loading]="loadingEntities()" (valueChange)="updateEntityId($event)" />
-<label class="form-label fw-semibold small">Event Fields</label>
+  </div>
+</details>
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Event fields</summary>
+  <div class="inspector-section-body">
 <small class="form-text text-muted d-block mb-2">
   Select which fields to show for each event entry.
 </small>
@@ -153,29 +180,41 @@
     </div>
   }
 </div>
-<hr class="my-2" />
-<label class="form-label fw-semibold small">Display</label>
+  </div>
+</details>
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Display</summary>
+  <div class="inspector-section-body">
 <div class="row g-2">
   <div class="col">
-    <label class="form-label small mb-1">Max Events</label>
+    <label class="form-label small mb-1">Max events</label>
     <input type="number" class="form-control form-control-sm" [(ngModel)]="calendarConfig.maxEvents" min="1" max="20"
       (ngModelChange)="onPropertyChanged()" />
   </div>
   <div class="col">
-    <label class="form-label small mb-1">Event Gap (px)</label>
+    <label class="form-label small mb-1">Event gap (px)</label>
     <input type="number" class="form-control form-control-sm"
       id="calEventGap-{{widget.id}}" min="0" step="1"
       [(ngModel)]="calendarConfig.eventGap"
       (ngModelChange)="onPropertyChanged()" placeholder="0" />
   </div>
 </div>
+  </div>
+</details>
 }
 
 @case ('weather') {
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Content</summary>
+  <div class="inspector-section-body">
 <app-widget-title-config [widget]="widget" (widgetChange)="applyWidgetChange($event)" />
 <app-entity-source-selector [value]="weatherConfig.entityId" [entities]="getFilteredEntities()"
   [loading]="loadingEntities()" (valueChange)="updateEntityId($event)" />
-<label class="form-label fw-semibold small">Visible Items</label>
+  </div>
+</details>
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Visible items</summary>
+  <div class="inspector-section-body">
 <small class="form-text text-muted d-block mb-2">
   Select which items to show; drag to position them in the layout editor on the canvas.
 </small>
@@ -203,8 +242,11 @@
   }
 </div>
 
-<hr class="my-2" />
-<label class="form-label fw-semibold small">Layout Editor</label>
+  </div>
+</details>
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Layout editor</summary>
+  <div class="inspector-section-body">
 <div class="d-flex gap-3 align-items-center">
   <div class="form-check form-switch mb-0">
     <input class="form-check-input" type="checkbox" id="wShowGuides-{{widget.id}}"
@@ -213,7 +255,7 @@
     <label class="form-check-label" for="wShowGuides-{{widget.id}}">Smart guides</label>
   </div>
   <div class="d-flex align-items-center gap-2">
-    <label class="form-label mb-0 text-nowrap">Snap</label>
+    <label class="form-label small mb-0 text-nowrap">Snap</label>
     <select class="form-select form-select-sm w-auto" [(ngModel)]="weatherConfig.snapStep"
       (ngModelChange)="onPropertyChanged()">
       <option [ngValue]="0">Off</option>
@@ -223,15 +265,20 @@
     </select>
   </div>
 </div>
-<small class="form-text text-muted">Applied when you click <em>Edit Layout</em> on the canvas.</small>
+<small class="form-text text-muted">Applied when you click <em>Edit layout</em> on the canvas.</small>
+  </div>
+</details>
 }
 
 @case ('weather-forecast') {
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Content</summary>
+  <div class="inspector-section-body">
 <app-widget-title-config [widget]="widget" (widgetChange)="applyWidgetChange($event)" />
 <app-entity-source-selector [value]="weatherForecastConfig.entityId" [entities]="getFilteredEntities()"
   [loading]="loadingEntities()" (valueChange)="updateEntityId($event)" />
 <div class="mb-3">
-  <label class="form-label fw-semibold small">Forecast Type</label>
+  <label class="form-label fw-semibold small">Forecast type</label>
   <select class="form-select" [(ngModel)]="weatherForecastConfig.forecastMode" (ngModelChange)="onPropertyChanged()">
     <option value="daily">Daily</option>
     <option value="hourly">Hourly</option>
@@ -241,8 +288,11 @@
     Daily: High/Low temperatures | Hourly: Temperature for each hour | Weekly: Summary for each day
   </small>
 </div>
-<hr class="my-2" />
-<label class="form-label fw-semibold small">Visible Fields</label>
+  </div>
+</details>
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Visible fields</summary>
+  <div class="inspector-section-body">
 <small class="form-text text-muted d-block mb-2">Choose which rows to display in each forecast column.</small>
 <div class="list-group list-group-flush border rounded mb-3">
   @for (field of allForecastFields; track field) {
@@ -260,26 +310,38 @@
     </div>
   }
 </div>
-<hr class="my-2" />
-<label class="form-label fw-semibold small">Display</label>
+  </div>
+</details>
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Display</summary>
+  <div class="inspector-section-body">
 <div class="row g-2">
   <div class="col">
-    <label class="form-label small mb-1">Max Items</label>
+    <label class="form-label small mb-1">Max items</label>
     <input type="number" class="form-control form-control-sm" [(ngModel)]="weatherForecastConfig.maxItems" min="1" max="14" placeholder="Auto"
       (ngModelChange)="onPropertyChanged()" />
     <small class="form-text text-muted">Leave empty for auto</small>
   </div>
   <div class="col">
-    <label class="form-label small mb-1">Row Gap (px)</label>
+    <label class="form-label small mb-1">Row gap (px)</label>
     <input type="number" class="form-control form-control-sm" [(ngModel)]="weatherForecastConfig.rowGap" min="0" placeholder="0"
       (ngModelChange)="onPropertyChanged()" />
   </div>
 </div>
+  </div>
+</details>
 }
 
 @case ('graph') {
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Title</summary>
+  <div class="inspector-section-body">
 <app-widget-title-config [widget]="widget" (widgetChange)="applyWidgetChange($event)" />
-<label class="form-label fw-semibold small">Data Series</label>
+  </div>
+</details>
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Data series</summary>
+  <div class="inspector-section-body">
 <small class="form-text text-muted d-block mb-3">Add multiple sources to compare over time</small>
 @if (graphConfig.series && graphConfig.series.length > 0) {
   <div class="series-list">
@@ -289,7 +351,7 @@
           <div class="d-flex justify-content-between align-items-start mb-2">
             <h6 class="card-subtitle text-muted mb-0">Series {{ idx + 1 }}</h6>
             <button type="button" class="btn btn-sm btn-link text-danger p-0" (click)="removeGraphSeries(idx)" title="Remove series">
-              <i class="fa fa-times-circle"></i>
+              <i class="fa-solid fa-times-circle"></i>
             </button>
           </div>
           
@@ -332,51 +394,63 @@
   </div>
 }
 <button type="button" class="btn btn-primary btn-sm w-100" (click)="addGraphSeries()">
-  <i class="fa fa-plus"></i> Add Series
+  <i class="fa-solid fa-plus"></i> Add series
 </button>
 
-<hr class="my-2" />
-<label class="form-label fw-semibold small">Chart Settings</label>
+  </div>
+</details>
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Chart</summary>
+  <div class="inspector-section-body">
 <div class="row g-2 mb-2">
   <div class="col">
     <label class="form-label small mb-1">Period</label>
     <select class="form-select form-select-sm" [(ngModel)]="graphConfig.period" (ngModelChange)="onPropertyChanged()">
-      <option value="1h">1 Hour</option>
-      <option value="6h">6 Hours</option>
-      <option value="24h">24 Hours</option>
-      <option value="7d">7 Days</option>
-      <option value="30d">30 Days</option>
+      <option value="1h">1 hour</option>
+      <option value="6h">6 hours</option>
+      <option value="24h">24 hours</option>
+      <option value="7d">7 days</option>
+      <option value="30d">30 days</option>
     </select>
   </div>
   <div class="col">
-    <label class="form-label small mb-1">Plot Type</label>
+    <label class="form-label small mb-1">Plot type</label>
     <select class="form-select form-select-sm" [(ngModel)]="graphConfig.plotType" (ngModelChange)="onPropertyChanged()">
-      <option value="line">Line Chart</option>
-      <option value="bar">Bar Chart</option>
+      <option value="line">Line chart</option>
+      <option value="bar">Bar chart</option>
     </select>
   </div>
 </div>
 @if (graphConfig.plotType === 'line') {
 <div>
-  <label class="form-label small mb-1">Line Width (px)</label>
+  <label class="form-label small mb-1">Line width (px)</label>
   <input type="number" class="form-control form-control-sm" [(ngModel)]="graphConfig.lineWidth" (ngModelChange)="onPropertyChanged()" min="1" max="10" placeholder="2" />
   <small class="form-text text-muted">Default: 2px</small>
 </div>
 }
 @if (graphConfig.plotType === 'bar') {
 <div>
-  <label class="form-label small mb-1">Bar Width</label>
+  <label class="form-label small mb-1">Bar width</label>
   <input type="number" class="form-control form-control-sm" [(ngModel)]="graphConfig.barWidth" (ngModelChange)="onPropertyChanged()" min="1" max="20" placeholder="Auto" />
   <small class="form-text text-muted">Leave empty for automatic width</small>
 </div>
 }
+  </div>
+</details>
 }
 
 @case ('todo') {
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Content</summary>
+  <div class="inspector-section-body">
 <app-widget-title-config [widget]="widget" (widgetChange)="applyWidgetChange($event)" />
 <app-entity-source-selector [value]="todoConfig.entityId" [entities]="getFilteredEntities()"
   [loading]="loadingEntities()" (valueChange)="updateEntityId($event)" />
-<label class="form-label fw-semibold small">Display</label>
+  </div>
+</details>
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Display</summary>
+  <div class="inspector-section-body">
 <div class="form-check form-switch mb-2">
   <input class="form-check-input" type="checkbox" [(ngModel)]="todoConfig.showCompleted" id="showCompleted"
     (ngModelChange)="onPropertyChanged()">
@@ -385,13 +459,16 @@
   </label>
 </div>
 <div class="mb-3">
-  <label class="form-label small mb-1">Max Items</label>
+  <label class="form-label small mb-1">Max items</label>
   <input type="number" class="form-control form-control-sm" [(ngModel)]="todoConfig.maxItems" min="1" max="50"
     (ngModelChange)="onPropertyChanged()" placeholder="Auto" />
   <small class="form-text text-muted">Leave empty to show as many as fit in the widget</small>
 </div>
-<hr class="my-2" />
-<label class="form-label fw-semibold small">Item Icons</label>
+  </div>
+</details>
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Item icons</summary>
+  <div class="inspector-section-body">
 <div class="list-group list-group-flush border rounded">
   <div class="list-group-item px-2 py-2">
     <div class="d-flex align-items-center gap-2">
@@ -418,15 +495,25 @@
     </div>
   </div>
 </div>
+  </div>
+</details>
 }
 
 @case ('rss-feed') {
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Content</summary>
+  <div class="inspector-section-body">
 <app-widget-title-config [widget]="widget" (widgetChange)="applyWidgetChange($event)" />
 <app-entity-source-selector [value]="rssFeedConfig.entityId" [entities]="getFilteredEntities()"
   [loading]="loadingEntities()" (valueChange)="updateEntityId($event)" />
+  </div>
+</details>
 }
 
 @case ('app-icon') {
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Icon</summary>
+  <div class="inspector-section-body">
 <div class="mb-2">
   <label class="form-label small mb-1">Size (px)</label>
   <input type="number" class="form-control form-control-sm" [(ngModel)]="appIconConfig.size" min="16" max="256"
@@ -439,22 +526,31 @@
   <label class="form-check-label" for="appIconDithering-{{widget.id}}">Dither icon</label>
 </div>
 <small class="form-text text-muted">Apply dithering to map icon shades to the color palette.</small>
+  </div>
+</details>
 }
 
 @case ('image') {
 @if (widget.config && 'imageUrl' in widget.config) {
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Title</summary>
+  <div class="inspector-section-body">
 <app-widget-title-config [widget]="widget" (widgetChange)="applyWidgetChange($event)" />
-<label class="form-label fw-semibold small">Image Source</label>
+  </div>
+</details>
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Image source</summary>
+  <div class="inspector-section-body">
 <div class="d-flex gap-2 mb-2">
   <button type="button" class="btn btn-sm btn-outline-primary flex-grow-1" (click)="imageFileInput.click()">
-    <i class="fa fa-upload"></i> From File
+    <i class="fa-solid fa-upload"></i> From file
   </button>
   <button type="button" class="btn btn-sm btn-outline-secondary flex-grow-1" (click)="showImageUrlInput = !showImageUrlInput">
-    <i class="fa fa-link"></i> From URL
+    <i class="fa-solid fa-link"></i> From URL
   </button>
   @if (widget.config.imageUrl) {
   <button type="button" class="btn btn-sm btn-outline-danger app-icon-button" (click)="clearUploadedImage()" aria-label="Clear image">
-    <i class="fa fa-trash" aria-hidden="true"></i>
+    <i class="fa-solid fa-trash" aria-hidden="true"></i>
   </button>
   }
 </div>
@@ -466,12 +562,12 @@
     placeholder="https://example.com/image.png" />
   <button type="button" class="btn btn-outline-primary" [disabled]="!imageUrlValue || imageUploading"
     (click)="uploadImageFromUrl()">
-    <i class="fa fa-download"></i> Fetch
+    <i class="fa-solid fa-download"></i> Fetch
   </button>
 </div>
 }
 @if (imageUploading) {
-<div class="text-muted small mb-2"><i class="fa fa-spinner fa-spin" aria-hidden="true"></i> Uploading…</div>
+<div class="text-muted small mb-2"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Uploading…</div>
 }
 @if (imageUploadError) {
 <div class="alert alert-danger py-1 px-2 small mb-2">{{ imageUploadError }}</div>
@@ -481,8 +577,11 @@
   <img [src]="widget.config.imageUrl | resolveUrl" alt="Image preview" />
 </div>
 }
-<hr class="my-2" />
-<label class="form-label fw-semibold small">Framing</label>
+  </div>
+</details>
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Framing</summary>
+  <div class="inspector-section-body">
 <div class="mb-2">
   <label class="form-label small mb-1">Zoom ({{ (widget.config.zoom || 1) | number:'1.1-1' }}x)</label>
   <input type="range" class="form-range" min="1" max="5" step="0.1"
@@ -491,7 +590,7 @@
 </div>
 @if (widget.config.zoom && widget.config.zoom > 1) {
 <div class="mb-2">
-  <label class="form-label small mb-1">Horizontal Position ({{ (widget.config.offsetX ?? 0) | number:'1.1-1' }})</label>
+  <label class="form-label small mb-1">Horizontal position ({{ (widget.config.offsetX ?? 0) | number:'1.1-1' }})</label>
   <input type="range" class="form-range" min="-1" max="1" step="0.05"
     [ngModel]="widget.config.offsetX ?? 0"
     (ngModelChange)="widget.config.offsetX = $event; onPropertyChanged()" />
@@ -500,7 +599,7 @@
   </div>
 </div>
 <div class="mb-2">
-  <label class="form-label small mb-1">Vertical Position ({{ (widget.config.offsetY ?? 0) | number:'1.1-1' }})</label>
+  <label class="form-label small mb-1">Vertical position ({{ (widget.config.offsetY ?? 0) | number:'1.1-1' }})</label>
   <input type="range" class="form-range" min="-1" max="1" step="0.05"
     [ngModel]="widget.config.offsetY ?? 0"
     (ngModelChange)="widget.config.offsetY = $event; onPropertyChanged()" />
@@ -509,8 +608,11 @@
   </div>
 </div>
 }
-<hr class="my-2" />
-<label class="form-label fw-semibold small">Rendering</label>
+  </div>
+</details>
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Rendering</summary>
+  <div class="inspector-section-body">
 <div class="form-check form-switch">
   <input class="form-check-input" type="checkbox" id="imageDithering-{{widget.id}}"
     [(ngModel)]="widget.config.dithering"
@@ -518,19 +620,24 @@
   <label class="form-check-label" for="imageDithering-{{widget.id}}">Dither image</label>
 </div>
 <small class="form-text text-muted">Apply dithering to map image colors to the color palette.</small>
+  </div>
+</details>
 }
 }
 
 @case ('version') {
 <div class="text-muted small">
-  <i class="fa fa-info-circle"></i> This widget displays the software version. No configuration needed.
+  <i class="fa-solid fa-info-circle"></i> This widget displays the software version. No configuration needed.
 </div>
 }
 
 @case ('ai-content') {
+<details class="inspector-section" open>
+  <summary class="inspector-section-summary">Content</summary>
+  <div class="inspector-section-body">
 <app-widget-title-config [widget]="widget" (widgetChange)="applyWidgetChange($event)" />
 <div class="mb-3">
-  <label class="form-label fw-semibold small">AI Prompt</label>
+  <label class="form-label fw-semibold small">AI prompt</label>
   <textarea class="form-control" rows="4" [(ngModel)]="aiContentConfig.prompt"
     (ngModelChange)="onPropertyChanged()"
     placeholder="e.g. 'Write a motivational quote for today'"></textarea>
@@ -554,13 +661,14 @@
       <span class="spinner-border spinner-border-sm me-1" role="status"></span>
       Generating…
     } @else {
-      <i class="fa fa-rotate me-1"></i>
+      <i class="fa-solid fa-rotate me-1"></i>
       Generate content
     }
   </button>
   <small class="form-text text-muted d-block mt-1">Generate and cache the AI response now</small>
 </div>
-
+  </div>
+</details>
 }
 }
 

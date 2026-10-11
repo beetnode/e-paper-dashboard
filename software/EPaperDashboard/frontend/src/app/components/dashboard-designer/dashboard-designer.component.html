@@ -182,18 +182,18 @@
               <div class="grid-overlay" [ngStyle]="gridOverlayStyle()"></div>
               @for (widget of layout().widgets; track widget.id) {
               <div class="widget-container" [ngStyle]="widgetStyles()[widget.id]"
-                role="button" tabindex="0" [attr.aria-label]="widget.type + ' widget. Use arrow keys to move.'"
+                role="button" tabindex="0" [attr.aria-label]="widgetDisplayName(widget) + ' widget. Use arrow keys to move, Shift and arrows to resize.'"
                 [attr.aria-pressed]="selectedWidget()?.id === widget.id"
                 (pointerdown)="onWidgetPointerDown($event, widget)"
                 (keydown)="onWidgetKeyDown($event, widget)">
-                <span class="widget-shell-label">{{ widget.type }}</span>
+                <span class="widget-shell-label">{{ widgetDisplayName(widget) }}</span>
               </div>
               }
 
               <!-- AI-generated widgets (read-only overlay) -->
               @for (widget of aiGeneratedWidgets(); track widget.id) {
               <div class="widget-container ai-widget" [ngStyle]="widgetStyles()[widget.id]">
-                <span class="widget-shell-label">{{ widget.type }}</span>
+                <span class="widget-shell-label">{{ widgetDisplayName(widget) }}</span>
               </div>
               }
 
@@ -230,7 +230,7 @@
                         @if (elementEditingWidgetId() === selectedWidget()!.id) {
                           <i class="fa-solid fa-check"></i> Done
                         } @else {
-                          <i class="fa-solid fa-arrows-up-down-left-right"></i> Edit Layout
+                          <i class="fa-solid fa-arrows-up-down-left-right" aria-hidden="true"></i> Edit layout
                         }
                       </button>
                   }
@@ -318,7 +318,7 @@
     </button>
     @if (selectedWidgetSupportsElementEditing()) {
       <button type="button" class="toolbar-btn" (click)="toggleElementEditing(selectedWidget()!)" [disabled]="renderedCanvasLoading() || !selectedWidgetGeometry()">
-        <i class="fa-solid fa-arrows-up-down-left-right" aria-hidden="true"></i> {{ elementEditingWidgetId() === selectedWidget()!.id ? 'Done' : 'Layout' }}
+        <i class="fa-solid fa-arrows-up-down-left-right" aria-hidden="true"></i> {{ elementEditingWidgetId() === selectedWidget()!.id ? 'Done' : 'Edit layout' }}
       </button>
     }
     <button type="button" class="toolbar-btn toolbar-btn-danger" (click)="deleteWidget(selectedWidget()!); mobileSelectionToolbar.set(false)">
@@ -395,10 +395,10 @@
         <span class="inspector-icon"><i class="fa {{ widgetIcon(widget) }}" aria-hidden="true"></i></span>
         <h2 class="inspector-title" [title]="widgetDisplayName(widget)">{{ widgetDisplayName(widget) }}</h2>
         @if (selectedSourceSummary(); as summary) {
-          <button type="button" class="source-chip" [ngClass]="'source-chip-' + summary.tone"
+          <button type="button" class="app-status-chip source-chip" [ngClass]="'app-status-chip-' + summary.tone"
             (click)="sourceDetailsOpen.set(!sourceDetailsOpen())" [attr.aria-expanded]="sourceDetailsOpen()"
             aria-controls="inspectorSourceDetails" title="Data sources">
-            <span class="source-dot" aria-hidden="true"></span>{{ summary.label }}
+            {{ summary.label }}<i class="fa-solid fa-chevron-down source-chip-caret" [class.open]="sourceDetailsOpen()" aria-hidden="true"></i>
           </button>
         }
       </div>
@@ -435,8 +435,9 @@
 
 <ng-template #layersContent>
   @if (layout().widgets.length === 0) {
-    <div class="layers-empty">
-      <p class="mb-2">No widgets yet.</p>
+    <div class="app-empty-state app-empty-state-compact">
+      <span class="app-empty-state-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>
+      <p class="mb-0">No widgets yet.</p>
       <button type="button" class="btn btn-sm btn-primary" (click)="openPicker()">
         <i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add widget
       </button>
@@ -537,7 +538,7 @@
         <span class="d-flex align-items-center">
           <span class="section-title">Color overrides</span>
         @if (hasLayoutColorOverrides()) {
-          <span class="badge bg-warning text-dark ms-2 override-badge" title="Some colors are overridden">Custom</span>
+          <span class="app-status-chip app-status-chip-warning override-chip" title="Some colors differ from the scheme">Custom</span>
         }
         </span>
         <i class="fa-solid" [ngClass]="colorOverridesCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
@@ -765,25 +766,25 @@
       [disabled]="renderedCanvasLoading() || !selectedWidgetGeometry()"
       (click)="toggleElementEditing(selectedWidget()!)">
       <i class="fa-solid me-1" [ngClass]="elementEditingWidgetId() === selectedWidget()!.id ? 'fa-check' : 'fa-arrows-up-down-left-right'" aria-hidden="true"></i>
-      {{ elementEditingWidgetId() === selectedWidget()!.id ? 'Finish editing layout' : 'Edit widget layout' }}
+      {{ elementEditingWidgetId() === selectedWidget()!.id ? 'Done' : 'Edit layout' }}
     </button>
     @if (renderedCanvasLoading()) {
       <p class="small text-muted mb-2" role="status">Updating the preview before layout editing…</p>
     }
   }
-  <div class="collapsible-section" [class.collapsed]="widgetColorOverridesCollapsed()">
-    <button type="button" class="collapsible-header collapsible-trigger" (click)="widgetColorOverridesCollapsed.set(!widgetColorOverridesCollapsed())"
-      [attr.aria-expanded]="!widgetColorOverridesCollapsed()" aria-controls="widgetColorOverridesPanel">
-      <span class="d-flex align-items-center">
-        <span class="section-title">Color overrides</span>
-        @if (hasWidgetColorOverrides(selectedWidget())) {
-        <span class="badge bg-warning text-dark ms-2 override-badge" title="Some colors are overridden">Custom</span>
-        }
-      </span>
-      <i class="fa-solid" [ngClass]="widgetColorOverridesCollapsed() ? 'fa-chevron-down' : 'fa-chevron-up'" aria-hidden="true"></i>
-    </button>
-    @if (!widgetColorOverridesCollapsed()) {
-    <div id="widgetColorOverridesPanel" class="collapsible-body">
+  <app-widget-config [widget]="selectedWidget()!" [dashboard]="dashboard()"
+    [availableEntities]="availableEntities()" [entitiesLoading]="entitiesLoading()"
+    [colorScheme]="layout().colorScheme"
+    (widgetChanged)="onWidgetConfigChanged($event)"
+    [attr.key]="selectedWidget()!.id"></app-widget-config>
+  <details class="inspector-section" [open]="!widgetColorOverridesCollapsed()" (toggle)="widgetColorOverridesCollapsed.set(!$any($event.target).open)">
+    <summary class="inspector-section-summary">
+      Colors
+      @if (hasWidgetColorOverrides(selectedWidget())) {
+        <span class="app-status-chip app-status-chip-warning override-chip" title="Some colors differ from the scheme">Custom</span>
+      }
+    </summary>
+    <div class="inspector-section-body">
       @for (field of widgetColorFields; track field.key) {
       <div class="color-row">
         <span class="color-row-label">{{ field.label }}@if (isWidgetColorOverridden(selectedWidget(), field.key)) {<span class="override-dot" title="Overridden for this widget"></span>}</span>
@@ -802,12 +803,6 @@
       </div>
       }
     </div>
-    }
-  </div>
-  <app-widget-config [widget]="selectedWidget()!" [dashboard]="dashboard()"
-    [availableEntities]="availableEntities()" [entitiesLoading]="entitiesLoading()"
-    [colorScheme]="layout().colorScheme"
-    (widgetChanged)="onWidgetConfigChanged($event)"
-    [attr.key]="selectedWidget()!.id"></app-widget-config>
+  </details>
   }
 </ng-template>

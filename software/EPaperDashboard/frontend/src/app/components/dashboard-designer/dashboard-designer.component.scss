@@ -363,13 +363,6 @@
   }
 }
 
-.layers-empty {
-  padding: 1.5rem 0.5rem;
-  color: var(--bs-secondary-color);
-  font-size: var(--designer-text-md);
-  text-align: center;
-}
-
 .designer-grid-container .card .inspector-body,
 .inspector-body {
   padding: 0.75rem;
@@ -433,36 +426,31 @@
   font-size: var(--designer-text-sm);
 }
 
+/* Data source summary uses .app-status-chip; only the button reset and caret are local. */
 .source-chip {
-  display: inline-flex;
-  align-items: center;
   flex: none;
-  gap: 0.35rem;
-  padding: 0.125rem 0.5rem;
-  border: 1px solid var(--bs-border-color);
-  border-radius: 1rem;
-  background: var(--bs-body-bg);
-  color: var(--bs-body-color);
-  font-size: var(--designer-text-xs);
+  border: 0;
   cursor: pointer;
+}
 
-  .source-dot {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 50%;
-    background: var(--bs-secondary-color);
+.source-chip-caret {
+  font-size: 0.6em;
+  transition: transform 0.15s;
+
+  &.open {
+    transform: rotate(180deg);
   }
+}
 
-  &.source-chip-success .source-dot {
-    background: var(--bs-success);
-  }
+.app-empty-state-compact {
+  gap: 0.5rem;
+  padding: 1.5rem 0.75rem;
+  font-size: var(--designer-text-sm);
 
-  &.source-chip-warning {
-    border-color: var(--bs-warning);
-
-    .source-dot {
-      background: var(--bs-warning);
-    }
+  .app-empty-state-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 1rem;
   }
 }
 

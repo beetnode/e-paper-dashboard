@@ -91,10 +91,59 @@ html[data-bs-theme="dark"] & {
   }
 }
 
-.override-badge {
-  padding: 0.25em 0.5em;
-  font-size: 0.65em;
-  line-height: 1;
+/* Inspector sections (native <details>), visually identical to .collapsible-section. */
+.inspector-section {
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--app-radius-sm);
+  background: var(--bs-card-bg, var(--bs-body-bg));
+
+  > .inspector-section-summary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    font-size: var(--designer-text-md);
+    font-weight: 600;
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    &::after {
+      content: '\f078';
+      margin-left: auto;
+      font-family: 'Font Awesome 7 Free', 'Font Awesome 6 Free';
+      font-size: var(--designer-text-xs);
+      font-weight: 900;
+      opacity: 0.7;
+      transition: transform 0.15s;
+    }
+
+    &:hover {
+      background: var(--bs-tertiary-bg);
+    }
+  }
+
+  &[open] > .inspector-section-summary::after {
+    transform: rotate(180deg);
+  }
+
+  > .inspector-section-body {
+    padding: 0.5rem 0.75rem 0.75rem;
+    border-top: 1px solid var(--bs-border-color);
+  }
+}
+
+/* "Custom" marker for overridden colors, a compact app status chip. */
+.override-chip {
+  min-height: 0;
+  padding: 0.05rem 0.45rem;
+  font-size: var(--designer-text-xs);
+  font-weight: 600;
 }
 
 
