@@ -240,42 +240,14 @@ export class DashboardListComponent {
       confirmLabel: 'Delete',
       isDangerous: true,
       onConfirm: async () => {
-        // Optimistically remove from UI and allow undo
-        this.dashboards.update(list => list.filter(d => d.id !== id));
-
-        let didUndo = false;
-
-        const performDelete = async () => {
-          try {
-            await firstValueFrom(this.dashboardService.deleteDashboard(id));
-            if (!didUndo) {
-              this.toastService.success('Dashboard deleted successfully');
-            }
-          } catch (error: any) {
-            // On error, reload list and show error
-            this.toastService.error(error.error?.message || 'Failed to delete dashboard');
-            this.loadDashboards();
-          }
-        };
-
-        const timeoutMs = 5000;
-        const timeoutId = setTimeout(() => {
-          performDelete();
-        }, timeoutMs);
-
-        this.toastService.showWithAction(
-          `Dashboard "${dashboard.name}" deleted`,
-          'Undo',
-          () => {
-            didUndo = true;
-            clearTimeout(timeoutId);
-            // restore dashboard in UI
-            this.dashboards.update(list => [dashboard, ...list]);
-            this.toastService.info('Deletion undone');
-          },
-          'info',
-          timeoutMs
-        );
+        try {
+          await firstValueFrom(this.dashboardService.deleteDashboard(id));
+          this.dashboards.update(list => list.filter(d => d.id !== id));
+          this.toastService.success('Dashboard deleted successfully');
+        } catch (error: any) {
+          this.toastService.error(error.error?.message || 'Failed to delete dashboard');
+          this.loadDashboards();
+        }
       }
     });
   }

@@ -51,7 +51,11 @@ internal sealed class PageToImageRenderingService(
 
     private string SafeFailure(Exception exception)
     {
-        if (exception is RenderingRequestException) return exception.Message;
+        if (exception is RenderingRequestException or RenderWorkerFailedException)
+        {
+            logger.LogWarning("Rendering failed: {Reason}", exception.Message);
+            return exception.Message;
+        }
         if (exception is OperationCanceledException) return "Rendering was cancelled or timed out. Try again.";
         // Exception messages can contain credential-bearing URLs or private server paths.
         logger.LogWarning("Rendering failed ({ErrorType})", exception.GetType().Name);

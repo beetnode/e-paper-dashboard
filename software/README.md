@@ -77,6 +77,7 @@ Install via the [izBoard Home Assistant Add-on repository](https://github.com/iz
 | `RENDERING_COMPONENT_RELEASE_TAG` | No | Override the component release tag; normally set by the official image |
 | `RENDERING_COMPONENT_BASE_URL` | No | Direct component artifact source for manual deployment testing; bypasses GitHub release lookup |
 | `RENDERING_COMPONENT_SOCKET` | No | Standalone app's private renderer Unix socket (default: `/run/izboard-rendering/renderer.sock`) |
+| `RENDERING_LOG_WORKER_ERRORS` | No | Set to `1` on the renderer to log raw browser errors for troubleshooting. They can contain dashboard URLs and page text. Default: `0` |
 | `RENDERING_MAX_CONCURRENT_RENDERS` | No | Concurrent worker limit, 1–16 (default: 2); increase only after measuring memory use |
 | `RENDERING_MAX_QUEUED_RENDERS` | No | Waiting request limit, 0–1000 (default: 100) |
 

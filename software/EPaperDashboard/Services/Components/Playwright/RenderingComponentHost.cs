@@ -65,9 +65,21 @@ internal static class RenderingComponentHost
                 // Do not log URLs, input HTML, tokens, or raw browser exceptions from a user's page.
                 if (message.Request.Mode == "html" && message.Request.Width == 200 && message.Request.Height == 100
                     && message.Request.Html == "<!doctype html><html><body>izBoard</body></html>")
-                    app.Logger.LogWarning("Rendering readiness check failed: {Error}", exception.Message);
-                else
-                    app.Logger.LogWarning("Isolated rendering request failed ({ErrorType})", exception.GetType().Name);
+                {
+                    app.Logger.LogWarning("Rendering readiness check failed: {Error}",
+                        (exception as RenderWorkerFailedException)?.WorkerError ?? exception.Message);
+                    return Results.StatusCode(500);
+                }
+                if (exception is RenderWorkerFailedException failure)
+                {
+                    // The sanitized reason is safe to log and to show to the dashboard owner.
+                    app.Logger.LogWarning("Isolated rendering request failed: {Reason}", failure.Message);
+                    // Opt-in operator diagnostics: raw errors can contain dashboard URLs or page text, never tokens.
+                    if (PlaywrightComponentRuntime.LogWorkerErrors)
+                        app.Logger.LogWarning("Rendering worker error: {WorkerError}", failure.WorkerError);
+                    return Results.Json(new PlaywrightComponentRuntime.RenderFailureResponse(failure.Message), statusCode: 500);
+                }
+                app.Logger.LogWarning("Isolated rendering request failed ({ErrorType})", exception.GetType().Name);
                 return Results.StatusCode(500);
             }
             finally { job.Complete(); }

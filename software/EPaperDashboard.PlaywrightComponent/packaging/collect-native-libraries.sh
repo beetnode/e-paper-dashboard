@@ -17,6 +17,18 @@ find "$component_root/browsers" "$component_root/worker/.playwright/node" -type 
     fi
   done | sort -u > /tmp/playwright-native-libraries.txt
 
+# NSS loads its PKCS#11 modules (softokn, freebl, root certificates) with dlopen, so ldd cannot
+# see them. Chromium aborts when it first verifies a certificate without them, e.g. when a
+# dashboard loads HTTPS resources. Collect the modules and their own dependencies explicitly.
+dpkg-query -L libnss3 | grep -E '/lib(softokn3|freebl3|freeblpriv3|nssckbi|nssdbm3)\.so$' > /tmp/playwright-nss-modules.txt
+for module in libsoftokn3.so libfreeblpriv3.so libnssckbi.so; do
+  grep -q "/$module\$" /tmp/playwright-nss-modules.txt || { echo "Missing NSS module $module" >&2; exit 1; }
+done
+while IFS= read -r module; do
+  ldd "$module" 2>/dev/null | awk '/=> \/|^\// { for (i = 1; i <= NF; i++) if ($i ~ /^\//) print $i }' || true
+done < /tmp/playwright-nss-modules.txt | sort -u >> /tmp/playwright-native-libraries.txt
+sort -u -o /tmp/playwright-native-libraries.txt /tmp/playwright-native-libraries.txt
+
 while IFS= read -r library; do
   case "$library" in
     "$component_root"/*) continue ;;
@@ -28,6 +40,16 @@ while IFS= read -r library; do
     cp "/usr/share/doc/$package_name/copyright" "$license_root/$package_name.txt"
   fi
 done < /tmp/playwright-native-libraries.txt
+
+# NSS looks for modules next to libnss3 and, with Debian's layout, in its nss/ subdirectory.
+mkdir -p "$library_root/nss"
+while IFS= read -r module; do
+  cp -L --preserve=mode,timestamps "$module" "$library_root/$(basename "$module")"
+  cp -L --preserve=mode,timestamps "$module" "$library_root/nss/$(basename "$module")"
+done < /tmp/playwright-nss-modules.txt
+if [ -f /usr/share/doc/libnss3/copyright ]; then
+  cp /usr/share/doc/libnss3/copyright "$license_root/libnss3.txt"
+fi
 
 # Chromium loads GTK/GLib data and fonts at runtime rather than through ELF linkage.
 if [ -d /usr/share/glib-2.0/schemas ]; then
