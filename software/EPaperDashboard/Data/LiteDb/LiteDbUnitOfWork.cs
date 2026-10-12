@@ -19,4 +19,7 @@ internal sealed class LiteDbUnitOfWork(LiteDbContext context) : IUnitOfWork
             throw;
         }
     }
+
+    // A LiteDB file belongs to one app instance, so a transaction is already exclusive.
+    public T ExecuteExclusive<T>(string lockName, Func<T> operation) => Execute(operation);
 }

@@ -43,7 +43,8 @@ public sealed class LegacyHomeAssistantSettingsMigration(
         {
             try
             {
-                unitOfWork.Execute(() => Migrate(id));
+                // Instances starting together take turns, so each sees connections the others created.
+                unitOfWork.ExecuteExclusive(nameof(LegacyHomeAssistantSettingsMigration), () => Migrate(id));
             }
             catch (Exception exception)
             {
@@ -54,7 +55,7 @@ public sealed class LegacyHomeAssistantSettingsMigration(
 
     private bool Migrate(DashboardId id)
     {
-        // Read again inside the transaction: another instance may have migrated it already.
+        // Read again under the lock: another instance may have migrated it already.
         var found = dashboards.FindById(id);
         if (found.HasNoValue || !HasLegacySettings(found.Value)) return false;
         var dashboard = found.Value;
