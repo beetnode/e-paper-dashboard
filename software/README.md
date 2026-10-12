@@ -74,7 +74,7 @@ The add-on image `izdevdigital/izboard-addon` is built from the `addon` target o
 | `DATABASE_PROVIDER` | No | `litedb` (default) or `postgresql`. Independent of `APP_MODE`. |
 | `DATABASE_CONNECTION_STRING` | PostgreSQL only | Npgsql connection string for an existing PostgreSQL database. |
 | `HOME_ASSISTANT_HOST` | No | Home Assistant URL (auto-detected in add-on mode) |
-| `RENDERING_COMPONENT_REPOSITORY` | No | GitHub repository that publishes the optional rendering component (default: `beetnode/e-paper-dashboard`) |
+| `RENDERING_COMPONENT_REPOSITORY` | No | GitHub repository that publishes the optional rendering component (default: `beetnode/izBoard`) |
 | `RENDERING_COMPONENT_RELEASE_TAG` | No | Override the component release tag; normally set by the official image |
 | `RENDERING_COMPONENT_BASE_URL` | No | Direct component artifact source for manual deployment testing; bypasses GitHub release lookup |
 | `RENDERING_COMPONENT_SOCKET` | No | Standalone app's private renderer Unix socket (default: `/run/izboard-rendering/renderer.sock`) |
