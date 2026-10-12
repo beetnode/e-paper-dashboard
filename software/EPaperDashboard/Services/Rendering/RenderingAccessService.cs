@@ -10,9 +10,9 @@ public sealed class RenderingAccessService(
     public bool IsEnabled(UserId owner)
     {
         if (deployment.Mode == DeploymentMode.Addon)
-            return owner == Constants.HomeAssistantVirtualUserId && (users.GetRenderingEnabled(owner) ?? true);
+            return owner == Constants.HomeAssistantVirtualUserId && (users.GetRenderingEnabled(owner) ?? false);
         var user = users.FindById(owner);
-        return user.HasValue && (users.GetRenderingEnabled(owner) ?? user.Value.RenderingEnabled ?? true);
+        return user.HasValue && (users.GetRenderingEnabled(owner) ?? user.Value.RenderingEnabled ?? false);
     }
 
     public void RequireAccount(UserId owner)

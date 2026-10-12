@@ -21,15 +21,19 @@ public sealed class RenderingAccessServiceTests
         new UserRenderScheduler(new ConfigurationBuilder().Build()));
 
     [Fact]
-    public void NewUsersMustOptIn_ExistingUsersKeepAccess()
+    public void UsersWithoutAnExplicitOptInHaveNoAccess()
     {
         var fresh = new User { Id = UserId.New(), RenderingEnabled = false };
-        var existing = new User { Id = UserId.New() };
+        var legacy = new User { Id = UserId.New() };
+        var optedIn = new User { Id = UserId.New() };
         _users.Setup(r => r.FindById(fresh.Id)).Returns(fresh);
-        _users.Setup(r => r.FindById(existing.Id)).Returns(existing);
+        _users.Setup(r => r.FindById(legacy.Id)).Returns(legacy);
+        _users.Setup(r => r.FindById(optedIn.Id)).Returns(optedIn);
+        _users.Setup(r => r.GetRenderingEnabled(optedIn.Id)).Returns(true);
         var access = Create();
         access.IsEnabled(fresh.Id).Should().BeFalse();
-        access.IsEnabled(existing.Id).Should().BeTrue();
+        access.IsEnabled(legacy.Id).Should().BeFalse();
+        access.IsEnabled(optedIn.Id).Should().BeTrue();
         access.IsEnabled(UserId.New()).Should().BeFalse();
     }
 
@@ -52,7 +56,8 @@ public sealed class RenderingAccessServiceTests
     [Fact]
     public async Task DisablingOneAccountCancelsOnlyThatAccount()
     {
-        var alice = new User { Id = UserId.New() }; var bob = new User { Id = UserId.New() };
+        var alice = new User { Id = UserId.New(), RenderingEnabled = true };
+        var bob = new User { Id = UserId.New(), RenderingEnabled = true };
         _users.Setup(r => r.FindById(alice.Id)).Returns(alice);
         _users.Setup(r => r.FindById(bob.Id)).Returns(bob);
         _users.Setup(r => r.SetRenderingEnabled(alice.Id, false)).Callback(() =>
@@ -93,6 +98,8 @@ public sealed class RenderingAccessServiceTests
     {
         _deployment.SetupGet(d => d.Mode).Returns(DeploymentMode.Addon);
         var access = Create();
+        access.IsEnabled(Constants.HomeAssistantVirtualUserId).Should().BeFalse();
+        _users.Setup(r => r.GetRenderingEnabled(Constants.HomeAssistantVirtualUserId)).Returns(true);
         access.IsEnabled(Constants.HomeAssistantVirtualUserId).Should().BeTrue();
         access.IsEnabled(UserId.New()).Should().BeFalse();
         access.SetEnabled(Constants.HomeAssistantVirtualUserId, false);
