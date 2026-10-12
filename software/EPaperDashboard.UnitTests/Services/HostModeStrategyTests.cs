@@ -1,4 +1,3 @@
-using EPaperDashboard.Models;
 using EPaperDashboard.Services;
 using EPaperDashboard.Utilities;
 using FluentAssertions;
@@ -30,27 +29,8 @@ public class HostModeStrategyTests
     }
 
     [Fact]
-    public void GetHomeAssistantConnection_UsesConfiguredHomeAssistantHost()
+    public void DefaultHomeAssistant_IsNotProvided()
     {
-        var sut = CreateSut(CreateValidConfig().Object);
-        var dashboard = new Dashboard { AccessToken = "token-123" };
-
-        var (host, token) = sut.GetHomeAssistantConnection(dashboard);
-
-        host.Should().Be("http://homeassistant.local:8123");
-        token.Should().Be("token-123");
-    }
-
-    [Fact]
-    public void GetHomeAssistantConnection_NoHomeAssistantHostConfigured_FallsBackToDefaultCoreUrl()
-    {
-        var config = CreateValidConfig();
-        config.SetupGet(c => c.HomeAssistantHost).Returns((string?)null);
-        var sut = CreateSut(config.Object);
-        var dashboard = new Dashboard { AccessToken = "token-123" };
-
-        var (host, _) = sut.GetHomeAssistantConnection(dashboard);
-
-        host.Should().Be(Constants.HomeAssistantCoreUrl);
+        CreateSut(CreateValidConfig().Object).DefaultHomeAssistant.Should().BeNull();
     }
 }

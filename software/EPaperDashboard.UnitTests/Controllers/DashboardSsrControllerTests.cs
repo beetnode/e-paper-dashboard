@@ -57,7 +57,7 @@ public class DashboardSsrControllerTests
             imageRenderer,
             new DesignerPreviewImageStore(TimeProvider.System),
             Mock.Of<IPageToImageRenderingService>(),
-            new HomeAssistantDashboardTargetResolver(Mock.Of<IDeploymentStrategy>(), Mock.Of<IEnvironmentConfiguration>(),
+            new HomeAssistantDashboardTargetResolver(Mock.Of<IEnvironmentConfiguration>(),
                 InMemoryProviderConnectionRepository.CreateStore()),
             TimeProvider.System);
     }

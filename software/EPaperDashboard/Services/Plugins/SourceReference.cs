@@ -1,7 +1,7 @@
 using System.Text;
 namespace EPaperDashboard.Services.Plugins;
 
-/// <summary>Opaque, URL-safe source keys. Bare entity IDs remain legacy dashboard HA references.</summary>
+/// <summary>Opaque, URL-safe source keys. Bare IDs belong to the default connection (the add-on).</summary>
 public static class SourceReference
 {
     private const string Prefix = "source:";

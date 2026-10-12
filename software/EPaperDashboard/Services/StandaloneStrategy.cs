@@ -20,26 +20,13 @@ public class StandaloneStrategy : IDeploymentStrategy
 
     public bool IsUserManagementEnabled => true;
 
-    public bool IsAutoConnected => false;
-
-    public string WebSocketPath => "/api/websocket";
+    public HomeAssistantEndpoint? DefaultHomeAssistant => null;
 
     public string GetConfigDirectory() => _environmentConfiguration.ConfigDir;
 
     public Uri? GetOAuthClientUri(HttpContext? context = null)
     {
         return _environmentConfiguration.ClientUri;
-    }
-
-    public Task<string?> CreateAccessTokenAsync(string clientName)
-    {
-        _logger.LogWarning("Long-lived token creation is not supported in standalone mode");
-        return Task.FromResult<string?>(null);
-    }
-
-    public (string host, string token) GetHomeAssistantConnection(Dashboard dashboard)
-    {
-        return (dashboard.Host!, dashboard.AccessToken!);
     }
 
     public UnitResult<string> ValidateConfiguration()

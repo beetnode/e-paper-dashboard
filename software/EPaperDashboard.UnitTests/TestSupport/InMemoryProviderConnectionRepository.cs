@@ -9,7 +9,8 @@ public sealed class InMemoryProviderConnectionRepository : IProviderConnectionRe
 {
     private readonly List<ProviderConnection> connections = [];
 
-    public static ProviderConnectionStore CreateStore() => new(new InMemoryProviderConnectionRepository(), new EphemeralDataProtectionProvider());
+    public static ProviderConnectionStore CreateStore(IDefaultConnectionSource? defaults = null) =>
+        new(new InMemoryProviderConnectionRepository(), new EphemeralDataProtectionProvider(), defaults);
 
     public List<ProviderConnection> FindByUserId(UserId userId) => connections.Where(c => c.UserId == userId).ToList();
     public ProviderConnection? Find(string id, UserId userId) => connections.FirstOrDefault(c => c.Id == id && c.UserId == userId);

@@ -1,3 +1,4 @@
+using EPaperDashboard.Models;
 using System.Net.WebSockets;
 using System.Text.Json;
 using CSharpFunctionalExtensions;
@@ -15,9 +16,9 @@ public class HomeAssistantTodoDataProvider(
     private readonly HomeAssistantConnectionService _connection = connection;
     private readonly ILogger<HomeAssistantTodoDataProvider> _logger = logger;
 
-    public async Task<Result<List<TodoItem>, string>> FetchTodoItemsAsync(HomeAssistantScope scope, string todoEntityId, CancellationToken cancellationToken = default)
+    public async Task<Result<List<TodoItem>, string>> FetchTodoItemsAsync(ProviderConnection homeAssistant, string todoEntityId, CancellationToken cancellationToken = default)
     {
-        var connectionInfo = _connection.GetConnectionInfo(scope);
+        var connectionInfo = _connection.GetConnectionInfo(homeAssistant);
         if (connectionInfo.IsFailure)
             return connectionInfo.Error;
 

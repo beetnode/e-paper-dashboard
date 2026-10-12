@@ -32,7 +32,7 @@ public sealed class ProviderConnectionsController(ProviderRegistry registry, Pro
         if (!HasAccount) return Forbid();
         var plugin = registry.Find(request.PluginId);
         if (plugin is null) return BadRequest(new { message = "Unknown provider" });
-        if (connections.List(CurrentUserId).Count >= 20) return BadRequest(new { message = "You can create up to 20 connections." });
+        if (connections.List(CurrentUserId).Count(c => !connections.IsDefault(c)) >= 20) return BadRequest(new { message = "You can create up to 20 connections." });
         var credentials = AllowedCredentials(plugin, request.Credentials);
         var error = Validate(plugin, request.Name, credentials);
         if (error is not null) return BadRequest(new { message = error });
@@ -47,6 +47,7 @@ public sealed class ProviderConnectionsController(ProviderRegistry registry, Pro
         if (!HasAccount) return Forbid();
         var connection = connections.Find(id, CurrentUserId);
         if (connection is null) return NotFound();
+        if (connections.IsDefault(connection)) return BadRequest(new { message = DefaultConnectionIsFixed });
         var plugin = registry.Find(connection.PluginId);
         if (plugin is null || request.PluginId != connection.PluginId) return BadRequest(new { message = "The provider cannot be changed." });
         var credentials = connections.Credentials(connection);
@@ -67,7 +68,9 @@ public sealed class ProviderConnectionsController(ProviderRegistry registry, Pro
     public IActionResult Delete(string id)
     {
         if (!HasAccount) return Forbid();
-        if (connections.Find(id, CurrentUserId) is null) return NotFound();
+        var connection = connections.Find(id, CurrentUserId);
+        if (connection is null) return NotFound();
+        if (connections.IsDefault(connection)) return BadRequest(new { message = DefaultConnectionIsFixed });
         connections.Delete(id, CurrentUserId);
         return NoContent();
     }
@@ -102,6 +105,7 @@ public sealed class ProviderConnectionsController(ProviderRegistry registry, Pro
         if (!HasAccount) return Forbid();
         var connection = connections.Find(id, CurrentUserId);
         if (connection is null) return NotFound();
+        if (connections.IsDefault(connection)) return BadRequest(new { message = DefaultConnectionIsFixed });
         if (registry.Find(connection.PluginId) is not IOAuthDataProviderPlugin plugin)
             return BadRequest(new { message = "This provider does not use sign-in." });
         var start = plugin.StartAuthorization(connection, HttpContext);
@@ -123,6 +127,8 @@ public sealed class ProviderConnectionsController(ProviderRegistry registry, Pro
         return LocalRedirect("~/connections?connected=" + Uri.EscapeDataString(plugin.Manifest.Id));
     }
 
+    private const string DefaultConnectionIsFixed = "This connection is provided by izBoard and cannot be changed or removed.";
+
     // Binds the one-time authorization state to the browser that started sign-in.
     internal static string StateCookie(string pluginId) => $"izboard-{pluginId}-oauth";
 
@@ -130,10 +136,13 @@ public sealed class ProviderConnectionsController(ProviderRegistry registry, Pro
     {
         var plugin = registry.Find(connection.PluginId);
         var credentials = connections.Credentials(connection);
+        var isDefault = connections.IsDefault(connection);
         return new
         {
             connection.Id, connection.Name, connection.PluginId,
-            connected = plugin is not IOAuthDataProviderPlugin oauth || oauth.IsAuthorized(credentials),
+            // The default connection is authorized by the deployment and has no editable credentials.
+            isDefault,
+            connected = isDefault || plugin is not IOAuthDataProviderPlugin oauth || oauth.IsAuthorized(credentials),
             credentials = plugin?.Manifest.Credentials.Where(field => !field.Secret)
                 .ToDictionary(field => field.Key, field => credentials.GetValueOrDefault(field.Key) ?? "")
         };

@@ -10,17 +10,10 @@ public interface IDeploymentStrategy
     DeploymentMode Mode { get; }
     bool IsUserManagementEnabled { get; }
     /// <summary>
-    /// When true, the strategy provides HA connection credentials automatically
-    /// (e.g. via supervisor token) so dashboards don't need individual OAuth tokens.
+    /// The Home Assistant server that the deployment connects to by itself (the add-on's supervisor proxy).
+    /// It backs every user's default Home Assistant connection; null when the deployment has none.
     /// </summary>
-    bool IsAutoConnected { get; }
-    /// <summary>
-    /// The WebSocket endpoint path relative to the host URL.
-    /// Supervisor proxy uses "/websocket"; direct HA uses "/api/websocket".
-    /// </summary>
-    string WebSocketPath { get; }
-    Task<string?> CreateAccessTokenAsync(string clientName);
-    (string host, string token) GetHomeAssistantConnection(Dashboard dashboard);
+    HomeAssistantEndpoint? DefaultHomeAssistant { get; }
     UnitResult<string> ValidateConfiguration();
     string GetConfigDirectory();
     ClaimsPrincipal? AuthenticateViaIngress(HttpContext context);

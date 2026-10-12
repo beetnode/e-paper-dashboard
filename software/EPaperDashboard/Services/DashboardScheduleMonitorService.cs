@@ -78,9 +78,8 @@ public class DashboardScheduleMonitorService : BackgroundService
             return;
         }
 
-        var hasHost = !string.IsNullOrWhiteSpace(dashboard.Host) || EnvironmentConfiguration.AppMode != DeploymentMode.Standalone;
-        var usesConnection = !string.IsNullOrEmpty(dashboard.HomeAssistantConnectionId);
-        if (!usesConnection && (!hasHost || string.IsNullOrWhiteSpace(dashboard.AccessToken)))
+        // Notifications go to the dashboard's Home Assistant connection, or the add-on's default connection.
+        if (string.IsNullOrEmpty(dashboard.HomeAssistantConnectionId) && EnvironmentConfiguration.AppMode != DeploymentMode.Addon)
         {
             return;
         }

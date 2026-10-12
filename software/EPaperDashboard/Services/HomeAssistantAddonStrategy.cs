@@ -29,33 +29,11 @@ public class HomeAssistantAddonStrategy : IDeploymentStrategy
 
     public bool IsUserManagementEnabled => false;
 
-    public bool IsAutoConnected => true;
-
-    public string WebSocketPath => "/websocket";
+    // The supervisor proxies Home Assistant Core's API and WebSocket with a token it provides, but cannot issue
+    // long-lived tokens: rendering a Home Assistant dashboard needs a connection with a user's own token.
+    public HomeAssistantEndpoint? DefaultHomeAssistant => new(Constants.SupervisorCoreUrl, _supervisorToken, "/websocket");
 
     public string GetConfigDirectory() => _environmentConfiguration.ConfigDir;
-
-    public Task<string?> CreateAccessTokenAsync(string clientName)
-    {
-        // The supervisor token authenticates as a system-generated user in HA Core.
-        // HA Core blocks long-lived token creation for system users:
-        //   "System generated users can only have system type refresh tokens"
-        // Users must manually create a long-lived token in HA (Profile → Long-Lived Access Tokens)
-        // for the "Home Assistant Dashboard" rendering mode (Playwright-based screenshots).
-        // The "Custom Layout" rendering mode works without this — it uses the supervisor token
-        // for API/WebSocket access directly.
-        _logger.LogInformation("Long-lived token creation not available in addon mode. " +
-            "Users should create one manually in HA for Home Assistant dashboard rendering.");
-        return Task.FromResult<string?>(null);
-    }
-
-    public (string host, string token) GetHomeAssistantConnection(Dashboard dashboard)
-    {
-        // In addon mode, always use the supervisor proxy and token.
-        // Individual dashboard tokens are not needed — the supervisor token
-        // provides full access to Home Assistant Core API.
-        return (Constants.SupervisorCoreUrl, _supervisorToken);
-    }
 
     public UnitResult<string> ValidateConfiguration()
     {

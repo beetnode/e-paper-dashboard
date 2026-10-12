@@ -1,3 +1,4 @@
+using EPaperDashboard.Models;
 using System.Net.WebSockets;
 using System.Text.Json;
 using CSharpFunctionalExtensions;
@@ -15,9 +16,9 @@ public class HomeAssistantCalendarDataProvider(
     private readonly HomeAssistantConnectionService _connection = connection;
     private readonly ILogger<HomeAssistantCalendarDataProvider> _logger = logger;
 
-    public async Task<Result<List<CalendarEvent>, string>> FetchCalendarEventsAsync(HomeAssistantScope scope, string calendarEntityId, int durationHours = 168, CancellationToken cancellationToken = default)
+    public async Task<Result<List<CalendarEvent>, string>> FetchCalendarEventsAsync(ProviderConnection homeAssistant, string calendarEntityId, int durationHours = 168, CancellationToken cancellationToken = default)
     {
-        var connectionInfo = _connection.GetConnectionInfo(scope);
+        var connectionInfo = _connection.GetConnectionInfo(homeAssistant);
         if (connectionInfo.IsFailure)
             return connectionInfo.Error;
 

@@ -82,11 +82,17 @@ import { ToastService } from '../../services/toast.service';
                   <span class="app-status-chip" [ngClass]="connection.connected ? 'app-status-chip-success' : 'app-status-chip-warning'">
                     <i class="fa-solid" [ngClass]="connection.connected ? 'fa-circle-check' : 'fa-triangle-exclamation'" aria-hidden="true"></i>{{ connection.connected ? 'Connected' : 'Sign-in required' }}
                   </span>
+                  @if (connection.isDefault) {
+                    <span class="app-status-chip app-status-chip-info"><i class="fa-solid fa-lock" aria-hidden="true"></i>Built-in</span>
+                  }
                 </div>
                 <p class="app-list-item-description">{{ pluginName(connection.pluginId) }}</p>
+                @if (connection.isDefault) {
+                  <p class="app-list-item-description">Provides widget data from this Home Assistant. Rendering a Home Assistant dashboard needs a connection with a long-lived access token.</p>
+                }
               </div>
               <div class="app-list-item-actions">
-                @if (supportsSignIn(connection.pluginId) && !connection.connected) {
+                @if (!connection.isDefault && supportsSignIn(connection.pluginId) && !connection.connected) {
                   <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="authorize(connection)" [attr.aria-label]="'Sign in to ' + pluginName(connection.pluginId)">
                     <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i><span class="d-none d-md-inline">Sign in to {{ pluginName(connection.pluginId) }}</span><span class="d-md-none">Sign in</span>
                   </button>
@@ -95,20 +101,22 @@ import { ToastService } from '../../services/toast.service';
                   [attr.aria-label]="'Test ' + connection.name" title="Test connection">
                   <i class="fa-solid fa-plug-circle-check" aria-hidden="true"></i>
                 </button>
-                @if (supportsSignIn(connection.pluginId) && connection.connected) {
+                @if (!connection.isDefault && supportsSignIn(connection.pluginId) && connection.connected) {
                   <button type="button" class="btn btn-ghost app-icon-button" [disabled]="busy()" (click)="authorize(connection)"
                     [attr.aria-label]="'Sign in to ' + pluginName(connection.pluginId) + ' again'" title="Sign in again">
                     <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i>
                   </button>
                 }
-                <button type="button" class="btn btn-ghost app-icon-button" [disabled]="busy()" (click)="edit(connection)"
-                  [attr.aria-label]="'Edit ' + connection.name" title="Edit">
-                  <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                </button>
-                <button type="button" class="btn btn-ghost btn-ghost-danger app-icon-button" [disabled]="busy()" (click)="remove(connection)"
-                  [attr.aria-label]="'Remove ' + connection.name" title="Remove">
-                  <i class="fa-solid fa-trash" aria-hidden="true"></i>
-                </button>
+                @if (!connection.isDefault) {
+                  <button type="button" class="btn btn-ghost app-icon-button" [disabled]="busy()" (click)="edit(connection)"
+                    [attr.aria-label]="'Edit ' + connection.name" title="Edit">
+                    <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                  </button>
+                  <button type="button" class="btn btn-ghost btn-ghost-danger app-icon-button" [disabled]="busy()" (click)="remove(connection)"
+                    [attr.aria-label]="'Remove ' + connection.name" title="Remove">
+                    <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                  </button>
+                }
               </div>
             </article>
           }

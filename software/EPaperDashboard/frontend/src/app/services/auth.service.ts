@@ -18,7 +18,6 @@ export class AuthService {
   readonly isAuthReady = computed(() => this.authReadySignal());
   readonly deploymentMode = computed<DeploymentMode>(() => this.currentUserSignal()?.deploymentMode ?? 'standalone');
   readonly isAddonMode = computed(() => this.deploymentMode() === 'addon');
-  readonly isHostMode = computed(() => this.deploymentMode() === 'host');
   readonly isUserManagementDisabled = computed(() => this.deploymentMode() === 'addon');
 
   getSetupStatus(): Observable<{ setupRequired: boolean; registrationEnabled: boolean }> {

@@ -22,10 +22,12 @@ namespace EPaperDashboard.Models
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public UserId UserId { get; set; } = UserId.Empty;
+        /// <summary>Retired Home Assistant token; read only to move it into a connection at startup.</summary>
         public string? AccessToken { get; set; }
+        /// <summary>Retired Home Assistant server URL; read only to move it into a connection at startup.</summary>
         public string? Host { get; set; }
         public string? Path { get; set; }
-        /// <summary>Named Home Assistant connection used by "Home Assistant Dashboard" rendering; null uses Host/AccessToken.</summary>
+        /// <summary>Named Home Assistant connection used by "Home Assistant Dashboard" rendering and notifications.</summary>
         public string? HomeAssistantConnectionId { get; set; }
         public List<TimeOnly>? UpdateTimes { get; set; }
         public LayoutConfig? LayoutConfig { get; set; }

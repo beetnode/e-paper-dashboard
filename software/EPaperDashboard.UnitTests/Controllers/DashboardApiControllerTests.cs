@@ -24,8 +24,7 @@ public class DashboardApiControllerTests
     private DashboardApiController CreateSut() => new(
         new DashboardService(_dashboardRepository.Object),
         new UserService(_userRepository.Object, _dashboardRepository.Object),
-        _deploymentStrategy.Object,
-        new HomeAssistantDashboardTargetResolver(_deploymentStrategy.Object, Mock.Of<IEnvironmentConfiguration>(), _connections));
+        new HomeAssistantDashboardTargetResolver(Mock.Of<IEnvironmentConfiguration>(), _connections));
 
     [Fact]
     public void GetDashboards_UserDoesNotExist_ReturnsUnauthorized()
@@ -44,15 +43,14 @@ public class DashboardApiControllerTests
     {
         var userId = UserId.New();
         _userRepository.Setup(r => r.FindById(userId)).Returns(new User { Id = userId });
-        _dashboardRepository.Setup(r => r.FindByUserId(userId)).Returns([new Dashboard { UserId = userId, AccessToken = "secret-dashboard-token" }]);
+        _dashboardRepository.Setup(r => r.FindByUserId(userId)).Returns([new Dashboard { UserId = userId, Name = "Kitchen" }]);
         var sut = CreateSut().WithUser(userId);
 
         var result = sut.GetDashboards();
 
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         ok.Value.Should().BeAssignableTo<List<DashboardResponseDto>>().Which.Should().ContainSingle()
-            .Which.HasAccessToken.Should().BeTrue();
-        System.Text.Json.JsonSerializer.Serialize(ok.Value).Should().NotContain("secret-dashboard-token");
+            .Which.Name.Should().Be("Kitchen");
     }
 
     [Fact]
@@ -180,6 +178,25 @@ public class DashboardApiControllerTests
             d.RenderingMode == RenderingMode.HomeAssistant && d.Path == "lovelace/0" && d.HomeAssistantConnectionId == connection.Id)), Times.Once);
     }
 
+    [Fact]
+    public void CreateDashboard_AddonDefaultConnection_CannotRender()
+    {
+        var userId = UserId.New();
+        _deploymentStrategy.SetupGet(d => d.DefaultHomeAssistant).Returns(new HomeAssistantEndpoint("http://supervisor/core", "token", "/websocket"));
+        var connections = InMemoryProviderConnectionRepository.CreateStore(new HomeAssistantAddonConnection(_deploymentStrategy.Object));
+        var sut = new DashboardApiController(new DashboardService(_dashboardRepository.Object),
+            new UserService(_userRepository.Object, _dashboardRepository.Object),
+            new HomeAssistantDashboardTargetResolver(Mock.Of<IEnvironmentConfiguration>(), connections))
+            .WithUser(userId);
+        _userRepository.Setup(r => r.FindById(userId)).Returns(new User { Id = userId });
+
+        var result = sut.CreateDashboard(new CreateDashboardRequest("HA", null, null, null, null,
+            RenderingMode: "HomeAssistant", HomeAssistantConnectionId: HomeAssistantAddonConnection.Id));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+        _dashboardRepository.Verify(r => r.Insert(It.IsAny<Dashboard>()), Times.Never);
+    }
+
     [Theory]
     [InlineData("google")]
     [InlineData("foreign")]
@@ -198,7 +215,7 @@ public class DashboardApiControllerTests
     }
 
     [Fact]
-    public void UpdateDashboard_EmptyConnectionId_SwitchesBackToDashboardSettings()
+    public void UpdateDashboard_EmptyConnectionId_RemovesConnection()
     {
         var userId = UserId.New();
         var dashboardId = DashboardId.New();
@@ -207,7 +224,7 @@ public class DashboardApiControllerTests
         var sut = CreateSut().WithUser(userId);
 
         sut.UpdateDashboard(dashboardId.Value, new UpdateDashboardRequest(
-            null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, HomeAssistantConnectionId: ""));
+            null, null, null, null, null, null, null, null, null, null, null, null, null, HomeAssistantConnectionId: ""));
 
         _dashboardRepository.Verify(r => r.Update(It.Is<Dashboard>(d => d.HomeAssistantConnectionId == null)), Times.Once);
     }
@@ -222,7 +239,7 @@ public class DashboardApiControllerTests
         var sut = CreateSut().WithUser(userId);
 
         sut.UpdateDashboard(dashboardId.Value, new UpdateDashboardRequest(
-            "renamed", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null));
+            "renamed", null, null, null, null, null, null, null, null, null, null, null, null));
 
         _dashboardRepository.Verify(r => r.Update(It.Is<Dashboard>(d => d.HomeAssistantConnectionId == "keep")), Times.Once);
     }
@@ -236,7 +253,7 @@ public class DashboardApiControllerTests
         var sut = CreateSut().WithUser(userId);
 
         var result = sut.UpdateDashboard(dashboardId.Value, new UpdateDashboardRequest(
-            null, null, null, null, null, null, null, null, RenderingMode: "HomeAssistant", null, null, null, null, null, null, null));
+            null, null, null, null, null, RenderingMode: "HomeAssistant", null, null, null, null, null, null, null));
 
         result.Should().BeOfType<BadRequestObjectResult>();
         _dashboardRepository.Verify(r => r.Update(It.IsAny<Dashboard>()), Times.Never);
@@ -251,41 +268,9 @@ public class DashboardApiControllerTests
         var sut = CreateSut().WithUser(userId);
 
         var result = sut.UpdateDashboard(dashboardId.Value, new UpdateDashboardRequest(
-            null, null, null, null, null, null, null, null, RenderingMode: "Custom", null, null, null, null, null, null, null));
+            null, null, null, null, null, RenderingMode: "Custom", null, null, null, null, null, null, null));
 
         result.Should().BeOfType<OkObjectResult>();
-    }
-
-    [Theory]
-    [InlineData("token", null)]
-    [InlineData(null, "http://ha.example.test")]
-    public void UpdateDashboard_SettingRetiredHomeAssistantSettings_ReturnsBadRequest(string? token, string? host)
-    {
-        var userId = UserId.New();
-        var dashboardId = DashboardId.New();
-        _dashboardRepository.Setup(r => r.FindById(dashboardId)).Returns(new Dashboard { Id = dashboardId, UserId = userId });
-        var sut = CreateSut().WithUser(userId);
-
-        var result = sut.UpdateDashboard(dashboardId.Value, new UpdateDashboardRequest(
-            null, null, token, null, host, null, null, null, null, null, null, null, null, null, null, null));
-
-        result.Should().BeOfType<BadRequestObjectResult>();
-        _dashboardRepository.Verify(r => r.Update(It.IsAny<Dashboard>()), Times.Never);
-    }
-
-    [Fact]
-    public void UpdateDashboard_ClearAccessTokenTrue_SetsAccessTokenNull()
-    {
-        var userId = UserId.New();
-        var dashboardId = DashboardId.New();
-        var dashboard = new Dashboard { Id = dashboardId, UserId = userId, AccessToken = "old-token", Host = "http://old.test" };
-        _dashboardRepository.Setup(r => r.FindById(dashboardId)).Returns(dashboard);
-        var sut = CreateSut().WithUser(userId);
-
-        sut.UpdateDashboard(dashboardId.Value, new UpdateDashboardRequest(
-            null, null, null, ClearAccessToken: true, null, null, null, null, null, null, null, null, null, null, null, null));
-
-        _dashboardRepository.Verify(r => r.Update(It.Is<Dashboard>(d => d.AccessToken == null && d.Host == null)), Times.Once);
     }
 
     [Fact]
@@ -297,7 +282,7 @@ public class DashboardApiControllerTests
         var sut = CreateSut().WithUser(UserId.New());
 
         var result = sut.UpdateDashboard(dashboardId.Value, new UpdateDashboardRequest(
-            "x", null, null, null, null, null, null, null, null, null, null, null, null, null, null, null));
+            "x", null, null, null, null, null, null, null, null, null, null, null, null));
 
         result.Should().BeOfType<ForbidResult>();
     }
@@ -313,7 +298,7 @@ public class DashboardApiControllerTests
         var sut = CreateSut().WithUser(userId);
 
         sut.UpdateDashboard(dashboardId.Value, new UpdateDashboardRequest(
-            null, null, null, null, null, null, null, null, null, null, null, null, null, IsAiEnabled: true, null, null));
+            null, null, null, null, null, null, null, null, null, null, IsAiEnabled: true, null, null));
 
         _dashboardRepository.Verify(r => r.Update(It.Is<Dashboard>(d => d.IsAiEnabled == false)), Times.Once);
     }

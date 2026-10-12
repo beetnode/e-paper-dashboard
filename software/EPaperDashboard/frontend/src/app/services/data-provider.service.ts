@@ -32,6 +32,8 @@ export interface ProviderConnection {
   name: string;
   pluginId: string;
   connected: boolean;
+  /** Provided by izBoard (the Home Assistant add-on's own server); it cannot be edited, removed, or used for rendering. */
+  isDefault?: boolean;
   credentials: Record<string, string>;
 }
 @Injectable({ providedIn: 'root' })

@@ -2,6 +2,7 @@ using EPaperDashboard.Authorization;
 using EPaperDashboard.Services.Rendering;
 using EPaperDashboard.Services.Providers;
 using EPaperDashboard.Services.Plugins;
+using EPaperDashboard.Services.Plugins.HomeAssistant;
 using EPaperDashboard.Services.Ai;
 using EPaperDashboard.Utilities;
 using EPaperDashboard.Data;
@@ -300,6 +301,8 @@ catch (Exception exception)
     Environment.ExitCode = 1;
     return;
 }
+
+app.Services.GetRequiredService<LegacyHomeAssistantSettingsMigration>().Run();
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 var strategy = app.Services.GetRequiredService<IDeploymentStrategy>();
