@@ -36,21 +36,29 @@ public sealed class FirmwareUpdateService : BackgroundService
     public FirmwareReleaseInfo? GetLatestRelease() => _latestRelease;
 
     /// <summary>
+    /// Whether the latest release can be delivered to devices right now: its binary is
+    /// cached locally, so a device download is served from disk instead of waiting on GitHub.
+    /// Both the device-facing version header and the UI's update badge depend on this.
+    /// </summary>
+    public bool IsOtaReady => GetReadyBinaryPath() is not null;
+
+    /// <summary>
     /// Gets the path to the cached firmware binary, downloading it if necessary.
     /// Returns null if no firmware is available.
     /// </summary>
     public async Task<string?> GetFirmwareBinaryPathAsync(CancellationToken cancellationToken = default)
     {
-        if (_latestRelease?.DownloadUrl is null)
+        var readyPath = GetReadyBinaryPath();
+        if (readyPath is not null)
+            return readyPath;
+
+        var release = _latestRelease;
+        if (release?.DownloadUrl is null)
             return null;
 
-        // Serve from cache if available
-        if (_cachedBinaryPath is not null && File.Exists(_cachedBinaryPath))
-            return _cachedBinaryPath;
-
         // Download on demand
-        await DownloadAndCacheBinaryAsync(_latestRelease.DownloadUrl, _latestRelease.Version, cancellationToken);
-        return _cachedBinaryPath;
+        await DownloadAndCacheBinaryAsync(release.DownloadUrl, release.Version, cancellationToken);
+        return GetReadyBinaryPath();
     }
 
     /// <summary>
@@ -121,28 +129,49 @@ public sealed class FirmwareUpdateService : BackgroundService
         _latestRelease = release;
 
         if (isNewVersion)
-        {
             _logger.LogInformation("New firmware version detected: {Version}", release.Version);
 
-            if (release.DownloadUrl is not null)
-            {
-                // Check if binary is already cached on disk (e.g., from before a server restart)
-                var expectedPath = Path.Combine(_firmwareCacheDir, $"firmware-{release.Version}.bin");
-                if (File.Exists(expectedPath))
-                {
-                    _cachedBinaryPath = expectedPath;
-                    _logger.LogInformation("Firmware binary v{Version} restored from disk cache", release.Version);
-                }
-                else
-                {
-                    await DownloadAndCacheBinaryAsync(release.DownloadUrl, release.Version, cancellationToken);
-                }
-            }
+        if (release.DownloadUrl is null)
+        {
+            _logger.LogWarning("Firmware release v{Version} has no binary asset; devices will not be offered an update", release.Version);
+            return;
+        }
+
+        if (IsOtaReady)
+        {
+            _logger.LogInformation("Firmware is up to date: {Version}", release.Version);
+            return;
+        }
+
+        // Check if binary is already cached on disk (e.g., from before a server restart)
+        var expectedPath = GetCachePath(release.Version);
+        if (File.Exists(expectedPath))
+        {
+            _cachedBinaryPath = expectedPath;
+            _logger.LogInformation("Firmware binary v{Version} restored from disk cache", release.Version);
         }
         else
         {
-            _logger.LogInformation("Firmware is up to date: {Version}", release.Version);
+            // Also retries a download that failed on an earlier check of the same version
+            await DownloadAndCacheBinaryAsync(release.DownloadUrl, release.Version, cancellationToken);
         }
+    }
+
+    private string GetCachePath(string version) => Path.Combine(_firmwareCacheDir, $"firmware-{version}.bin");
+
+    /// <summary>
+    /// The cached binary path, only when it belongs to the latest release. A binary left over
+    /// from an older release must never be served for a newer version: the device would flash
+    /// it, still report the old version, and reflash on every wake.
+    /// </summary>
+    private string? GetReadyBinaryPath()
+    {
+        var release = _latestRelease;
+        var path = _cachedBinaryPath;
+        if (release?.DownloadUrl is null || path is null)
+            return null;
+
+        return path == GetCachePath(release.Version) && File.Exists(path) ? path : null;
     }
 
     private async Task<byte[]?> DownloadAndCacheBinaryAsync(string downloadUrl, string version, CancellationToken cancellationToken)
@@ -166,7 +195,7 @@ public sealed class FirmwareUpdateService : BackgroundService
             }
 
             // Cache the new binary
-            var cachePath = Path.Combine(_firmwareCacheDir, $"firmware-{version}.bin");
+            var cachePath = GetCachePath(version);
             await File.WriteAllBytesAsync(cachePath, binary, cancellationToken);
             _cachedBinaryPath = cachePath;
 

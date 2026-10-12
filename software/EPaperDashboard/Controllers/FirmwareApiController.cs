@@ -33,7 +33,7 @@ public class FirmwareApiController(FirmwareUpdateService firmwareUpdateService) 
             publishedAt = release.PublishedAt,
             fileSize = release.FileSize,
             hasDownload = release.DownloadUrl is not null,
-            isUpdateAvailable = release.DownloadUrl is not null
+            isUpdateAvailable = firmwareUpdateService.IsOtaReady
         });
     }
 
@@ -61,7 +61,7 @@ public class FirmwareApiController(FirmwareUpdateService firmwareUpdateService) 
             publishedAt = release.PublishedAt,
             fileSize = release.FileSize,
             hasDownload = release.DownloadUrl is not null,
-            isUpdateAvailable = release.DownloadUrl is not null
+            isUpdateAvailable = firmwareUpdateService.IsOtaReady
         });
     }
 

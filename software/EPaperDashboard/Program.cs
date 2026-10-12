@@ -369,10 +369,12 @@ app.Use(async (context, next) =>
 			}
 		}
 
-		// Add latest firmware version header to all device-port responses
+		// Add latest firmware version header to all device-port responses, but only once the
+		// binary is cached: an uncached download can outlast the device's OTA timeout and
+		// burn its limited retries for that version.
 		var firmwareService = context.RequestServices.GetService<FirmwareUpdateService>();
 		var latestRelease = firmwareService?.GetLatestRelease();
-		if (latestRelease?.DownloadUrl is not null)
+		if (latestRelease is not null && firmwareService!.IsOtaReady)
 		{
 			context.Response.OnStarting(() =>
 			{
