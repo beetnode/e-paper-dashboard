@@ -1,3 +1,4 @@
+using EPaperDashboard.Models;
 using System.Net.WebSockets;
 using System.Text.Json;
 using CSharpFunctionalExtensions;
@@ -26,9 +27,9 @@ public class HomeAssistantEntityStateProvider(
     };
 
 
-    public async Task<Result<List<EntityState>, string>> FetchEntityStatesAsync(HomeAssistantScope scope, string[] entityIds, CancellationToken cancellationToken = default)
+    public async Task<Result<List<EntityState>, string>> FetchEntityStatesAsync(ProviderConnection homeAssistant, string[] entityIds, CancellationToken cancellationToken = default)
     {
-        var connectionInfo = _connection.GetConnectionInfo(scope);
+        var connectionInfo = _connection.GetConnectionInfo(homeAssistant);
         if (connectionInfo.IsFailure)
             return connectionInfo.Error;
 

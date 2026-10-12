@@ -342,6 +342,66 @@ public class PostgresRepositoryIntegrationTests
         });
     }
 
+    [PostgresFact]
+    public void ExecuteExclusive_LetsOneInstanceRunAtATime()
+    {
+        WithEmptySchema(connectionString =>
+        {
+            var settings = new DatabaseSettings(DatabaseProvider.PostgreSql, connectionString);
+            var running = 0;
+            var overlapped = false;
+            Parallel.For(0, 4, _ =>
+            {
+                using var context = new PostgresDbContext(settings);
+                new PostgresUnitOfWork(context).ExecuteExclusive("test", () =>
+                {
+                    if (Interlocked.Increment(ref running) > 1) overlapped = true;
+                    Thread.Sleep(100);
+                    Interlocked.Decrement(ref running);
+                    return true;
+                });
+            });
+            overlapped.Should().BeFalse();
+        });
+    }
+
+    [PostgresFact]
+    public void LegacySettingsMigration_InstancesStartingTogetherShareOneConnection()
+    {
+        WithEmptySchema(connectionString =>
+        {
+            using var services = CreateMigratedServices(connectionString);
+            var settings = new DatabaseSettings(DatabaseProvider.PostgreSql, connectionString);
+            var owner = UserId.New();
+            var dashboards = Enumerable.Range(0, 6).Select(i => new Dashboard
+            {
+                UserId = owner, Name = "D" + i, Host = "http://ha.test:8123", AccessToken = "token",
+                RenderingMode = RenderingMode.HomeAssistant
+            }).ToList();
+            var setup = services.GetRequiredService<IDashboardRepository>();
+            dashboards.ForEach(setup.Insert);
+            // Instances share data protection keys in production; one ephemeral provider stands in for them.
+            var protection = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
+            var deployment = new Moq.Mock<EPaperDashboard.Services.IDeploymentStrategy>();
+            deployment.SetupGet(d => d.Mode).Returns(EPaperDashboard.Utilities.DeploymentMode.Standalone);
+
+            Parallel.For(0, 3, _ =>
+            {
+                using var context = new PostgresDbContext(settings);
+                var connections = new EPaperDashboard.Services.Plugins.ProviderConnectionStore(new PostgresProviderConnectionRepository(context), protection);
+                new EPaperDashboard.Services.Plugins.HomeAssistant.LegacyHomeAssistantSettingsMigration(
+                    new PostgresDashboardRepository(context), connections, new PostgresUnitOfWork(context), deployment.Object,
+                    Moq.Mock.Of<EPaperDashboard.Utilities.IEnvironmentConfiguration>(),
+                    Microsoft.Extensions.Logging.Abstractions.NullLogger<EPaperDashboard.Services.Plugins.HomeAssistant.LegacyHomeAssistantSettingsMigration>.Instance).Run();
+            });
+
+            services.GetRequiredService<IProviderConnectionRepository>().FindByUserId(owner).Should().ContainSingle();
+            var migrated = setup.FindByUserId(owner);
+            migrated.Should().OnlyContain(d => d.AccessToken == null && d.Host == null);
+            migrated.Select(d => d.HomeAssistantConnectionId).Distinct().Should().ContainSingle().Which.Should().NotBeNull();
+        });
+    }
+
     private static void WithEmptySchema(Action<string> test)
     {
         var connectionString = Environment.GetEnvironmentVariable("TEST_POSTGRES_CONNECTION_STRING")!;

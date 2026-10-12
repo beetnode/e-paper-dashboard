@@ -1,3 +1,4 @@
+using EPaperDashboard.Models;
 using System.Net.WebSockets;
 using System.Text.Json;
 using CSharpFunctionalExtensions;
@@ -15,9 +16,9 @@ public class HomeAssistantRssFeedDataProvider(
     private readonly HomeAssistantConnectionService _connection = connection;
     private readonly ILogger<HomeAssistantRssFeedDataProvider> _logger = logger;
 
-    public async Task<Result<List<RssFeedEntry>, string>> FetchRssFeedEntriesAsync(HomeAssistantScope scope, string feedEntityId, CancellationToken cancellationToken = default)
+    public async Task<Result<List<RssFeedEntry>, string>> FetchRssFeedEntriesAsync(ProviderConnection homeAssistant, string feedEntityId, CancellationToken cancellationToken = default)
     {
-        var connectionInfo = _connection.GetConnectionInfo(scope);
+        var connectionInfo = _connection.GetConnectionInfo(homeAssistant);
         if (connectionInfo.IsFailure)
             return connectionInfo.Error;
 

@@ -31,13 +31,6 @@ public static class Constants
 
     public const string SupervisorCoreUrl = "http://supervisor/core";
 
-    /// <summary>
-    /// Direct HA Core URL via internal Docker DNS name.
-    /// Used for loading HA web UI pages (e.g. Playwright rendering), which
-    /// cannot go through the supervisor API proxy.
-    /// </summary>
-    public const string HomeAssistantInternalUrl = "http://homeassistant:8123";
-    
     public const string HomeAssistantCoreUrl = "http://localhost:8123";
     
     public const string IngressPathHeader = "X-Ingress-Path";

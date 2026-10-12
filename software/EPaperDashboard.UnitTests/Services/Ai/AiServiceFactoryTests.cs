@@ -2,6 +2,7 @@ using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services;
 using EPaperDashboard.Services.Ai;
+using EPaperDashboard.UnitTests.TestSupport;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -18,7 +19,8 @@ public class AiServiceFactoryTests
     {
         connectionService ??= new HomeAssistantConnectionService(
             new DashboardService(Mock.Of<IDashboardRepository>()),
-            Mock.Of<IDeploymentStrategy>());
+            Mock.Of<IDeploymentStrategy>(),
+            InMemoryProviderConnectionRepository.CreateStore());
 
         return new AiServiceFactory(
             httpClientFactory ?? Mock.Of<IHttpClientFactory>(),

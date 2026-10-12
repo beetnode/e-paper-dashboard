@@ -14,15 +14,15 @@ public class HomeAssistantDashboardTargetResolverTests
 {
     private readonly Mock<IDeploymentStrategy> _deployment = new();
     private readonly Mock<IEnvironmentConfiguration> _environment = new();
-    private readonly ProviderConnectionStore _connections = InMemoryProviderConnectionRepository.CreateStore();
+    private readonly ProviderConnectionStore _connections;
     private readonly UserId _owner = UserId.New();
 
     public HomeAssistantDashboardTargetResolverTests()
     {
-        _deployment.SetupGet(d => d.Mode).Returns(DeploymentMode.Standalone);
+        _connections = InMemoryProviderConnectionRepository.CreateStore(new HomeAssistantAddonConnection(_deployment.Object));
     }
 
-    private HomeAssistantDashboardTargetResolver CreateSut() => new(_deployment.Object, _environment.Object, _connections);
+    private HomeAssistantDashboardTargetResolver CreateSut() => new(_environment.Object, _connections);
 
     private ProviderConnection AddConnection(UserId owner, string pluginId = "home-assistant", string host = "https://ha.example.test")
     {
@@ -35,7 +35,7 @@ public class HomeAssistantDashboardTargetResolverTests
     public void Resolve_NamedConnection_UsesConnectionServerAndToken()
     {
         var connection = AddConnection(_owner);
-        var dashboard = new Dashboard { UserId = _owner, HomeAssistantConnectionId = connection.Id, Path = "lovelace/0", Host = "https://legacy.test", AccessToken = "legacy" };
+        var dashboard = new Dashboard { UserId = _owner, HomeAssistantConnectionId = connection.Id, Path = "lovelace/0" };
 
         var result = CreateSut().Resolve(dashboard);
 
@@ -73,23 +73,23 @@ public class HomeAssistantDashboardTargetResolverTests
     }
 
     [Fact]
-    public void Resolve_LegacyDashboardSettings_UsesHostAndToken()
+    public void Resolve_AddonDefaultConnection_CannotRender()
     {
-        var dashboard = new Dashboard { UserId = _owner, Host = "http://legacy.test:8123", AccessToken = "legacy", Path = "lovelace/energy" };
+        _deployment.SetupGet(d => d.DefaultHomeAssistant).Returns(new HomeAssistantEndpoint("http://supervisor/core", "token", "/websocket"));
+        var sut = CreateSut();
+        var defaultConnection = sut.FindConnection(HomeAssistantAddonConnection.Id, _owner)!;
+        var dashboard = new Dashboard { UserId = _owner, HomeAssistantConnectionId = defaultConnection.Id, Path = "lovelace/0" };
 
-        var result = CreateSut().Resolve(dashboard);
-
-        result.Value.DashboardUri.Should().Be(new Uri("http://legacy.test:8123/lovelace/energy"));
-        result.Value.Tokens.AccessToken.Should().Be("legacy");
+        sut.CanRender(defaultConnection).Should().BeFalse();
+        sut.Resolve(dashboard).Error.Should().Be(HomeAssistantDashboardTargetResolver.DefaultConnectionCannotRender);
     }
 
     [Fact]
-    public void Resolve_AddonWithoutHost_UsesInternalHomeAssistantUrl()
+    public void Resolve_WithoutConnection_AsksForOne()
     {
-        _deployment.SetupGet(d => d.Mode).Returns(DeploymentMode.Addon);
-        var dashboard = new Dashboard { UserId = _owner, AccessToken = "long-lived", Path = "lovelace/0" };
+        var dashboard = new Dashboard { UserId = _owner, Path = "lovelace/0" };
 
-        CreateSut().Resolve(dashboard).Value.DashboardUri.Should().Be(new Uri(Constants.HomeAssistantInternalUrl + "/lovelace/0"));
+        CreateSut().Resolve(dashboard).Error.Should().Contain("Select a Home Assistant connection");
     }
 
     [Theory]
@@ -101,15 +101,5 @@ public class HomeAssistantDashboardTargetResolverTests
         var dashboard = new Dashboard { UserId = _owner, HomeAssistantConnectionId = connection.Id, Path = path };
 
         CreateSut().Resolve(dashboard).Error.Should().Contain("path");
-    }
-
-    [Fact]
-    public void Resolve_MissingToken_FailsButUriStillResolves()
-    {
-        var dashboard = new Dashboard { UserId = _owner, Host = "http://legacy.test", Path = "lovelace/0" };
-        var sut = CreateSut();
-
-        sut.Resolve(dashboard).Error.Should().Contain("Select a Home Assistant connection");
-        sut.ResolveUri(dashboard).IsSuccess.Should().BeTrue();
     }
 }

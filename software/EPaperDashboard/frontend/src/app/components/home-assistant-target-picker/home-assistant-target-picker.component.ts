@@ -2,7 +2,6 @@ import { Component, EventEmitter, HostListener, Input, OnInit, Output, ViewChild
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { Observable } from 'rxjs';
 import { DataProviderService, ProviderConnection } from '../../services/data-provider.service';
 import { HomeAssistantService } from '../../services/home-assistant.service';
 import { DashboardSelectorDialogComponent } from '../dashboard-selector-dialog/dashboard-selector-dialog.component';
@@ -11,7 +10,7 @@ export const HOME_ASSISTANT_PLUGIN_ID = 'home-assistant';
 
 /**
  * Picks the Home Assistant page rendered by "Home Assistant dashboard" mode: a named connection from
- * Connections (or, when allowed, the dashboard's own host/token settings) and a dashboard path.
+ * Connections and a dashboard path.
  * The connection list reloads when the window regains focus, so connections added in another tab appear here.
  */
 @Component({
@@ -24,9 +23,7 @@ export const HOME_ASSISTANT_PLUGIN_ID = 'home-assistant';
       <label class="form-label fw-semibold" for="haConnection">Home Assistant connection</label>
       <div class="input-group">
         <select id="haConnection" class="form-select" [ngModel]="connectionId" (ngModelChange)="selectConnection($event)" [disabled]="disabled">
-          @if (allowDashboardSettings) {
-            <option value="">{{ dashboardSettingsLabel }}</option>
-          } @else if (!connectionId) {
+          @if (!connectionId) {
             <option value="" disabled>{{ loading() ? 'Loading connections…' : 'Select a connection' }}</option>
           }
           @for (connection of connections(); track connection.id) {
@@ -50,9 +47,9 @@ export const HOME_ASSISTANT_PLUGIN_ID = 'home-assistant';
         <div class="alert alert-warning small mt-2 mb-0" role="alert">
           This connection has no access token yet. <a routerLink="/connections" target="_blank" rel="noopener" class="alert-link">Sign in or add a token</a>, then come back to this tab.
         </div>
-      } @else if (!loading() && connections().length === 0 && !allowDashboardSettings) {
+      } @else if (!loading() && connections().length === 0) {
         <div class="alert alert-info small mt-2 mb-0" role="status">
-          No Home Assistant connection yet. <a routerLink="/connections" target="_blank" rel="noopener" class="alert-link">Add one</a>, then come back to this tab.
+          Rendering needs a Home Assistant connection with a long-lived access token. <a routerLink="/connections" target="_blank" rel="noopener" class="alert-link">Add one</a>, then come back to this tab.
         </div>
       }
     </div>
@@ -78,12 +75,6 @@ export class HomeAssistantTargetPickerComponent implements OnInit {
   @Input() connectionId = '';
   @Input() path = '';
   @Input() disabled = false;
-  /** Offers the dashboard's own host/token settings as the empty option (existing dashboards). */
-  @Input() allowDashboardSettings = false;
-  @Input() dashboardSettingsLabel = 'Dashboard settings (host and token)';
-  /** Dashboard whose saved host/token are browsed when no connection is selected. */
-  @Input() dashboardId: string | null = null;
-  @Input() dashboardSettingsReady = false;
   /** Selects the first connection when nothing is selected yet. */
   @Input() autoSelect = false;
   @Output() readonly connectionIdChange = new EventEmitter<string>();
@@ -100,7 +91,8 @@ export class HomeAssistantTargetPickerComponent implements OnInit {
     this.loading.set(true);
     this.providers.connections().subscribe({
       next: connections => {
-        this.connections.set(connections.filter(c => c.pluginId === HOME_ASSISTANT_PLUGIN_ID));
+        // The add-on's default connection has no long-lived token, so it cannot render dashboards.
+        this.connections.set(connections.filter(c => c.pluginId === HOME_ASSISTANT_PLUGIN_ID && !c.isDefault));
         this.loading.set(false);
         this.loaded.set(true);
         // Prefer a connection that can already render; one that still needs sign-in is the fallback.
@@ -134,17 +126,13 @@ export class HomeAssistantTargetPickerComponent implements OnInit {
   }
 
   canBrowse(): boolean {
-    if (this.connectionId) return this.isSelectedReady();
-    return this.allowDashboardSettings && !!this.dashboardId && this.dashboardSettingsReady;
+    return !!this.connectionId && this.isSelectedReady();
   }
 
   browse(): void {
-    const source: Observable<any[]> | null = this.connectionId
-      ? this.homeAssistant.getConnectionDashboards(this.connectionId)
-      : this.dashboardId ? this.homeAssistant.getDashboards(this.dashboardId) : null;
-    if (!source) return;
+    if (!this.canBrowse()) return;
     this.selector.openWithLoading();
-    source.subscribe({
+    this.homeAssistant.getConnectionDashboards(this.connectionId).subscribe({
       next: dashboards => {
         this.selector.open(dashboards.map(item => ({ url_path: item.id, title: item.title, id: item.id })))
           .then(selected => { if (selected) { this.path = selected; this.pathChange.emit(selected); } });

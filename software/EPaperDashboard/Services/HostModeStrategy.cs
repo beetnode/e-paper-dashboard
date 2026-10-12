@@ -9,39 +9,24 @@ public class HostModeStrategy : IDeploymentStrategy
 {
     private readonly ILogger<HostModeStrategy> _logger;
     private readonly IEnvironmentConfiguration _environmentConfiguration;
-    private readonly string _homeAssistantHost;
 
     public HostModeStrategy(ILogger<HostModeStrategy> logger, IEnvironmentConfiguration environmentConfiguration)
     {
         _logger = logger;
         _environmentConfiguration = environmentConfiguration;
-        _homeAssistantHost = environmentConfiguration.HomeAssistantHost
-            ?? Constants.HomeAssistantCoreUrl;
     }
 
     public DeploymentMode Mode => DeploymentMode.Host;
 
     public bool IsUserManagementEnabled => true;
 
-    public bool IsAutoConnected => false;
-
-    public string WebSocketPath => "/api/websocket";
+    public HomeAssistantEndpoint? DefaultHomeAssistant => null;
 
     public string GetConfigDirectory() => _environmentConfiguration.ConfigDir;
 
     public Uri? GetOAuthClientUri(HttpContext? context = null)
     {
         return _environmentConfiguration.ClientUri;
-    }
-
-    public Task<string?> CreateAccessTokenAsync(string clientName)
-    {
-        return Task.FromResult<string?>(null);
-    }
-
-    public (string host, string token) GetHomeAssistantConnection(Dashboard dashboard)
-    {
-        return (_homeAssistantHost, dashboard.AccessToken!);
     }
 
     public UnitResult<string> ValidateConfiguration()

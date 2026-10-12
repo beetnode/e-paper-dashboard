@@ -19,9 +19,9 @@ public class HomeAssistantService(
     private readonly ILogger<HomeAssistantService> _logger = logger;
     private readonly HomeAssistantConnectionService _connection = connection;
 
-    public async Task<Result<List<HassUrlInfo>, string>> FetchDashboards(HomeAssistantScope scope)
+    public async Task<Result<List<HassUrlInfo>, string>> FetchDashboards(ProviderConnection homeAssistant)
     {
-        var connectionInfo = _connection.GetConnectionInfo(scope);
+        var connectionInfo = _connection.GetConnectionInfo(homeAssistant);
         if (connectionInfo.IsFailure)
             return connectionInfo.Error;
 
@@ -45,9 +45,9 @@ public class HomeAssistantService(
         }
     }
 
-    public async Task<Result<List<HassEntity>, string>> FetchEntities(HomeAssistantScope scope, CancellationToken cancellationToken = default)
+    public async Task<Result<List<HassEntity>, string>> FetchEntities(ProviderConnection homeAssistant, CancellationToken cancellationToken = default)
     {
-        var connectionInfo = _connection.GetConnectionInfo(scope);
+        var connectionInfo = _connection.GetConnectionInfo(homeAssistant);
         if (connectionInfo.IsFailure)
             return connectionInfo.Error;
 
@@ -152,15 +152,13 @@ public class HomeAssistantService(
 
     public async Task<Result<bool, string>> SendNotification(Dashboard dashboard, string message, string title = "EPaper Dashboard")
     {
-        // Dashboards rendering a named connection notify that Home Assistant instance.
-        HomeAssistantScope scope = new HomeAssistantScope.DashboardSettings(dashboard.Id.ToString());
-        if (!string.IsNullOrEmpty(dashboard.HomeAssistantConnectionId))
+        // Dashboards rendering a named connection notify that Home Assistant instance, others the add-on's.
+        var connection = _connection.ResolveConnection(dashboard, dashboard.HomeAssistantConnectionId);
+        if (connection.IsFailure)
         {
-            var connection = _connection.FindConnection(dashboard.HomeAssistantConnectionId, dashboard.UserId);
-            if (connection is null) return "The dashboard's Home Assistant connection is unavailable.";
-            scope = new HomeAssistantScope.Connection(connection);
+            return connection.Error;
         }
-        var connectionInfo = _connection.GetConnectionInfo(scope);
+        var connectionInfo = _connection.GetConnectionInfo(connection.Value);
         if (connectionInfo.IsFailure)
         {
             return connectionInfo.Error;

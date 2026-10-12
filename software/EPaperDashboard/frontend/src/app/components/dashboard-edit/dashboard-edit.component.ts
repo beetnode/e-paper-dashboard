@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy, signal, computed, ChangeDetectorRef, ViewChild, HostListener } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, signal, ChangeDetectorRef, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -6,7 +6,6 @@ import { HttpClient } from '@angular/common/http';
 import { DashboardService } from '../../services/dashboard.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
-import { DialogService } from '../../services/dialog.service';
 import { DeviceService, Device } from '../../services/device.service';
 import { AiService } from '../../services/ai.service';
 import { Dashboard, DashboardOrientation, DashboardSizePreset, DASHBOARD_SIZE_PRESETS, DEFAULT_DASHBOARD_SIZE, AiConfig, AiConnectionMode, ConversationAgent } from '../../models/types';
@@ -99,12 +98,6 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
         </div>
 
         <div class="app-section-grid">
-          @if (dashboard()!.hasLegacyConnection) {
-            <div class="app-section-grid-full">
-              <ng-container *ngTemplateOutlet="legacySettingsNotice" />
-            </div>
-          }
-
           <div class="app-section-stack">
             <section class="app-section-card" aria-labelledby="generalSettingsTitle">
               <h2 id="generalSettingsTitle" class="app-section-title mb-3">General</h2>
@@ -158,11 +151,7 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
                   [connectionId]="dashboardForm.controls.homeAssistantConnectionId.value"
                   (connectionIdChange)="onHomeAssistantConnectionChange($event)"
                   [path]="dashboardForm.controls.path.value"
-                  (pathChange)="onHomeAssistantPathChange($event)"
-                  [allowDashboardSettings]="!!dashboard()!.hasLegacyConnection"
-                  dashboardSettingsLabel="Legacy dashboard settings"
-                  [dashboardId]="dashboard()!.id"
-                  [dashboardSettingsReady]="dashboardSettingsReady()" />
+                  (pathChange)="onHomeAssistantPathChange($event)" />
               </section>
             } @else {
               <ng-container *ngTemplateOutlet="scheduleSection" />
@@ -220,8 +209,6 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
                         [ngModelOptions]="{standalone: true}">
                         @if (isAddonMode()) {
                           <option value="">Home Assistant add-on</option>
-                        } @else if (dashboard()!.hasLegacyConnection) {
-                          <option value="">Legacy dashboard settings</option>
                         } @else {
                           <option value="" disabled>Select a connection</option>
                         }
@@ -286,27 +273,6 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
           </section>
         </ng-template>
 
-        <ng-template #legacySettingsNotice>
-          <div class="alert alert-secondary small mb-0" role="status">
-            <strong>Legacy Home Assistant settings.</strong>
-            @if (previewModeValue === 'homeassistant') {
-              @if (dashboardForm.controls.homeAssistantConnectionId.value) {
-                This dashboard no longer uses them. Remove them once you no longer need to switch back.
-              } @else {
-                This dashboard still renders with its retired host and token. Select a connection below to replace them.
-              }
-            } @else {
-              Widgets created before connections may still read data through them. Reselect their sources from a connection, then remove these settings.
-            }
-            <a routerLink="/connections" target="_blank" rel="noopener" class="alert-link">Manage connections</a>
-            <div class="mt-2">
-              <button type="button" class="btn btn-sm btn-outline-danger" (click)="clearLegacySettings()" [disabled]="isSaving()">
-                <i class="fa-solid fa-trash" aria-hidden="true"></i> Remove legacy settings
-              </button>
-            </div>
-          </div>
-        </ng-template>
-
       </form>
 
       <!-- Preview Modal -->
@@ -332,12 +298,10 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
   private readonly http = inject(HttpClient);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly toastService = inject(ToastService);
-  private readonly dialogService = inject(DialogService);
   private readonly playwrightComponentService = inject(PlaywrightComponentService);
   private readonly dataProviderService = inject(DataProviderService);
 
   readonly isAddonMode = this.authService.isAddonMode;
-  readonly hideHostField = computed(() => this.isAddonMode() || this.authService.isHostMode());
 
   readonly dashboard = signal<Dashboard | null>(null);
   readonly isLoading = signal(false);
@@ -394,7 +358,8 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
 
   private loadHomeAssistantConnections(): void {
     this.dataProviderService.connections().subscribe({
-      next: connections => this.homeAssistantConnections.set(connections.filter(c => c.pluginId === HOME_ASSISTANT_PLUGIN_ID)),
+      // The add-on's default connection is the empty "Home Assistant add-on" option.
+      next: connections => this.homeAssistantConnections.set(connections.filter(c => c.pluginId === HOME_ASSISTANT_PLUGIN_ID && !c.isDefault)),
       error: () => this.homeAssistantConnections.set([]),
     });
   }
@@ -520,7 +485,7 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
       description: formValue.description?.trim() || undefined,
       path: formValue.path?.trim() || undefined,
       updateTimes: this.updateTimes().length > 0 ? this.updateTimes() : undefined,
-      // Only Home Assistant mode edits the connection; an empty value selects the dashboard settings.
+      // Only Home Assistant mode edits the connection.
       ...(this.previewModeValue === 'homeassistant' ? { homeAssistantConnectionId: formValue.homeAssistantConnectionId } : {}),
       orientation: this.orientationValue,
       screenWidth: selectedSize.width,
@@ -603,30 +568,6 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
     }
   }
 
-  async clearLegacySettings(): Promise<void> {
-    const currentDashboard = this.dashboard();
-    if (!currentDashboard) return;
-    const stillRendering = this.previewModeValue === 'homeassistant' && !this.dashboardForm.controls.homeAssistantConnectionId.value;
-    await this.dialogService.confirm({
-      title: 'Remove legacy settings',
-      message: stillRendering
-        ? 'This dashboard still renders with these settings. After removing them it cannot render until you select a connection. Remove them?'
-        : 'Remove the retired Home Assistant host and token from this dashboard? Widgets that still read data through them will show unavailable data.',
-      confirmLabel: 'Remove',
-      isDangerous: true,
-      onConfirm: () => {
-        this.dashboardService.updateDashboard(currentDashboard.id, { clearAccessToken: true }).subscribe({
-          next: updated => {
-            this.dashboard.set(updated);
-            this.originalDashboard = JSON.parse(JSON.stringify(updated));
-            this.toastService.success('Legacy settings removed.');
-          },
-          error: error => this.toastService.httpError(error, 'Could not remove the legacy settings.'),
-        });
-      }
-    });
-  }
-
   onOrientationChange(): void {
     this.dashboardForm.markAsDirty();
   }
@@ -639,9 +580,9 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
     this.aiConfig.update(c => ({ ...c, connectionMode: mode }));
     this.dashboardForm.markAsDirty();
     if (mode === 'HomeAssistant') {
-      // Without the add-on or legacy settings, a named connection is required; start with a signed-in one.
+      // Outside the add-on, a named connection is required; start with a signed-in one.
       const currentDashboard = this.dashboard();
-      if (!this.aiConfig().homeAssistantConnectionId && !this.isAddonMode() && !currentDashboard?.hasLegacyConnection) {
+      if (!this.aiConfig().homeAssistantConnectionId && !this.isAddonMode()) {
         const connection = this.homeAssistantConnections().find(c => c.connected);
         if (connection) this.aiConfig.update(c => ({ ...c, homeAssistantConnectionId: connection.id }));
       }
@@ -683,17 +624,7 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
     if (mode === 'ssr') {
       return !this.dashboard()?.layoutConfig;
     }
-    if (!this.dashboardForm.controls.path.value) {
-      return true;
-    }
-    return !this.dashboardForm.controls.homeAssistantConnectionId.value && !this.dashboardSettingsReady();
-  }
-
-  /** Whether the dashboard's retired host/token settings can still reach Home Assistant. */
-  dashboardSettingsReady(): boolean {
-    const dashboard = this.dashboard();
-    // The add-on and host modes manage the host; Home Assistant rendering still needs a long-lived token.
-    return !!dashboard?.hasLegacyConnection && dashboard.hasAccessToken && (this.hideHostField() || !!dashboard.host);
+    return !this.dashboardForm.controls.path.value || !this.dashboardForm.controls.homeAssistantConnectionId.value;
   }
 
   onHomeAssistantConnectionChange(connectionId: string): void {

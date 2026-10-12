@@ -1,3 +1,4 @@
+using EPaperDashboard.Models;
 using System.Text.Json;
 using CSharpFunctionalExtensions;
 
@@ -16,9 +17,9 @@ public class HomeAssistantEntityHistoryProvider(
     private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
     private readonly ILogger<HomeAssistantEntityHistoryProvider> _logger = logger;
 
-    public async Task<Result<Dictionary<string, List<HistoryState>>, string>> FetchEntityHistoryAsync(HomeAssistantScope scope, IEnumerable<string> entityIds, int hours = 24, CancellationToken cancellationToken = default)
+    public async Task<Result<Dictionary<string, List<HistoryState>>, string>> FetchEntityHistoryAsync(ProviderConnection homeAssistant, IEnumerable<string> entityIds, int hours = 24, CancellationToken cancellationToken = default)
     {
-        var connectionInfo = _connection.GetConnectionInfo(scope);
+        var connectionInfo = _connection.GetConnectionInfo(homeAssistant);
         if (connectionInfo.IsFailure)
             return connectionInfo.Error;
 

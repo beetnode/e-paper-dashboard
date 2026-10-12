@@ -9,4 +9,6 @@ internal sealed class ImmediateUnitOfWork : IUnitOfWork
     private ImmediateUnitOfWork() { }
 
     public T Execute<T>(Func<T> operation) => operation();
+
+    public T ExecuteExclusive<T>(string lockName, Func<T> operation) => operation();
 }

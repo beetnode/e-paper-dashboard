@@ -35,6 +35,17 @@ describe('home assistant target picker', () => {
     expect(options).not.toContain('Google');
   });
 
+  it('leaves out the add-on default connection, which cannot render dashboards', () => {
+    const selected: string[] = [];
+    const addon = { ...homeAssistant, id: 'addon', name: 'Home Assistant add-on', isDefault: true };
+    const fixture = create(picker => { picker.autoSelect = true; picker.connectionIdChange.subscribe(id => selected.push(id)); });
+    http.expectOne('/api/providers/connections').flush({ data: [addon] });
+    fixture.detectChanges();
+    expect(fixture.componentInstance.connections()).toEqual([]);
+    expect(selected).toEqual([]);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('long-lived access token');
+  });
+
   it('picks up a connection added in another tab when the window regains focus', () => {
     const selected: string[] = [];
     const fixture = create(picker => { picker.autoSelect = true; picker.connectionIdChange.subscribe(id => selected.push(id)); });
@@ -62,15 +73,5 @@ describe('home assistant target picker', () => {
     fixture.detectChanges();
     fixture.componentInstance.browse();
     http.expectOne('/api/homeassistant/connections/ha-1/dashboards').flush({ data: [{ id: 'lovelace/0', title: 'Overview' }] });
-  });
-
-  it('browses the dashboard settings only when they are ready', () => {
-    const fixture = create(picker => { picker.allowDashboardSettings = true; picker.dashboardId = 'd-1'; });
-    http.expectOne('/api/providers/connections').flush({ data: [] });
-    expect(fixture.componentInstance.canBrowse()).toBe(false);
-    fixture.componentInstance.dashboardSettingsReady = true;
-    expect(fixture.componentInstance.canBrowse()).toBe(true);
-    fixture.componentInstance.browse();
-    http.expectOne('/api/dashboards/d-1/homeassistant/dashboards').flush({ data: [] });
   });
 });

@@ -53,6 +53,22 @@ describe('provider connections', () => {
     await fixture.whenStable();
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Sign in to Google Calendar & Tasks');
   });
+  it('shows the built-in add-on connection without edit, remove or sign-in actions', async () => {
+    const fixture = TestBed.createComponent(ProviderConnectionsComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/providers').flush({ data: plugins });
+    http.expectOne('/api/providers/connections').flush({ data: [
+      { id: 'addon', name: 'Home Assistant add-on', pluginId: 'home-assistant', connected: true, isDefault: true, credentials: {} },
+    ] });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.textContent).toContain('Built-in');
+    expect(element.querySelector('[aria-label="Remove Home Assistant add-on"]')).toBeNull();
+    expect(element.querySelector('[aria-label="Edit Home Assistant add-on"]')).toBeNull();
+    expect(element.textContent).not.toContain('Sign in to Home Assistant');
+    expect(element.querySelector('[aria-label="Test Home Assistant add-on"]')).not.toBeNull();
+  });
   it('creates a named connection using the entered credentials', () => {
     const success = vi.spyOn(TestBed.inject(ToastService), 'success');
     const fixture = create(); const component = fixture.componentInstance; component.startAdd();

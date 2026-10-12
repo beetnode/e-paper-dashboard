@@ -49,7 +49,7 @@ public sealed class AiServiceFactory(
             return "A dashboard with Home Assistant connection is required for HA AI mode";
         }
 
-        var connectionInfo = homeAssistantConnectionService.ResolveScope(dashboardId, aiConfig.HomeAssistantConnectionId)
+        var connectionInfo = homeAssistantConnectionService.ResolveConnection(dashboardId, aiConfig.HomeAssistantConnectionId)
             .Bind(homeAssistantConnectionService.GetConnectionInfo);
         if (connectionInfo.IsFailure)
         {

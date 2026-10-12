@@ -28,7 +28,6 @@ public sealed class ProviderPluginTests : IDisposable
     private readonly LiteDbDashboardRepository dashboards;
     private readonly Dashboard dashboard = new() { Id = DashboardId.New(), UserId = UserId.New() };
     private readonly FakePlugin plugin = new("example");
-    private readonly FakeDashboardPlugin legacy = new("dashboard-provider");
     private readonly FakeOAuthPlugin oauthPlugin = new("signin");
     private readonly PluginDataRouter router;
 
@@ -43,7 +42,7 @@ public sealed class ProviderPluginTests : IDisposable
         dashboards = new(db);
         dashboards.Insert(dashboard);
         new LiteDbUserRepository(db).Insert(new User { Id = dashboard.UserId, Username = "owner" });
-        router = new(new DashboardService(dashboards), connections, new ProviderRegistry([plugin, legacy, oauthPlugin]),
+        router = new(new DashboardService(dashboards), connections, new ProviderRegistry([plugin, oauthPlugin]),
             NullLogger<PluginDataRouter>.Instance);
     }
 
@@ -96,31 +95,20 @@ public sealed class ProviderPluginTests : IDisposable
             result.IsSuccess.Should().BeTrue();
             result.Value.Single().Summary.Should().Be(source.ConnectionName);
         }
-        plugin.Fetches.Select(f => f.Connection!.Id).Should().BeEquivalentTo([a.Id, b.Id]);
-    }
-
-    [Fact]
-    public async Task LegacySourcesKeepTheirDashboardConnection()
-    {
-        var result = await router.FetchCalendarEventsAsync(dashboard.Id.Value, "calendar.home");
-        result.IsSuccess.Should().BeTrue();
-        legacy.Fetches.Should().ContainSingle().Which.Connection.Should().BeNull();
-        legacy.Fetches[0].DashboardId.Should().Be(dashboard.Id.Value);
-        plugin.Fetches.Should().BeEmpty();
+        plugin.Fetches.Select(f => f.Connection.Id).Should().BeEquivalentTo([a.Id, b.Id]);
     }
 
     [Theory]
     [InlineData("source:invalid:YWJj")]
     [InlineData("source:00000000000000000000000000000000:%%%")]
     [InlineData("source:00000000000000000000000000000000:")]
-    public async Task MalformedSourceReferencesFailWithoutFallingBackToHomeAssistant(string value)
+    public async Task MalformedSourceReferencesFailWithoutFallingBackToTheDefaultConnection(string value)
     {
         var result = await router.FetchCalendarEventsAsync(dashboard.Id.Value, value);
         result.IsFailure.Should().BeTrue();
-        legacy.Fetches.Should().BeEmpty();
         var states = await router.FetchEntityStatesAsync(dashboard.Id.Value, [value]);
         states.IsFailure.Should().BeTrue();
-        legacy.Fetches.Should().BeEmpty();
+        plugin.Fetches.Should().BeEmpty();
     }
 
     [Fact]
@@ -161,7 +149,7 @@ public sealed class ProviderPluginTests : IDisposable
     public async Task BespokePluginWidgetUsesAuthorizedCachedDataAndInvalidatesOnDelete()
     {
         var connection = Add();
-        var registry = new ProviderRegistry([plugin, legacy]);
+        var registry = new ProviderRegistry([plugin]);
         var sut = new SsrDataProvider(router, router, router, router, router, Mock.Of<IAiContentProvider>(),
             new MemoryCache(new MemoryCacheOptions()), TimeProvider.System, NullLogger<SsrDataProvider>.Instance, router, registry);
         var layout = new EPaperDashboard.Models.Rendering.LayoutConfig(100, 100, 1, 1, null!,
@@ -182,14 +170,16 @@ public sealed class ProviderPluginTests : IDisposable
     [Fact]
     public async Task PluginSpecificRequestsCannotBeRedirectedToAnotherPlugin()
     {
-        var result = await router.FetchAsync(dashboard.Id.Value, new("custom", "sensor.legacy"), default, "example");
-        result.IsFailure.Should().BeTrue();
-        legacy.Fetches.Should().BeEmpty();
+        var store = new ProviderConnectionStore(repository, new EphemeralDataProtectionProvider(), new FixedDefaultConnection("signin"));
+        var sut = new PluginDataRouter(new DashboardService(dashboards), store, new ProviderRegistry([plugin, oauthPlugin]), NullLogger<PluginDataRouter>.Instance);
+        var result = await sut.FetchAsync(dashboard.Id.Value, new("custom", "sensor.default"), default, "example");
+        result.Error.Should().Contain("its own plugin");
+        oauthPlugin.Fetches.Should().BeEmpty();
     }
 
-    private ProviderConnectionsController Controller()
+    private ProviderConnectionsController Controller(ProviderConnectionStore? store = null)
     {
-        var controller = new ProviderConnectionsController(new ProviderRegistry([plugin, legacy, oauthPlugin]), connections,
+        var controller = new ProviderConnectionsController(new ProviderRegistry([plugin, oauthPlugin]), store ?? connections,
             new UserService(new LiteDbUserRepository(db), dashboards, repository));
         controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext
         {
@@ -226,45 +216,49 @@ public sealed class ProviderPluginTests : IDisposable
     }
 
     [Fact]
-    public async Task DashboardConnectionIsDiscoveredOnlyWhenThePluginReportsIt()
+    public async Task BareSourceIdsUseTheDefaultConnection()
     {
-        (await router.DiscoverAsync(dashboard.Id.Value, default)).Sources.Should().BeEmpty();
-        dashboard.AccessToken = "dashboard-token";
-        dashboards.Update(dashboard);
-        var discovery = await router.DiscoverAsync(dashboard.Id.Value, default);
-        var source = discovery.Sources.Should().ContainSingle().Subject;
+        var store = new ProviderConnectionStore(repository, new EphemeralDataProtectionProvider(), new FixedDefaultConnection("example"));
+        var sut = new PluginDataRouter(new DashboardService(dashboards), store, new ProviderRegistry([plugin]), NullLogger<PluginDataRouter>.Instance);
+
+        var source = (await sut.DiscoverAsync(dashboard.Id.Value, default)).Sources.Should().ContainSingle().Subject;
         source.EntityId.Should().Be("calendar/primary");
-        source.PluginId.Should().Be("dashboard-provider");
-        source.ConnectionId.Should().BeNull();
-        source.ConnectionName.Should().Be("Dashboard dashboard-provider");
+        source.ConnectionId.Should().Be(FixedDefaultConnection.Id);
+        source.ConnectionName.Should().Be("Built-in");
+
+        (await sut.FetchCalendarEventsAsync(dashboard.Id.Value, "calendar.home")).Value.Single().Summary.Should().Be("Built-in");
+        (await sut.FetchEntityStatesAsync(dashboard.Id.Value, ["sensor.home"])).IsSuccess.Should().BeTrue();
+        plugin.Fetches.Should().HaveCount(2).And.OnlyContain(f => f.Connection.Id == FixedDefaultConnection.Id);
     }
 
     [Fact]
-    public void CacheVersionChangesWhenTheDashboardConnectionChanges()
+    public void DefaultConnectionIsListedButCannotBeChangedOrRemoved()
     {
-        var initial = router.CacheVersion(dashboard.Id.Value);
-        dashboard.AccessToken = "rotated";
-        dashboards.Update(dashboard);
-        router.CacheVersion(dashboard.Id.Value).Should().NotBe(initial);
+        var store = new ProviderConnectionStore(repository, new EphemeralDataProtectionProvider(), new FixedDefaultConnection("signin"));
+        var controller = Controller(store);
+
+        var listed = JsonSerializer.Serialize(((OkObjectResult)controller.List()).Value);
+        listed.Should().Contain(FixedDefaultConnection.Id).And.Contain("\"isDefault\":true").And.Contain("\"connected\":true");
+        controller.Update(FixedDefaultConnection.Id, new("signin", "Renamed", [])).Should().BeOfType<BadRequestObjectResult>();
+        controller.Delete(FixedDefaultConnection.Id).Should().BeOfType<BadRequestObjectResult>();
+        controller.Authorize(FixedDefaultConnection.Id).Should().BeOfType<BadRequestObjectResult>();
+        store.Find(FixedDefaultConnection.Id, dashboard.UserId).Should().NotBeNull();
+        store.Credentials(store.DefaultConnection(dashboard.UserId)!).Should().BeEmpty();
     }
 
     [Fact]
-    public async Task BareSourceIdsFailWithoutADashboardConnectionPlugin()
+    public async Task BareSourceIdsFailWithoutADefaultConnection()
     {
-        var sut = new PluginDataRouter(new DashboardService(dashboards), connections, new ProviderRegistry([plugin]), NullLogger<PluginDataRouter>.Instance);
-        (await sut.FetchCalendarEventsAsync(dashboard.Id.Value, "calendar.home")).IsFailure.Should().BeTrue();
-        (await sut.FetchEntityStatesAsync(dashboard.Id.Value, ["sensor.home"])).IsFailure.Should().BeTrue();
+        (await router.FetchCalendarEventsAsync(dashboard.Id.Value, "calendar.home")).IsFailure.Should().BeTrue();
+        (await router.FetchEntityStatesAsync(dashboard.Id.Value, ["sensor.home"])).IsFailure.Should().BeTrue();
         plugin.Fetches.Should().BeEmpty();
     }
 
     [Fact]
-    public void RegistryRejectsAmbiguousDashboardConnectionsAndInconsistentOAuthManifests()
+    public void RegistryRejectsInconsistentOAuthManifests()
     {
-        var twoDashboardPlugins = () => new ProviderRegistry([legacy, new FakeDashboardPlugin("other")]);
-        twoDashboardPlugins.Should().Throw<InvalidOperationException>();
         var oauthWithoutContract = () => new ProviderRegistry([new FakePlugin("plain", requiresOAuth: true)]);
         oauthWithoutContract.Should().Throw<InvalidOperationException>();
-        new ProviderRegistry([plugin, legacy]).DashboardConnectionPlugin.Should().BeSameAs(legacy);
     }
 
     [Fact]
@@ -368,15 +362,14 @@ public sealed class ProviderPluginTests : IDisposable
         public Task<Result<SourceData, string>> FetchAsync(ProviderContext context, SourceQuery query, CancellationToken cancellationToken)
         {
             Fetches.Add(context);
-            return Task.FromResult(Result.Success<SourceData, string>(new() { CalendarEvents = [new() { Summary = context.Connection?.Name ?? "Legacy" }], Custom = JsonSerializer.SerializeToElement(new { name = context.Connection?.Name }) }));
+            return Task.FromResult(Result.Success<SourceData, string>(new() { CalendarEvents = [new() { Summary = context.Connection.Name }], Custom = JsonSerializer.SerializeToElement(new { name = context.Connection.Name }) }));
         }
     }
 
-    private sealed class FakeDashboardPlugin(string id) : FakePlugin(id), IDashboardConnectionPlugin
+    private sealed class FixedDefaultConnection(string pluginId) : IDefaultConnectionSource
     {
-        public string DashboardConnectionName => "Dashboard " + id;
-        public bool HasDashboardConnection(Dashboard dashboard) => !string.IsNullOrEmpty(dashboard.AccessToken);
-        public string DashboardConnectionVersion(Dashboard dashboard) => dashboard.AccessToken ?? "";
+        public const string Id = "0000000000000000000000000000def0";
+        public ProviderConnection? DefaultConnection(UserId owner) => new() { Id = Id, UserId = owner, PluginId = pluginId, Name = "Built-in" };
     }
 
     private sealed class FakeOAuthPlugin(string id) : FakePlugin(id, requiresOAuth: true, tokenField: true), IOAuthDataProviderPlugin

@@ -15,6 +15,8 @@ public static class HomeAssistantModule
         services.AddSingleton<HomeAssistantEntityHistoryProvider>();
         services.AddSingleton<HomeAssistantRssFeedDataProvider>();
         services.AddSingleton<HomeAssistantDashboardTargetResolver>();
+        services.AddSingleton<IDefaultConnectionSource, HomeAssistantAddonConnection>();
+        services.AddSingleton<LegacyHomeAssistantSettingsMigration>();
         services.AddSingleton<IDataProviderPlugin, HomeAssistantPlugin>();
         return services;
     }

@@ -303,8 +303,8 @@ public sealed class AiApiController(
         }
 
         // The query names the connection being chosen; otherwise use the one already saved for this dashboard.
-        var scope = homeAssistantConnectionService.ResolveScope(dashboardId, connectionId ?? dashboard.AiConfig?.HomeAssistantConnectionId);
-        var connectionInfo = scope.Bind(homeAssistantConnectionService.GetConnectionInfo);
+        var connection = homeAssistantConnectionService.ResolveConnection(dashboard, connectionId ?? dashboard.AiConfig?.HomeAssistantConnectionId);
+        var connectionInfo = connection.Bind(homeAssistantConnectionService.GetConnectionInfo);
         if (connectionInfo.IsFailure)
         {
             return BadRequest("Select a Home Assistant connection that is signed in to list its conversation agents.");
@@ -312,7 +312,7 @@ public sealed class AiApiController(
 
         try
         {
-            using var ws = await homeAssistantConnectionService.ConnectAsync(scope.Value);
+            using var ws = await homeAssistantConnectionService.ConnectAsync(connection.Value);
 
             var message = new Dictionary<string, object>
             {
