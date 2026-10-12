@@ -2,7 +2,7 @@
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble AS base
 LABEL org.opencontainers.image.licenses="AGPL-3.0-or-later" \
-  org.opencontainers.image.source="https://github.com/izdev-digital/e-paper-dashboard" \
+  org.opencontainers.image.source="https://github.com/beetnode/izBoard" \
   org.opencontainers.image.title="izBoard" \
   org.opencontainers.image.description="Application for managing the dashboards for e-paper display"
 RUN apt-get update && apt-get install -y --no-install-recommends \

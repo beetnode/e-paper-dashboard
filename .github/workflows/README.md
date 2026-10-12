@@ -47,7 +47,7 @@ Pull request builds count the temporary merge commit GitHub creates for the PR, 
 ## Usage
 
 ### Download Artifacts
-- **Releases**: [github.com/beetnode/e-paper-dashboard/releases](https://github.com/beetnode/e-paper-dashboard/releases)
+- **Releases**: [github.com/beetnode/izBoard/releases](https://github.com/beetnode/izBoard/releases)
 - **Actions runs**: Actions tab → Select workflow run → Artifacts
 
 ### Docker Images

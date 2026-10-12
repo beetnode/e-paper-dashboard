@@ -13,7 +13,7 @@ public sealed class PlaywrightComponentManager : BackgroundService
     private const int ManifestSchemaVersion = 2;
     private const long MaximumComponentBytes = 1_500_000_000;
     private const long MaximumExtractedBytes = 3_000_000_000;
-    private const string DefaultRepository = "beetnode/e-paper-dashboard";
+    private const string DefaultRepository = "beetnode/izBoard";
     private static readonly TimeSpan UpdateRetryInterval = TimeSpan.FromMinutes(15);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 

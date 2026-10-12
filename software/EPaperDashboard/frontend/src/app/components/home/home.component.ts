@@ -56,7 +56,7 @@ import { AuthService } from '../../services/auth.service';
           <a class="btn btn-primary btn-lg px-5 hero-btn-primary" routerLink="/dashboards">
             {{ isAuthenticated() ? 'Open dashboards' : 'Get started' }}
           </a>
-          <a class="btn btn-outline-primary btn-lg px-5 hero-btn-github" href="https://github.com/beetnode/e-paper-dashboard" target="_blank" rel="noopener noreferrer">
+          <a class="btn btn-outline-primary btn-lg px-5 hero-btn-github" href="https://github.com/beetnode/izBoard" target="_blank" rel="noopener noreferrer">
             GitHub
           </a>
         </div>
