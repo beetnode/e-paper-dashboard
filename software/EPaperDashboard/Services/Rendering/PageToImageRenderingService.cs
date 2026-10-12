@@ -70,11 +70,11 @@ internal sealed class PageToImageRenderingService(
         queueTimeout.CancelAfter(TimeSpan.FromSeconds(150));
         using var lease = await runtime.AcquireRenderAsync(queueTimeout.Token);
         var component = componentManager.GetActiveComponent();
+        // Installation is started only by opting in through Rendering settings, never by a render request.
         if (component is null)
-        {
-            componentManager.StartInstallation(onlyIfNeeded: true);
-            throw new RenderingRequestException("Rendering is being prepared on this server. Try again shortly or check Rendering settings.");
-        }
+            throw new RenderingRequestException(componentManager.GetStatus().State == PlaywrightComponentState.Installing
+                ? "Rendering is being prepared on this server. Try again shortly or check Rendering settings."
+                : "Rendering is not installed on this server. Enable rendering in Rendering settings.");
         var screenshot = await runtime.RunAsync(component, request, token);
         return imageFactory.Load(screenshot, new Size(request.Width, request.Height));
     }, cancellationToken);
