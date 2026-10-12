@@ -237,6 +237,10 @@ import { Dashboard } from '../../models/types';
                 </span>
                 @if (hasFirmwareUpdate(device)) {
                   <span class="app-status-chip app-status-chip-warning"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i>Update available</span>
+                } @else if (hasUndeliverableFirmwareUpdate(device)) {
+                  <span class="app-status-chip app-status-chip-muted" title="A newer firmware is released, but the server has no binary to send over the air yet.">
+                    <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>Update not deliverable
+                  </span>
                 }
               </div>
               <div class="app-list-item-meta">
@@ -322,6 +326,8 @@ import { Dashboard } from '../../models/types';
               }
               @if (!info.hasDownload) {
                 <div class="text-muted mt-1">No firmware binary is published for over-the-air updates yet.</div>
+              } @else if (!info.isUpdateAvailable) {
+                <div class="text-muted mt-1">The firmware binary is not downloaded to the server yet, so devices are not offered the update. Use “Check for updates” to retry.</div>
               }
             </div>
             @if (info.releaseNotes) {
@@ -482,7 +488,17 @@ export class DeviceListComponent implements OnDestroy {
     return Date.now() - new Date(device.lastSeenAt).getTime() < 30 * 60 * 1000;
   }
 
+  /** Newer firmware the server is actually offering to devices over the air. */
   hasFirmwareUpdate(device: Device): boolean {
+    return this.isBehindLatestRelease(device) && !!this.firmwareInfo()?.isUpdateAvailable;
+  }
+
+  /** Newer firmware is released, but the server has no binary to deliver yet. */
+  hasUndeliverableFirmwareUpdate(device: Device): boolean {
+    return this.isBehindLatestRelease(device) && !this.firmwareInfo()?.isUpdateAvailable;
+  }
+
+  private isBehindLatestRelease(device: Device): boolean {
     const latest = this.firmwareInfo()?.version;
     return !!device.firmwareVersion && !!latest && this.isVersionLower(device.firmwareVersion, latest);
   }
