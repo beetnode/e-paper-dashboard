@@ -1,0 +1,290 @@
+# Home Assistant themes for izBoard e-paper displays.
+#
+# The rendering component captures a dashboard and maps every pixel to the nearest display
+# color: pure black #000000, pure red #FF0000 or pure white #FFFFFF. Light tints vanish into
+# white and mid tones land on an unpredictable side, so these themes only use the three
+# palette colors.
+#
+# Colors are written as hex on purpose: Home Assistant only derives the matching `rgb-*`
+# variables (used for tinted backgrounds, tile icons, badges, ...) from hex values, not from
+# color names such as `red`.
+#
+# Variable names are checked against the Home Assistant frontend source (October 2026).
+# Cards do not all use the same tokens, so besides the base colors the theme also sets the
+# variables of common cards and the components they share. Values that a component sets on
+# its own element (for example the 20% tile icon background) cannot be changed by a theme.
+
+epaper-red-black-white:
+  # ---------------------------------------------------------------- cards
+  ha-card-background: "#FFFFFF"
+  ha-card-border-color: "#000000"
+  ha-card-border-width: "2px"
+  ha-card-border-radius: "8px"
+  ha-card-box-shadow: none
+  ha-card-header-color: "#000000"
+  divider-color: "#000000"
+  entities-divider-color: "#000000"
+  outline-color: "#000000"
+  outline-hover-color: "#000000"
+
+  # ---------------------------------------------------------------- shadows (render as grey smudges)
+  ha-box-shadow-s: none
+  ha-box-shadow-m: none
+  ha-box-shadow-l: none
+  shadow-color: transparent
+
+  # ---------------------------------------------------------------- heading card and badges
+  ha-heading-card-title-color: "#000000"
+  ha-heading-card-subtitle-color: "#000000"
+  ha-heading-badge-text-color: "#000000"
+  label-badge-background-color: "#FFFFFF"
+  label-badge-text-color: "#000000"
+  label-badge-red: "#FF0000"
+  label-badge-blue: "#000000"
+  label-badge-green: "#000000"
+  label-badge-yellow: "#FF0000"
+  label-badge-grey: "#000000"
+
+  # ---------------------------------------------------------------- icons
+  # icon-color applies to picture-elements icons, state-icon-color to inactive entity icons.
+  icon-color: "#FF0000"
+  state-icon-color: "#000000"
+  ha-icon-button-inactive-color: "#000000"
+  ha-icon-button-active-color: "#FF0000"
+
+  # ---------------------------------------------------------------- weather forecast card
+  weather-icon-cloud-back-color: "#000000"
+  weather-icon-cloud-front-color: "#FFFFFF"
+  weather-icon-sun-color: "#FF0000"
+  weather-icon-moon-color: "#000000"
+  weather-icon-rain-color: "#000000"
+  weather-icon-snow-color: "#FFFFFF"
+  weather-icon-snow-stroke-color: "#000000"
+
+  # ---------------------------------------------------------------- toggles (entities card, entity rows)
+  ha-switch-background-color: "#FFFFFF"
+  ha-switch-border-color: "#000000"
+  ha-switch-thumb-background-color: "#000000"
+  ha-switch-thumb-border-color: "#000000"
+  ha-switch-checked-background-color: "#FF0000"
+  ha-switch-checked-border-color: "#FF0000"
+  ha-switch-checked-thumb-background-color: "#FFFFFF"
+  ha-switch-checked-thumb-border-color: "#FFFFFF"
+  ha-switch-thumb-box-shadow: none
+
+  # ---------------------------------------------------------------- checkboxes (to-do list card)
+  ha-checkbox-border-color: "#000000"
+  ha-color-fill-primary-loud-resting: "#FF0000"
+  mdc-checkbox-unchecked-color: "#000000"
+  mdc-checkbox-disabled-color: "#000000"
+
+  # ---------------------------------------------------------------- newer components (badges, clock, buttons)
+  # These read the built-in blue/grey scale instead of primary-color, and its light steps
+  # (for example the clock card's second hand) would disappear into white.
+  ha-color-text-primary: "#000000"
+  ha-color-text-secondary: "#000000"
+  ha-color-text-disabled: "#000000"
+  ha-color-text-link: "#FF0000"
+  ha-color-border-neutral-quiet: "#000000"
+  ha-color-border-neutral-normal: "#000000"
+  ha-color-border-neutral-loud: "#000000"
+  ha-color-border-primary-normal: "#FF0000"
+  ha-color-border-primary-loud: "#FF0000"
+  ha-color-border-danger-normal: "#FF0000"
+  ha-color-border-danger-loud: "#FF0000"
+
+  # ---------------------------------------------------------------- markdown card
+  markdown-code-background-color: "#FFFFFF"
+  markdown-code-text-color: "#000000"
+  markdown-link-color: "#FF0000"
+  markdown-table-border-color: "#000000"
+
+  # ---------------------------------------------------------------- picture cards
+  # Text sits on a dark translucent bar over the image; white stays readable on it.
+  ha-picture-card-text-color: "#FFFFFF"
+
+  # ---------------------------------------------------------------- energy cards
+  energy-grid-consumption-color: "#000000"
+  energy-grid-return-color: "#FF0000"
+  energy-solar-color: "#FF0000"
+  energy-battery-in-color: "#000000"
+  energy-battery-out-color: "#FF0000"
+  energy-gas-color: "#000000"
+  energy-water-color: "#000000"
+  energy-non-fossil-color: "#000000"
+
+  # ---------------------------------------------------------------- typography
+  # Small text loses strokes after quantization and is read from a distance, so every size
+  # step is about 3px larger than Home Assistant's default. Small sizes grow the most
+  # (10px caption becomes 13px), headings the least (40px becomes 44px). Most cards use these
+  # tokens; a few hardcode their sizes (button card name, light card, big numbers).
+  # Change ha-font-size-scale to make every size proportionally larger or smaller.
+  ha-font-size-scale: "1"
+  ha-font-size-xs: "calc(13px * var(--ha-font-size-scale))"
+  ha-font-size-s: "calc(15px * var(--ha-font-size-scale))"
+  ha-font-size-m: "calc(17px * var(--ha-font-size-scale))"
+  ha-font-size-l: "calc(19px * var(--ha-font-size-scale))"
+  ha-font-size-xl: "calc(23px * var(--ha-font-size-scale))"
+  ha-font-size-2xl: "calc(27px * var(--ha-font-size-scale))"
+  ha-font-size-3xl: "calc(31px * var(--ha-font-size-scale))"
+  ha-font-size-4xl: "calc(35px * var(--ha-font-size-scale))"
+  ha-font-size-5xl: "calc(44px * var(--ha-font-size-scale))"
+  # Light (300) strokes are thinner than a display pixel and break up.
+  ha-font-weight-light: "400"
+  # Tiles in a sections view are 56px rows. Condensed line height keeps the larger name and
+  # state on one tile without clipping.
+  ha-tile-info-primary-line-height: "1.2"
+  # Optional: heavier body text, or taller grid rows when larger text still clips.
+  # ha-font-weight-normal: "500"
+  # ha-section-grid-row-height: "64px"
+
+  modes:
+    light: &epaper-red-black-white-colors
+      # -------------------------------------------------------------- base
+      primary-color: "#FF0000"
+      dark-primary-color: "#FF0000"
+      darker-primary-color: "#FF0000"
+      light-primary-color: "#FF0000"
+      accent-color: "#000000"
+      primary-background-color: "#FFFFFF"
+      secondary-background-color: "#FFFFFF"
+      clear-background-color: "#FFFFFF"
+      card-background-color: "#FFFFFF"
+      mdc-theme-surface: "#FFFFFF"
+      mdc-theme-primary: "#FF0000"
+
+      # -------------------------------------------------------------- text
+      primary-text-color: "#000000"
+      secondary-text-color: "#000000"
+      text-primary-color: "#FFFFFF"
+      text-light-primary-color: "#000000"
+      disabled-text-color: "#FF0000"
+      # Mostly drawn at 20-30% opacity (thermostat track, inactive tile icon background).
+      disabled-color: "#000000"
+
+      # -------------------------------------------------------------- header / sidebar (visible without kiosk mode)
+      app-header-background-color: "#FFFFFF"
+      app-header-text-color: "#000000"
+      app-header-border-bottom: "2px solid #000000"
+      sidebar-background-color: "#FFFFFF"
+      sidebar-text-color: "#000000"
+      sidebar-icon-color: "#000000"
+      sidebar-selected-text-color: "#FF0000"
+      sidebar-selected-icon-color: "#FF0000"
+
+      # -------------------------------------------------------------- status colors (gauge severity, alerts)
+      success-color: "#000000"
+      info-color: "#000000"
+      warning-color: "#FF0000"
+      error-color: "#FF0000"
+
+      # -------------------------------------------------------------- named palette (tiles, badges and card `color:` options)
+      # Warm colors map to red, cool and neutral colors map to black.
+      red-color: "#FF0000"
+      pink-color: "#FF0000"
+      deep-orange-color: "#FF0000"
+      orange-color: "#FF0000"
+      amber-color: "#FF0000"
+      yellow-color: "#FF0000"
+      brown-color: "#FF0000"
+      purple-color: "#000000"
+      deep-purple-color: "#000000"
+      indigo-color: "#000000"
+      blue-color: "#000000"
+      light-blue-color: "#000000"
+      cyan-color: "#000000"
+      teal-color: "#000000"
+      green-color: "#000000"
+      light-green-color: "#000000"
+      lime-color: "#000000"
+      blue-grey-color: "#000000"
+      dark-grey-color: "#000000"
+      grey-color: "#000000"
+      light-grey-color: "#FFFFFF"
+      black-color: "#000000"
+      white-color: "#FFFFFF"
+
+      # -------------------------------------------------------------- entity states (tile, button, glance, history timeline)
+      # Active is red and inactive is black. Domains whose default active color is a cool
+      # color would otherwise look the same on and off, so they are set to red explicitly.
+      state-active-color: "#FF0000"
+      state-inactive-color: "#000000"
+      state-unavailable-color: "#FF0000"
+      state-cover-active-color: "#FF0000"
+      state-fan-active-color: "#FF0000"
+      state-humidifier-on-color: "#FF0000"
+      state-media_player-active-color: "#FF0000"
+      state-vacuum-active-color: "#FF0000"
+      state-valve-active-color: "#FF0000"
+      state-lawn_mower-active-color: "#FF0000"
+      state-person-home-color: "#FF0000"
+      state-device_tracker-home-color: "#FF0000"
+      state-climate-auto-color: "#FF0000"
+      state-climate-cool-color: "#FF0000"
+      state-climate-dry-color: "#FF0000"
+      state-climate-fan_only-color: "#FF0000"
+      state-climate-heat-color: "#FF0000"
+      state-climate-heat-cool-color: "#FF0000"
+      # Timeline gaps: unavailable and unknown periods are left blank.
+      history-unavailable-color: "#FFFFFF"
+      history-unknown-color: "#FFFFFF"
+
+      # -------------------------------------------------------------- chart and calendar series
+      # Used by history, statistics, distribution and energy device charts and by calendar
+      # event colors. Series alternate between red and black.
+      color-1: "#FF0000"
+      color-2: "#000000"
+      color-3: "#FF0000"
+      color-4: "#000000"
+      color-5: "#FF0000"
+      color-6: "#000000"
+      color-7: "#FF0000"
+      color-8: "#000000"
+      color-9: "#FF0000"
+      color-10: "#000000"
+      color-11: "#FF0000"
+      color-12: "#000000"
+      color-13: "#FF0000"
+      color-14: "#000000"
+      color-15: "#FF0000"
+      color-16: "#000000"
+      color-17: "#FF0000"
+      color-18: "#000000"
+      color-19: "#FF0000"
+      color-20: "#000000"
+      color-21: "#FF0000"
+      color-22: "#000000"
+      color-23: "#FF0000"
+      color-24: "#000000"
+      color-25: "#FF0000"
+      color-26: "#000000"
+      color-27: "#FF0000"
+      color-28: "#000000"
+      color-29: "#FF0000"
+      color-30: "#000000"
+      color-31: "#FF0000"
+      color-32: "#000000"
+      color-33: "#FF0000"
+      color-34: "#000000"
+      color-35: "#FF0000"
+      color-36: "#000000"
+      color-37: "#FF0000"
+      color-38: "#000000"
+      color-39: "#FF0000"
+      color-40: "#000000"
+      color-41: "#FF0000"
+      color-42: "#000000"
+      color-43: "#FF0000"
+      color-44: "#000000"
+      color-45: "#FF0000"
+      color-46: "#000000"
+      color-47: "#FF0000"
+      color-48: "#000000"
+      color-49: "#FF0000"
+      color-50: "#000000"
+      color-51: "#FF0000"
+      color-52: "#000000"
+      color-53: "#FF0000"
+      color-54: "#000000"
+
+    dark: *epaper-red-black-white-colors

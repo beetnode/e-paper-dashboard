@@ -42,6 +42,8 @@ izBoard has three components that work together:
 
 **3. [Packaging](packaging/)** – 3D-printable enclosure designs for the device hardware.
 
+[Home Assistant resources](home-assistant/) include an e-paper theme for dashboards captured by the rendering component.
+
 ## Getting Started
 
 1. **Deploy the server** using Docker (see [Software README](software/README.md)) or the [Home Assistant Add-on](https://github.com/beetnode/hass-add-ons/tree/master/e-paper-dashboard)

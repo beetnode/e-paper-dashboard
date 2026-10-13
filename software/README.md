@@ -160,6 +160,7 @@ and unrelated internal services. Container/browser isolation does not by itself 
 
 The default image does not include the browser-rendering runtime or browser binaries. Custom layouts work without them.
 To render an existing Home Assistant dashboard, sign in with your own account, open **Settings → Rendering**, and select **Enable for my account**.
+Apply the [e-paper theme](../home-assistant/README.md) to the captured view so it uses only the display colors.
 In add-on mode, open the same page through Home Assistant ingress; the control applies to the whole add-on.
 izBoard downloads the version-matched component for the current CPU architecture from the project's GitHub release, verifies its
 SHA-256 checksum, performs a browser readiness test, and activates it immediately. The component is stored in the persistent `/data` volume, so it survives image
