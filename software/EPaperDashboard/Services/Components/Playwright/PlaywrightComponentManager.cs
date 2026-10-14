@@ -527,10 +527,8 @@ public sealed class PlaywrightComponentManager : BackgroundService
         string? error = null) =>
         new(state, Constants.AppVersion, GetRuntimeIdentifier(), IsRuntimeSupported(), installedVersion, Error: error);
 
-    internal static string GetDefaultReleaseTag(string appVersion)
-    {
-        return $"rendering-v{NormalizeVersion(appVersion)}";
-    }
+    // Releases attach the component to the application release built from the same commit.
+    internal static string GetDefaultReleaseTag(string appVersion) => $"v{GetCompatibilityVersion(appVersion)}";
 
     internal static string NormalizeVersion(string version)
     {

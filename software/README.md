@@ -168,9 +168,9 @@ the matching component; Home Assistant screenshots are unavailable until it is r
 renders and deletes all of its files from `/data`. Activation atomically switches between version directories, and interrupted
 installation/removal cleanup is completed on startup.
 
-CI builds and publishes component archives, but does not run renderer deployment/browser tests. Each release has a retained,
-version-addressed component GitHub release (`rendering-v<major.minor.patch.build>`) published before its application image. Existing
-component releases are never overwritten, so released installations do not depend on mutable releases. Development (`latest`) images
+CI builds and publishes component archives, but does not run renderer deployment/browser tests. Each application release
+(`v<major.minor.patch>`) carries the component built from the same commit, attached before its application images are published.
+A published release's component is never overwritten, so released installations do not depend on mutable releases. Development (`latest`) images
 install from the `rendering-latest` release, which every master build replaces; an older development image reports a version
 mismatch once a newer build has replaced it.
 Developers manually verify deployments by setting `RENDERING_COMPONENT_BASE_URL` to a directory served over HTTP that contains the
