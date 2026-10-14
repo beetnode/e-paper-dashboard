@@ -200,7 +200,7 @@ public class UserServiceTests
     {
         var users = new Mock<IUserRepository>();
         var deployment = new Mock<IDeploymentStrategy>();
-        deployment.SetupGet(d => d.Mode).Returns(DeploymentMode.Addon);
+        deployment.SetupGet(d => d.IsUserManagementEnabled).Returns(false);
         var stored = new User { Id = UserId.New(), Username = "left-over", AiConfig = new AiConfig() };
         users.Setup(r => r.FindById(stored.Id)).Returns(stored);
         var sut = new UserService(users.Object, Mock.Of<IDashboardRepository>(), deployment: deployment.Object);

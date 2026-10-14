@@ -18,7 +18,7 @@ describe('AuthService account creation', () => {
     const request = http.expectOne('/api/auth/setup');
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual({ username: 'admin', password: 'password' });
-    request.flush({ id: 'admin-id', username: 'admin', isSuperUser: true, deploymentMode: 'standalone' });
+    request.flush({ id: 'admin-id', username: 'admin', isSuperUser: true, userManagementEnabled: true });
     expect(auth.currentUser()?.isSuperUser).toBe(true);
     expect(auth.isAuthReady()).toBe(true);
   });

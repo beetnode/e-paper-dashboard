@@ -22,14 +22,17 @@ public sealed class PlaywrightComponentRuntime
     private int _queuedRequests;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public PlaywrightComponentRuntime(IConfiguration? configuration = null, IEnvironmentConfiguration? environment = null)
+    public PlaywrightComponentRuntime(
+        IConfiguration? configuration = null,
+        IEnvironmentConfiguration? environment = null,
+        IDeploymentStrategy? deploymentStrategy = null)
     {
         _concurrency = ReadLimit(configuration, "RENDERING_MAX_CONCURRENT_RENDERS", 2, 1, 16);
         _maximumQueuedRequests = ReadLimit(configuration, "RENDERING_MAX_QUEUED_RENDERS", 100, 0, 1000);
         _slots = new SemaphoreSlim(_concurrency, _concurrency);
         _socketPath = configuration?["RENDERING_COMPONENT_SOCKET"] ?? "/run/izboard-rendering/renderer.sock";
         _componentRoot = Path.Combine(environment?.ConfigDir ?? "/data", "components", "playwright");
-        _allowLocal = environment?.IsAddonMode == true;
+        _allowLocal = deploymentStrategy?.RunsRendererInProcess == true;
     }
 
     private static int ReadLimit(IConfiguration? configuration, string key, int fallback, int minimum, int maximum)

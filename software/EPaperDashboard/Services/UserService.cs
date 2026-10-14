@@ -27,7 +27,7 @@ public sealed class UserService(
     /// </summary>
     public bool HasAccount(UserId id) =>
         IsAddonOwner(id)
-        || (id != UserId.Empty && deployment?.Mode != DeploymentMode.Addon && userRepository.FindById(id).HasValue);
+        || (id != UserId.Empty && deployment?.IsUserManagementEnabled != false && userRepository.FindById(id).HasValue);
 
     /// <summary>Returns the owner's global AI provider, or null when it is not configured or the owner has no account.</summary>
     public AiConfig? GetAiConfig(UserId id) =>

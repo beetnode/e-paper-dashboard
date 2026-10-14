@@ -1,8 +1,7 @@
-using System.Security.Claims;
+using System.Net;
 using EPaperDashboard.Services;
 using EPaperDashboard.Utilities;
 using FluentAssertions;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -10,8 +9,8 @@ using Xunit;
 
 namespace EPaperDashboard.UnitTests.Services;
 
-// The strategy's constructor requires SUPERVISOR_TOKEN to be set (it throws otherwise), so each
-// test sets it for the duration of the test instance and restores the previous value afterward.
+// The strategy reads SUPERVISOR_TOKEN when it is created, so each test sets it for the duration
+// of the test instance and restores the previous value afterward.
 public class HomeAssistantAddonStrategyTests : IDisposable
 {
     private readonly string? _originalSupervisorToken = Environment.GetEnvironmentVariable("SUPERVISOR_TOKEN");
@@ -30,114 +29,132 @@ public class HomeAssistantAddonStrategyTests : IDisposable
         return new(NullLogger<HomeAssistantAddonStrategy>.Instance, configuration.Object);
     }
 
-    [Fact]
-    public void GetOAuthClientUri_NoIngressHeader_ReturnsNull()
+    private static DefaultHttpContext IngressContext(string ingressPath = "/api/hassio_ingress/abc123", string remoteAddress = "172.30.32.2")
     {
-        var sut = CreateSut();
         var context = new DefaultHttpContext();
-
-        sut.GetOAuthClientUri(context).Should().BeNull();
+        context.Request.Headers[Constants.IngressPathHeader] = ingressPath;
+        context.Connection.RemoteIpAddress = IPAddress.Parse(remoteAddress);
+        context.Connection.LocalPort = 8128;
+        return context;
     }
 
     [Fact]
-    public void GetOAuthClientUri_IngressHeaderPresent_BuildsUriFromBrowserOriginAndIngressPath()
+    public void GetHomeAssistantOAuthClient_NotAnIngressRequest_Fails()
     {
-        var sut = CreateSut();
         var context = new DefaultHttpContext();
-        context.Request.Headers[Constants.IngressPathHeader] = "/api/hassio_ingress/abc123";
-        context.Items["BrowserOrigin"] = "http://homeassistant.local:8123";
+        context.Request.Headers.Origin = "http://homeassistant.local:8123";
 
-        var result = sut.GetOAuthClientUri(context);
-
-        result!.ToString().Should().Be("http://homeassistant.local:8123/api/hassio_ingress/abc123");
+        CreateSut().GetHomeAssistantOAuthClient(context).Error.Should().Contain("ingress");
     }
 
     [Fact]
-    public void GetOAuthClientUri_NoBrowserOriginItem_FallsBackToDefaultHomeAssistantOrigin()
+    public void GetHomeAssistantOAuthClient_UsesTheBrowserOrigin()
     {
-        var sut = CreateSut();
-        var context = new DefaultHttpContext();
-        context.Request.Headers[Constants.IngressPathHeader] = "/ingress/x";
+        var context = IngressContext();
+        context.Request.Headers.Origin = "https://ha.example.test:8123";
 
-        var result = sut.GetOAuthClientUri(context);
+        var client = CreateSut().GetHomeAssistantOAuthClient(context);
 
-        result!.ToString().Should().StartWith("http://homeassistant/ingress/x");
+        client.Value.Should().Be(new HomeAssistantOAuthClient(
+            "https://ha.example.test:8123/api/hassio_ingress/abc123", "https://ha.example.test:8123"));
     }
 
     [Fact]
-    public void AuthenticateViaIngress_NoIngressHeader_ReturnsNull()
+    public void GetHomeAssistantOAuthClient_WithoutOrigin_UsesTheForwardedHost()
     {
-        var sut = CreateSut();
-        var context = new DefaultHttpContext();
+        var context = IngressContext();
+        context.Request.Headers["X-Forwarded-Proto"] = "https";
+        context.Request.Headers["X-Forwarded-Host"] = "ha.example.test, 172.30.32.1";
 
-        sut.AuthenticateViaIngress(context).Should().BeNull();
+        CreateSut().GetHomeAssistantOAuthClient(context).Value.ClientId.Should().Be("https://ha.example.test");
     }
 
     [Fact]
-    public void AuthenticateViaIngress_IngressHeaderPresent_ReturnsPrincipalWithAdminAndSuperUserClaims()
+    public void GetHomeAssistantOAuthClient_OpaqueOrigin_UsesTheForwardedHost()
     {
-        var sut = CreateSut();
-        var context = new DefaultHttpContext();
-        context.Request.Headers[Constants.IngressPathHeader] = "/ingress/x";
+        var context = IngressContext();
+        context.Request.Headers.Origin = "null";
+        context.Request.Headers["X-Forwarded-Proto"] = "http";
+        context.Request.Headers["X-Forwarded-Host"] = "homeassistant.local:8123";
 
-        var principal = sut.AuthenticateViaIngress(context);
-
-        principal.Should().NotBeNull();
-        principal!.FindFirst(ClaimTypes.NameIdentifier)!.Value.Should().Be(Constants.HomeAssistantVirtualUserId.ToString());
-        principal.FindFirst(Constants.IsSuperUserClaim)!.Value.Should().Be("true");
-        principal.FindFirst(Constants.HomeAssistantIngressClaim)!.Value.Should().Be("true");
+        CreateSut().GetHomeAssistantOAuthClient(context).Value.ClientId.Should().Be("http://homeassistant.local:8123");
     }
 
     [Fact]
-    public async Task ProcessIngressPathAsync_NoIngressHeader_ReturnsFalseWithoutModifyingRequest()
+    public void GetHomeAssistantOAuthClient_UnknownBrowserOrigin_Fails()
     {
-        var sut = CreateSut();
-        var context = new DefaultHttpContext();
-        context.Request.Path = "/dashboard";
-        var originalPath = context.Request.Path;
-
-        var handled = await sut.ProcessIngressPathAsync(context, Mock.Of<IWebHostEnvironment>());
-
-        handled.Should().BeFalse();
-        context.Request.Path.Should().Be(originalPath);
+        CreateSut().GetHomeAssistantOAuthClient(IngressContext()).IsFailure.Should().BeTrue();
     }
 
     [Fact]
-    public async Task ProcessIngressPathAsync_IngressHeaderPresent_SetsPathBaseAndStripsPrefix()
+    public void RunsRendererInProcess_IsTrue() => CreateSut().RunsRendererInProcess.Should().BeTrue();
+
+    [Fact]
+    public void IsIngressRequest_FromSupervisor_ReturnsTrue()
     {
-        var sut = CreateSut();
+        CreateSut().IsIngressRequest(IngressContext()).Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsIngressRequest_ForgedHeaderFromAnotherAddress_ReturnsFalse()
+    {
+        CreateSut().IsIngressRequest(IngressContext(remoteAddress: "172.30.33.5")).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsIngressRequest_MalformedIngressPath_ReturnsFalse()
+    {
+        CreateSut().IsIngressRequest(IngressContext("/api/hassio_ingress/x\"><script>")).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsIngressRequest_OnDevicePort_ReturnsFalse()
+    {
+        var context = IngressContext();
+        context.Connection.LocalPort = Constants.DefaultDevicePort;
+
+        CreateSut().IsIngressRequest(context).Should().BeFalse();
+    }
+
+    [Fact]
+    public void RewriteIngressPath_SetsPathBaseAndStripsPrefix()
+    {
         var context = new DefaultHttpContext();
-        context.Request.Headers[Constants.IngressPathHeader] = "/api/hassio_ingress/abc123";
         context.Request.Path = "/api/hassio_ingress/abc123/dashboard/5";
 
-        await sut.ProcessIngressPathAsync(context, Mock.Of<IWebHostEnvironment>());
+        HomeAssistantAddonStrategy.RewriteIngressPath(context, "/api/hassio_ingress/abc123");
 
         context.Request.PathBase.Value.Should().Be("/api/hassio_ingress/abc123");
         context.Request.Path.Value.Should().Be("/dashboard/5");
-        context.Items["IngressPath"].Should().Be("/api/hassio_ingress/abc123");
     }
 
     [Fact]
-    public async Task ProcessIngressPathAsync_IngressPathEqualsFullRequestPath_RewritesPathToRoot()
+    public void RewriteIngressPath_IngressPathEqualsFullRequestPath_RewritesPathToRoot()
     {
-        var sut = CreateSut();
         var context = new DefaultHttpContext();
-        context.Request.Headers[Constants.IngressPathHeader] = "/ingress/x";
-        context.Request.Path = "/ingress/x";
+        context.Request.Path = "/api/hassio_ingress/abc123";
 
-        await sut.ProcessIngressPathAsync(context, Mock.Of<IWebHostEnvironment>());
+        HomeAssistantAddonStrategy.RewriteIngressPath(context, "/api/hassio_ingress/abc123");
 
         context.Request.Path.Value.Should().Be("/");
     }
 
     [Fact]
-    public void GetConfigDirectory_ReturnsInjectedEnvironmentConfigurationValue()
+    public void WithBaseHref_SetsTheIngressPathAsBase()
     {
-        var environmentConfiguration = new Mock<IEnvironmentConfiguration>();
-        environmentConfiguration.SetupGet(c => c.ConfigDir).Returns("/custom/data");
-        var sut = new HomeAssistantAddonStrategy(NullLogger<HomeAssistantAddonStrategy>.Instance, environmentConfiguration.Object);
+        HomeAssistantAddonStrategy.WithBaseHref("<head><base href=\"/\"></head>", "/api/hassio_ingress/abc123")
+            .Should().Be("<head><base href=\"/api/hassio_ingress/abc123/\"></head>");
+    }
 
-        sut.GetConfigDirectory().Should().Be("/custom/data");
+    [Fact]
+    public void ValidateConfiguration_WithoutSupervisorToken_FailsInsteadOfThrowing()
+    {
+        Environment.SetEnvironmentVariable("SUPERVISOR_TOKEN", null);
+
+        var sut = CreateSut();
+
+        sut.ValidateConfiguration().Error.Should().Contain("SUPERVISOR_TOKEN");
+        sut.DefaultHomeAssistant.Should().BeNull();
     }
 
     [Fact]

@@ -28,16 +28,12 @@ public class HomeAssistantAuthService(
     {
         if (!Uri.TryCreate(host, UriKind.Absolute, out var hostUri))
             return "Enter the Home Assistant server URL first.";
-        var clientUri = deploymentStrategy.GetOAuthClientUri(httpContext);
-        if (clientUri == null)
-            return deploymentStrategy.Mode == DeploymentMode.Addon
-                ? "Could not determine ingress URL from request. Ensure you're accessing the addon through Home Assistant ingress."
-                : "CLIENT_URL is not configured. This is required for Home Assistant sign-in.";
+        var client = deploymentStrategy.GetHomeAssistantOAuthClient(httpContext);
+        if (client.IsFailure)
+            return client.Error;
 
         var hostUrl = hostUri.ToString().TrimEnd('/');
-        var appUrl = clientUri.ToString().TrimEnd('/');
-        // Home Assistant accepts redirect URIs on the client ID's origin. Under ingress that origin is Home Assistant's.
-        var clientId = deploymentStrategy.Mode == DeploymentMode.Addon ? clientUri.GetLeftPart(UriPartial.Authority) : appUrl;
+        var (appUrl, clientId) = client.Value;
         var state = _stateProtector.Protect(JsonSerializer.Serialize(new StateData(
             hostUrl, clientId, connection.Id, connection.UserId.Value, timeProvider.GetUtcNow().ToUnixTimeSeconds())));
         var redirectUri = $"{appUrl}/api/providers/home-assistant/callback";

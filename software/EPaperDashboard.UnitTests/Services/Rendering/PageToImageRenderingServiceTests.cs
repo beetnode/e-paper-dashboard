@@ -60,7 +60,7 @@ public sealed class PageToImageRenderingServiceTests : IDisposable
         PlaywrightComponentManager? manager = null, PlaywrightComponentRuntime? runtime = null)
     {
         var deployment = new Mock<IDeploymentStrategy>();
-        deployment.SetupGet(d => d.Mode).Returns(DeploymentMode.Standalone);
+        deployment.SetupGet(d => d.IsUserManagementEnabled).Returns(true);
         var access = new RenderingAccessService(
             new UserService(users, Mock.Of<IDashboardRepository>(), deployment: deployment.Object), Mock.Of<IDashboardRepository>(),
             new UserRenderScheduler(new ConfigurationBuilder().Build()));

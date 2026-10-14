@@ -68,14 +68,19 @@ catch (ArgumentException exception)
 	return;
 }
 
+var devicePort = builder.Configuration.GetValue<int>("DevicePort", Constants.DefaultDevicePort);
+// The Angular dev server proxies ingress test requests from the local machine.
+var allowLoopbackIngress = builder.Environment.IsDevelopment();
+
 // Register deployment strategy based on APP_MODE via a single shared factory (used again below
 // for pre-container validation, so the mode→type mapping only lives in one place).
 builder.Services.AddSingleton<IDeploymentStrategy>(sp =>
-	DeploymentStrategyFactory.Create(EnvironmentConfiguration.AppMode, environmentConfiguration, sp.GetRequiredService<ILoggerFactory>()));
+	DeploymentStrategyFactory.Create(EnvironmentConfiguration.AppMode, environmentConfiguration,
+		sp.GetRequiredService<ILoggerFactory>(), devicePort, allowLoopbackIngress));
 
 // Validate configuration using strategy (no DI container yet, so use a throwaway null logger)
 var validationStrategy = DeploymentStrategyFactory.Create(
-	EnvironmentConfiguration.AppMode, environmentConfiguration, NullLoggerFactory.Instance);
+	EnvironmentConfiguration.AppMode, environmentConfiguration, NullLoggerFactory.Instance, devicePort, allowLoopbackIngress);
 
 var validationResult = validationStrategy.ValidateConfiguration();
 if (validationResult.IsFailure)
@@ -242,7 +247,16 @@ builder.Services.AddHttpClient(Constants.PlaywrightComponentHttpClientName, clie
 	client.Timeout = TimeSpan.FromMinutes(30);
 });
 
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+// Requests that came through Home Assistant ingress use the add-on's shared user; everything else uses the cookie.
+const string DefaultAuthenticationScheme = "Default";
+builder.Services.AddAuthentication(DefaultAuthenticationScheme)
+.AddPolicyScheme(DefaultAuthenticationScheme, null, options =>
+{
+	options.ForwardDefaultSelector = context =>
+		context.RequestServices.GetRequiredService<IDeploymentStrategy>().IsIngressRequest(context)
+			? HomeAssistantIngressAuthenticationHandler.SchemeName
+			: CookieAuthenticationDefaults.AuthenticationScheme;
+})
 .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
 {
 	options.LoginPath = "/Login";
@@ -265,7 +279,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 		return Task.CompletedTask;
 	}
 })
-.AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>("ApiKey", null);
+.AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>("ApiKey", null)
+.AddScheme<AuthenticationSchemeOptions, HomeAssistantIngressAuthenticationHandler>(HomeAssistantIngressAuthenticationHandler.SchemeName, null);
 
 builder.Services.AddAuthorizationBuilder()
 	.AddPolicy("SuperUserOnly", policy => policy.RequireClaim(Constants.IsSuperUserClaim, "true"))
@@ -307,12 +322,7 @@ app.Services.GetRequiredService<LegacyHomeAssistantSettingsMigration>().Run();
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 var strategy = app.Services.GetRequiredService<IDeploymentStrategy>();
 
-// Perform deployment-specific initial setup
-using (var scope = app.Services.CreateScope())
-{
-	strategy.PerformInitialSetup(scope.ServiceProvider);
-}
-
+// Only loopback proxies are trusted: ingress requests are recognized by the Supervisor's own address.
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
 	ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
@@ -335,12 +345,10 @@ if (!app.Environment.IsDevelopment())
 	app.UseHsts();
 }
 
-strategy.ApplyMiddleware(app, app.Environment);
+strategy.UseBeforeRouting(app, app.Environment);
 
 app.UseRouting();
 app.UseRateLimiter();
-
-var devicePort = builder.Configuration.GetValue<int>("DevicePort", 8129);
 
 app.Use(async (context, next) =>
 {
@@ -406,11 +414,10 @@ app.Use(async (context, next) =>
 });
 
 app.UseAuthentication();
-strategy.ApplyPostAuthenticationMiddleware(app, app.Environment);
 app.UseAuthorization();
 app.MapControllers();
 
-strategy.ApplyPostStaticFilesMiddleware(app, app.Environment);
+strategy.UseBeforeStaticFiles(app, app.Environment);
 
 app.UseStaticFiles();
 

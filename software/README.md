@@ -68,12 +68,11 @@ The add-on image `izdevdigital/izboard-addon` is built from the `addon` target o
 
 | Variable | Required | Description |
 |---|---|---|
-| `CLIENT_URL` | Yes | Absolute HTTP or HTTPS URL reachable from the display network. In standalone/host mode it is also the Home Assistant OAuth client URL; in add-on mode it is the direct device endpoint. |
+| `CLIENT_URL` | Yes | Absolute HTTP or HTTPS URL reachable from the display network. In standalone mode it is also the Home Assistant OAuth client URL; in add-on mode it is the direct device endpoint. |
 | `TZ` | Recommended | Timezone (e.g. `Europe/London`) |
 | `APP_MODE` | No | Deployment mode: `standalone` (default) or `addon` |
 | `DATABASE_PROVIDER` | No | `litedb` (default) or `postgresql`. Independent of `APP_MODE`. |
 | `DATABASE_CONNECTION_STRING` | PostgreSQL only | Npgsql connection string for an existing PostgreSQL database. |
-| `HOME_ASSISTANT_HOST` | No | Host mode only: Home Assistant URL used when moving older dashboard settings into connections (default `http://localhost:8123`) |
 | `RENDERING_COMPONENT_REPOSITORY` | No | GitHub repository that publishes the optional rendering component (default: `beetnode/izBoard`) |
 | `RENDERING_COMPONENT_RELEASE_TAG` | No | Override the component release tag; normally set by the official image |
 | `RENDERING_COMPONENT_BASE_URL` | No | Direct component artifact source for manual deployment testing; bypasses GitHub release lookup |
@@ -90,7 +89,7 @@ The add-on image `izdevdigital/izboard-addon` is built from the `addon` target o
 | `8128` | Web UI and API |
 | `8129` | Device communication (pairing, firmware image retrieval, and configuration) |
 
-`CLIENT_URL` must describe the externally reachable URL after port mappings or a reverse proxy are applied. If displays are isolated on a VLAN, allow them to reach this URL. In standalone/host mode, expose the same URL to both the browser OAuth callback and the display API (normally through port `8128` or a reverse proxy). In add-on mode, use the exposed device port (`8129` by default), not the browser-only ingress URL.
+`CLIENT_URL` must describe the externally reachable URL after port mappings or a reverse proxy are applied. If displays are isolated on a VLAN, allow them to reach this URL. In standalone mode, expose the same URL to both the browser OAuth callback and the display API (normally through port `8128` or a reverse proxy). In add-on mode, use the exposed device port (`8129` by default), not the browser-only ingress URL.
 
 For HTTPS, the display verifies the server certificate against its embedded trusted root bundle and must be able to obtain network time on its first connection. Deployments using a private certificate authority must add that root to the firmware bundle before flashing.
 

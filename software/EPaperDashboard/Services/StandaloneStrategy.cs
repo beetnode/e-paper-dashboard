@@ -1,7 +1,6 @@
 using EPaperDashboard.Models;
 using EPaperDashboard.Utilities;
 using CSharpFunctionalExtensions;
-using System.Security.Claims;
 
 namespace EPaperDashboard.Services;
 
@@ -22,11 +21,17 @@ public class StandaloneStrategy : IDeploymentStrategy
 
     public HomeAssistantEndpoint? DefaultHomeAssistant => null;
 
-    public string GetConfigDirectory() => _environmentConfiguration.ConfigDir;
+    public bool RunsRendererInProcess => false;
 
-    public Uri? GetOAuthClientUri(HttpContext? context = null)
+    public Result<HomeAssistantOAuthClient, string> GetHomeAssistantOAuthClient(HttpContext? context)
     {
-        return _environmentConfiguration.ClientUri;
+        if (_environmentConfiguration.ClientUri is not { } clientUri)
+        {
+            return "CLIENT_URL is not configured. This is required for Home Assistant sign-in.";
+        }
+
+        var appUrl = clientUri.ToString().TrimEnd('/');
+        return new HomeAssistantOAuthClient(appUrl, appUrl);
     }
 
     public UnitResult<string> ValidateConfiguration()
@@ -51,30 +56,13 @@ public class StandaloneStrategy : IDeploymentStrategy
         return UnitResult.Success<string>();
     }
 
-    public ClaimsPrincipal? AuthenticateViaIngress(HttpContext context)
-    {
-        return null;
-    }
+    public bool IsIngressRequest(HttpContext context) => false;
 
-    public Task<bool> ProcessIngressPathAsync(HttpContext context, IWebHostEnvironment environment)
-    {
-        return Task.FromResult(false);
-    }
-
-    public void PerformInitialSetup(IServiceProvider serviceProvider)
-    {
-
-    }
-
-    public void ApplyMiddleware(IApplicationBuilder app, IWebHostEnvironment environment)
+    public void UseBeforeRouting(IApplicationBuilder app, IWebHostEnvironment environment)
     {
     }
 
-    public void ApplyPostAuthenticationMiddleware(IApplicationBuilder app, IWebHostEnvironment environment)
-    {
-    }
-
-    public void ApplyPostStaticFilesMiddleware(IApplicationBuilder app, IWebHostEnvironment environment)
+    public void UseBeforeStaticFiles(IApplicationBuilder app, IWebHostEnvironment environment)
     {
     }
 }

@@ -65,20 +65,13 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
         {
             new Claim(ClaimTypes.NameIdentifier, user.Value.Id.ToString()),
             new Claim(ClaimTypes.Name, user.Value.Username),
-            new Claim("IsSuperUser", user.Value.IsSuperUser.ToString().ToLower())
+            new Claim(Constants.IsSuperUserClaim, user.Value.IsSuperUser.ToString().ToLower())
         };
         var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
         var principal = new ClaimsPrincipal(identity);
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
 
-        return Ok(new
-        {
-            id = user.Value.Id.ToString(),
-            username = user.Value.Username,
-            nickname = user.Value.Nickname,
-            isSuperUser = user.Value.IsSuperUser,
-            deploymentMode = _deploymentStrategy.Mode.ToString().ToLowerInvariant()
-        });
+        return Ok(UserResponse(user.Value.Id.ToString(), user.Value.Username, user.Value.Nickname, user.Value.IsSuperUser));
     }
 
     [HttpPost("register")]
@@ -119,14 +112,7 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
         var principal = new ClaimsPrincipal(identity);
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
 
-        return Ok(new
-        {
-            id = user.Value.Id.ToString(),
-            username = user.Value.Username,
-            nickname = user.Value.Nickname,
-            isSuperUser = user.Value.IsSuperUser,
-            deploymentMode = _deploymentStrategy.Mode.ToString().ToLowerInvariant()
-        });
+        return Ok(UserResponse(user.Value.Id.ToString(), user.Value.Username, user.Value.Nickname, user.Value.IsSuperUser));
     }
 
     [HttpPost("logout")]
@@ -152,32 +138,29 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
         // In Home Assistant ingress mode, return simplified user info
         if (isHAIngress)
         {
-            return Ok(new
-            {
-                id = userId,
-                username = username,
-                nickname = username,
-                isSuperUser = isSuperUser,
-                deploymentMode = _deploymentStrategy.Mode.ToString().ToLowerInvariant()
-            });
+            return Ok(UserResponse(userId, username, username, isSuperUser));
         }
 
-        // In standalone/host mode, get full user details from database
+        // In standalone mode, get full user details from database
         var user = _userService.GetUserById(CurrentUserId);
         if (user.HasNoValue)
         {
             return Unauthorized();
         }
 
-        return Ok(new
-        {
-            id = user.Value.Id.ToString(),
-            username = user.Value.Username,
-            nickname = user.Value.Nickname,
-            isSuperUser = user.Value.IsSuperUser,
-            deploymentMode = _deploymentStrategy.Mode.ToString().ToLowerInvariant()
-        });
+        return Ok(UserResponse(user.Value.Id.ToString(), user.Value.Username, user.Value.Nickname, user.Value.IsSuperUser));
     }
+
+    // The deployment's capabilities travel with the user, so the UI never has to infer them from a mode name.
+    private object UserResponse(string? id, string? username, string? nickname, bool isSuperUser) => new
+    {
+        id,
+        username,
+        nickname,
+        isSuperUser,
+        userManagementEnabled = _deploymentStrategy.IsUserManagementEnabled,
+        hasDefaultHomeAssistantConnection = _deploymentStrategy.DefaultHomeAssistant is not null
+    };
 }
 
 public record LoginRequest(string Username, string Password);

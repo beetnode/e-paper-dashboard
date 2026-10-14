@@ -11,7 +11,7 @@ describe('RenderingSettingsComponent', () => {
   beforeEach(() => {
     addon = false;
     TestBed.configureTestingModule({ imports: [RenderingSettingsComponent], providers: [
-      provideHttpClient(), provideHttpClientTesting(), { provide: AuthService, useValue: { isAddonMode: () => addon } }
+      provideHttpClient(), provideHttpClientTesting(), { provide: AuthService, useValue: { isUserManagementDisabled: () => addon } }
     ] });
     http = TestBed.inject(HttpTestingController);
   });
