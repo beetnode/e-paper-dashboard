@@ -152,5 +152,18 @@ public sealed class AccountSetupTests : IDisposable
         users.ExistsOtherActiveSuperUser(admin.Id).Should().BeTrue();
     }
 
+    [Fact]
+    public void SetupCodeIsSharedUntilSetupCompletes()
+    {
+        using var context = Open();
+        var users = new LiteDbUserRepository(context);
+
+        users.GetOrCreateSetupCode("FIRST111").Should().Be("FIRST111");
+        users.GetOrCreateSetupCode("SECOND22").Should().Be("FIRST111");
+
+        users.TryCreateAdministrator(new User { Username = "admin" }).Should().BeTrue();
+        users.GetOrCreateSetupCode("THIRD333").Should().Be("THIRD333");
+    }
+
     public void Dispose() { if (Directory.Exists(_directory)) Directory.Delete(_directory, true); }
 }

@@ -155,11 +155,7 @@ public sealed class UserService(
         string? temporaryPassword = null;
         var result = Administer(actor, target, user =>
         {
-            temporaryPassword = NewTemporaryPassword();
-            user.PasswordHash = PasswordHashing.Hash(temporaryPassword);
-            user.MustChangePassword = true;
-            user.SecurityStamp = NewSecurityStamp();
-            userRepository.Update(user);
+            temporaryPassword = IssueTemporaryPassword(user);
             return AdminActionResult.Done;
         });
         return (result, result == AdminActionResult.Done ? temporaryPassword : null);
@@ -178,6 +174,35 @@ public sealed class UserService(
         });
 
     public const int TemporaryPasswordLength = 20;
+
+    // The operator console has no acting account, so the self and last-administrator checks do not apply.
+    public bool TryPromoteFromConsole(string username) =>
+        ExecuteUnderUsersLock(() => userRepository.FindByUsername(username).Match(user =>
+        {
+            user.IsSuperUser = true;
+            user.IsSuspended = false;
+            userRepository.Update(user);
+            sessions?.Invalidate(user.Id);
+            return true;
+        }, () => false));
+
+    public string? TryResetPasswordFromConsole(string username) =>
+        ExecuteUnderUsersLock(() => userRepository.FindByUsername(username).Match(user =>
+        {
+            var temporaryPassword = IssueTemporaryPassword(user);
+            sessions?.Invalidate(user.Id);
+            return temporaryPassword;
+        }, () => (string?)null));
+
+    private string IssueTemporaryPassword(User user)
+    {
+        var temporaryPassword = NewTemporaryPassword();
+        user.PasswordHash = PasswordHashing.Hash(temporaryPassword);
+        user.MustChangePassword = true;
+        user.SecurityStamp = NewSecurityStamp();
+        userRepository.Update(user);
+        return temporaryPassword;
+    }
 
     private AdminActionResult Administer(UserId actor, UserId target, Func<User, AdminActionResult> change)
     {

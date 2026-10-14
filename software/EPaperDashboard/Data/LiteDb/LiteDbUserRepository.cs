@@ -39,12 +39,26 @@ internal sealed class LiteDbUserRepository(LiteDbContext context) : IUserReposit
                 user.IsSuperUser = true;
                 Insert(user);
                 context.ServiceState.Insert(new BsonDocument { ["_id"] = "setup", ["complete"] = true });
+                context.ServiceState.Delete(SetupCodeId);
                 context.Commit();
                 return true;
             }
             catch { context.Rollback(); throw; }
         }
     }
+
+    public string GetOrCreateSetupCode(string candidate)
+    {
+        lock (context.UserWriteLock)
+        {
+            var stored = context.ServiceState.FindById(SetupCodeId);
+            if (stored is not null) return stored["code"].AsString;
+            context.ServiceState.Insert(new BsonDocument { ["_id"] = SetupCodeId, ["code"] = candidate });
+            return candidate;
+        }
+    }
+
+    private const string SetupCodeId = "setup-code";
 
     public bool? GetRenderingEnabled(UserId id)
     {

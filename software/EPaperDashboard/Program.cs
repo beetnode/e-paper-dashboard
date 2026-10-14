@@ -37,6 +37,12 @@ if (args.Contains("--maintenance"))
     return;
 }
 
+if (args.Contains("--users"))
+{
+    Environment.ExitCode = UserAdminCommand.Run(new EnvironmentConfigurationWrapper(), args);
+    return;
+}
+
 // The same slim image runs the restricted sidecar, keeping both hosts on the exact app build.
 // Exit before app configuration, databases, authentication, or application routes are initialized.
 if (args.Contains("--rendering-host"))
@@ -170,6 +176,7 @@ builder.Services
 	.AddSingleton<IImageFactory, ImageFactory>()
 	.AddSingleton<UserSessionValidator>()
 	.AddSingleton<UserService>()
+	.AddSingleton<SetupCodeProvider>()
 	.AddSingleton<DashboardService>()
 	.AddSingleton<DeviceService>()
 	.AddSingleton<PairingService>()
@@ -343,6 +350,7 @@ catch (Exception exception)
 app.Services.GetRequiredService<LegacyHomeAssistantSettingsMigration>().Run();
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
+app.Services.GetRequiredService<SetupCodeProvider>().AnnounceIfPending(logger);
 var strategy = app.Services.GetRequiredService<IDeploymentStrategy>();
 
 // Only loopback proxies are trusted: ingress requests are recognized by the Supervisor's own address.

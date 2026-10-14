@@ -15,7 +15,7 @@ namespace EPaperDashboard.Controllers;
 [ApiController]
 [Route("api/auth")]
 [AllowedDuringPasswordChange]
-public class AuthApiController(UserService userService, IDeploymentStrategy deploymentStrategy) : BaseApiController
+public class AuthApiController(UserService userService, IDeploymentStrategy deploymentStrategy, SetupCodeProvider setupCodes) : BaseApiController
 {
     private readonly UserService _userService = userService;
     private readonly IDeploymentStrategy _deploymentStrategy = deploymentStrategy;
@@ -36,11 +36,15 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
     [HttpPost("setup")]
     [AllowAnonymous]
     [EnableRateLimiting("AccountCreation")]
-    public async Task<IActionResult> Setup([FromBody] RegisterRequest request)
+    public async Task<IActionResult> Setup([FromBody] SetupRequest request)
     {
         if (!_deploymentStrategy.IsUserManagementEnabled) return Forbid();
         var error = UserService.ValidateCredentials(request.Username, request.Password);
         if (error is not null) return BadRequest(new { message = error });
+        if (_userService.IsSetupComplete())
+            return Conflict(new { message = "Service setup is already complete. Sign in or create a regular account." });
+        if (!setupCodes.Matches(request.SetupCode))
+            return BadRequest(new { code = "invalid_setup_code", message = "The setup code is incorrect. Find the current code in the service log." });
         if (!_userService.TryCreateAdministrator(request.Username, request.Password))
             return Conflict(new { message = "Service setup is already complete. Sign in or create a regular account." });
         return await Login(new LoginRequest(request.Username.Trim(), request.Password));
@@ -154,3 +158,4 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
 
 public record LoginRequest(string Username, string Password);
 public record RegisterRequest(string Username, string Password);
+public record SetupRequest(string Username, string Password, string? SetupCode);

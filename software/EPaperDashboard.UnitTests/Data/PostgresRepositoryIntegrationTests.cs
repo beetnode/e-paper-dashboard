@@ -334,6 +334,24 @@ public class PostgresRepositoryIntegrationTests
     }
 
     [PostgresFact]
+    public void SetupCode_IsSharedAcrossConnectionsUntilSetupCompletes()
+    {
+        WithEmptySchema(connectionString =>
+        {
+            Migrate(connectionString);
+            using var first = CreateServices(connectionString);
+            using var second = CreateServices(connectionString);
+            var a = new PostgresUserRepository(first.GetRequiredService<PostgresDbContext>());
+            var b = new PostgresUserRepository(second.GetRequiredService<PostgresDbContext>());
+
+            a.GetOrCreateSetupCode("FIRST111").Should().Be("FIRST111");
+            b.GetOrCreateSetupCode("SECOND22").Should().Be("FIRST111");
+            a.TryCreateAdministrator(new User { Username = "admin" }).Should().BeTrue();
+            b.GetOrCreateSetupCode("THIRD333").Should().Be("THIRD333");
+        });
+    }
+
+    [PostgresFact]
     public void Setup_IsAtomicAcrossConnectionsAndStaysClosedAfterDeletion()
     {
         WithEmptySchema(connectionString =>

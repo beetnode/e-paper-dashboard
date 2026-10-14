@@ -21,6 +21,11 @@ export interface RegisterRequest {
   password: string;
 }
 
+export interface SetupRequest extends RegisterRequest {
+  /** One-time code the server writes to its log until the first administrator exists. */
+  setupCode: string;
+}
+
 export type DashboardOrientation = 'Landscape' | 'Portrait';
 
 export interface DashboardSizePreset {

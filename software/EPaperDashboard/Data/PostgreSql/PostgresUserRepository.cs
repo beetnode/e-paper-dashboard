@@ -38,8 +38,20 @@ internal sealed class PostgresUserRepository(PostgresDbContext context) : IUserR
         user.IsSuperUser = true;
         Insert(user);
         context.Execute("INSERT INTO izboard_service_state (id) VALUES ('setup')");
+        context.Execute("DELETE FROM izboard_service_state WHERE id = 'setup-code'");
         return true;
     });
+
+    public string GetOrCreateSetupCode(string candidate)
+    {
+        context.Execute(
+            "INSERT INTO izboard_service_state (id, document) VALUES ('setup-code', @document) ON CONFLICT (id) DO NOTHING",
+            PostgresDbContext.DocumentParameter(new SetupCodeState(candidate)));
+        return context.FindOne<SetupCodeState>(
+            "SELECT document FROM izboard_service_state WHERE id = 'setup-code'")?.Code ?? candidate;
+    }
+
+    private sealed record SetupCodeState(string Code);
 
     public bool? GetRenderingEnabled(UserId id) => context.FindOne<RenderingPreference>(
         "SELECT jsonb_build_object('Enabled', enabled) FROM izboard_service_state WHERE id = @id",

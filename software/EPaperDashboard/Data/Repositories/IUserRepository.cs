@@ -14,6 +14,8 @@ public interface IUserRepository
     bool ExistsOtherActiveSuperUser(UserId except);
     bool IsSetupComplete();
     bool TryCreateAdministrator(User user);
+    /// <summary>Stores <paramref name="candidate"/> as the setup code unless one exists, and returns the stored code.</summary>
+    string GetOrCreateSetupCode(string candidate);
     bool? GetRenderingEnabled(UserId id);
     void SetRenderingEnabled(UserId id, bool enabled);
     AiConfig? GetAiConfig(UserId id);

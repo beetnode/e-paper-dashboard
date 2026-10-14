@@ -22,14 +22,18 @@ public class AuthApiControllerTests
     private readonly Mock<IDashboardRepository> _dashboardRepository = new();
     private readonly Mock<IDeploymentStrategy> _deploymentStrategy = new();
     private readonly Mock<IAuthenticationService> _authenticationService = new();
+    private const string SetupCode = "ABCD2345";
 
     private AuthApiController CreateSut(UserId? userId = null, bool isHomeAssistantIngress = false)
     {
         _deploymentStrategy.SetupGet(d => d.IsUserManagementEnabled).Returns(true);
         _userRepository.Setup(r => r.IsSetupComplete()).Returns(true);
+        _userRepository.Setup(r => r.GetOrCreateSetupCode(It.IsAny<string>())).Returns(SetupCode);
+        var userService = new UserService(_userRepository.Object, _dashboardRepository.Object);
         var controller = new AuthApiController(
-            new UserService(_userRepository.Object, _dashboardRepository.Object),
-            _deploymentStrategy.Object);
+            userService,
+            _deploymentStrategy.Object,
+            new SetupCodeProvider(_userRepository.Object, userService, _deploymentStrategy.Object));
 
         var services = new ServiceCollection();
         services.AddSingleton(_authenticationService.Object);
@@ -124,7 +128,7 @@ public class AuthApiControllerTests
     {
         var sut = CreateSut();
         _userRepository.Setup(r => r.TryCreateAdministrator(It.IsAny<User>())).Returns(false);
-        (await sut.Setup(new RegisterRequest("admin", "password"))).Should().BeOfType<ConflictObjectResult>();
+        (await sut.Setup(new SetupRequest("admin", "password", SetupCode))).Should().BeOfType<ConflictObjectResult>();
         _authenticationService.Verify(a => a.SignInAsync(It.IsAny<HttpContext>(), It.IsAny<string>(),
             It.IsAny<ClaimsPrincipal>(), It.IsAny<AuthenticationProperties>()), Times.Never);
     }
@@ -133,6 +137,7 @@ public class AuthApiControllerTests
     public async Task Setup_CreatesAdministratorAndSignsIn()
     {
         var sut = CreateSut();
+        _userRepository.Setup(r => r.IsSetupComplete()).Returns(false);
         _userRepository.Setup(r => r.TryCreateAdministrator(It.IsAny<User>())).Returns((User user) =>
         {
             _userRepository.Setup(r => r.FindByUsername(user.Username)).Returns(user);
@@ -140,7 +145,21 @@ public class AuthApiControllerTests
             user.RenderingEnabled.Should().BeFalse();
             return true;
         });
-        (await sut.Setup(new RegisterRequest("admin", "password"))).Should().BeOfType<OkObjectResult>();
+        (await sut.Setup(new SetupRequest("admin", "password", "abcd-2345"))).Should().BeOfType<OkObjectResult>();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("WRONG123")]
+    public async Task Setup_WithoutTheLoggedSetupCode_DoesNotCreateAnAdministrator(string? code)
+    {
+        var sut = CreateSut();
+        _userRepository.Setup(r => r.IsSetupComplete()).Returns(false);
+
+        (await sut.Setup(new SetupRequest("admin", "password", code))).Should().BeOfType<BadRequestObjectResult>();
+
+        _userRepository.Verify(r => r.TryCreateAdministrator(It.IsAny<User>()), Times.Never);
     }
 
     [Theory]
@@ -151,7 +170,7 @@ public class AuthApiControllerTests
     {
         var sut = CreateSut();
         (await sut.Register(new RegisterRequest(username, password))).Should().BeOfType<BadRequestObjectResult>();
-        (await sut.Setup(new RegisterRequest(username, password))).Should().BeOfType<BadRequestObjectResult>();
+        (await sut.Setup(new SetupRequest(username, password, SetupCode))).Should().BeOfType<BadRequestObjectResult>();
         _userRepository.Verify(r => r.TryInsert(It.IsAny<User>()), Times.Never);
         _userRepository.Verify(r => r.TryCreateAdministrator(It.IsAny<User>()), Times.Never);
     }
@@ -163,7 +182,7 @@ public class AuthApiControllerTests
         _deploymentStrategy.SetupGet(d => d.IsUserManagementEnabled).Returns(false);
         (await sut.Login(new LoginRequest("admin", "password"))).Should().BeOfType<ForbidResult>();
         (await sut.Register(new RegisterRequest("alice", "password"))).Should().BeOfType<ForbidResult>();
-        (await sut.Setup(new RegisterRequest("admin", "password"))).Should().BeOfType<ForbidResult>();
+        (await sut.Setup(new SetupRequest("admin", "password", SetupCode))).Should().BeOfType<ForbidResult>();
     }
 
     [Fact]
