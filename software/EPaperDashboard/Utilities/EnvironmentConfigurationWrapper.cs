@@ -10,7 +10,6 @@ public sealed class EnvironmentConfigurationWrapper : IEnvironmentConfiguration
 {
     public DeploymentMode AppMode => EnvironmentConfiguration.AppMode;
     public bool IsAddonMode => EnvironmentConfiguration.IsAddonMode;
-    public string? HomeAssistantHost => EnvironmentConfiguration.HomeAssistantHost;
     public Uri? ClientUri => EnvironmentConfiguration.ClientUri;
     public TimeSpan DashboardScheduleCheckInterval => EnvironmentConfiguration.DashboardScheduleCheckInterval;
     public TimeSpan DashboardMissedScheduleTolerance => EnvironmentConfiguration.DashboardMissedScheduleTolerance;

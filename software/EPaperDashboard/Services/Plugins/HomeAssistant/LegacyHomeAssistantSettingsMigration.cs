@@ -17,7 +17,6 @@ public sealed class LegacyHomeAssistantSettingsMigration(
     ProviderConnectionStore connections,
     IUnitOfWork unitOfWork,
     IDeploymentStrategy deployment,
-    IEnvironmentConfiguration environment,
     ILogger<LegacyHomeAssistantSettingsMigration> logger)
 {
     // Rendering loads the Home Assistant web UI, which the add-on's supervisor proxy does not serve.
@@ -94,8 +93,6 @@ public sealed class LegacyHomeAssistantSettingsMigration(
     {
         var host = deployment.Mode switch
         {
-            // Host mode always reached the configured server, whatever the dashboard stored.
-            DeploymentMode.Host => environment.HomeAssistantHost ?? Constants.HomeAssistantCoreUrl,
             DeploymentMode.Addon when string.IsNullOrWhiteSpace(dashboard.Host) => AddonHomeAssistantUrl,
             _ => dashboard.Host?.Trim()
         };

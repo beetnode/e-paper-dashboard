@@ -1,4 +1,4 @@
-export type DeploymentMode = 'addon' | 'host' | 'standalone';
+export type DeploymentMode = 'addon' | 'standalone';
 
 export interface User {
   id: string;

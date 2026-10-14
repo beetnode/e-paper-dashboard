@@ -396,7 +396,6 @@ public class PostgresRepositoryIntegrationTests
                 var connections = new EPaperDashboard.Services.Plugins.ProviderConnectionStore(new PostgresProviderConnectionRepository(context), protection);
                 new EPaperDashboard.Services.Plugins.HomeAssistant.LegacyHomeAssistantSettingsMigration(
                     new PostgresDashboardRepository(context), connections, new PostgresUnitOfWork(context), deployment.Object,
-                    Moq.Mock.Of<EPaperDashboard.Utilities.IEnvironmentConfiguration>(),
                     Microsoft.Extensions.Logging.Abstractions.NullLogger<EPaperDashboard.Services.Plugins.HomeAssistant.LegacyHomeAssistantSettingsMigration>.Instance).Run();
             });
 

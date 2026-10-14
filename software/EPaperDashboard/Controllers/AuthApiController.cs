@@ -162,7 +162,7 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
             });
         }
 
-        // In standalone/host mode, get full user details from database
+        // In standalone mode, get full user details from database
         var user = _userService.GetUserById(CurrentUserId);
         if (user.HasNoValue)
         {

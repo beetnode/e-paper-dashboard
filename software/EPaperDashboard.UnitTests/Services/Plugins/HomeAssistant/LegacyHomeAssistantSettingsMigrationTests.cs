@@ -19,7 +19,6 @@ public class LegacyHomeAssistantSettingsMigrationTests
     private readonly Dictionary<DashboardId, Dashboard> _stored = [];
     private readonly Mock<IDashboardRepository> _dashboards = new();
     private readonly Mock<IDeploymentStrategy> _deployment = new();
-    private readonly Mock<IEnvironmentConfiguration> _environment = new();
     private readonly ProviderConnectionStore _connections;
     private readonly UserId _owner = UserId.New();
 
@@ -40,7 +39,7 @@ public class LegacyHomeAssistantSettingsMigrationTests
     }
 
     private void Run() => new LegacyHomeAssistantSettingsMigration(_dashboards.Object, _connections, ImmediateUnitOfWork.Instance,
-        _deployment.Object, _environment.Object, NullLogger<LegacyHomeAssistantSettingsMigration>.Instance).Run();
+        _deployment.Object, NullLogger<LegacyHomeAssistantSettingsMigration>.Instance).Run();
 
     private Dashboard Store(string? host, string? token, RenderingMode mode = RenderingMode.Custom, object? config = null)
     {
@@ -122,18 +121,6 @@ public class LegacyHomeAssistantSettingsMigrationTests
         HomeAssistantConnections().Should().BeEmpty();
         dashboard.AccessToken.Should().BeNull();
         dashboard.LayoutConfig!.Widgets[0].Config.GetProperty("entityId").GetString().Should().Be("sensor.x");
-    }
-
-    [Fact]
-    public void HostMode_UsesTheConfiguredServer()
-    {
-        _deployment.SetupGet(d => d.Mode).Returns(DeploymentMode.Host);
-        _environment.SetupGet(e => e.HomeAssistantHost).Returns("http://core.test:8123");
-        Store("http://ignored.test", "token");
-
-        Run();
-
-        _connections.Credentials(HomeAssistantConnections().Single())["host"].Should().Be("http://core.test:8123");
     }
 
     [Fact]

@@ -11,8 +11,6 @@ public static class DeploymentStrategyFactory
     {
         DeploymentMode.Addon => new HomeAssistantAddonStrategy(
             loggerFactory.CreateLogger<HomeAssistantAddonStrategy>(), environmentConfiguration),
-        DeploymentMode.Host => new HostModeStrategy(
-            loggerFactory.CreateLogger<HostModeStrategy>(), environmentConfiguration),
         _ => new StandaloneStrategy(
             loggerFactory.CreateLogger<StandaloneStrategy>(), environmentConfiguration)
     };

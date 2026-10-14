@@ -31,8 +31,6 @@ public static class Constants
 
     public const string SupervisorCoreUrl = "http://supervisor/core";
 
-    public const string HomeAssistantCoreUrl = "http://localhost:8123";
-    
     public const string IngressPathHeader = "X-Ingress-Path";
     
     public const string IsSuperUserClaim = "IsSuperUser";
