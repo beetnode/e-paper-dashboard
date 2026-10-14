@@ -32,6 +32,25 @@ public sealed class AccountSetupTests : IDisposable
     }
 
     [Fact]
+    public void AiConfigOfAccountlessOwnerSurvivesRestart()
+    {
+        using (var context = Open())
+        {
+            new LiteDbUserRepository(context).SetAiConfig(Constants.HomeAssistantVirtualUserId,
+                new AiConfig { ConnectionMode = AiConnectionMode.Direct, DirectEndpoint = "http://llm", DirectModel = "m" });
+        }
+
+        using (var context = Open())
+        {
+            var users = new LiteDbUserRepository(context);
+            users.GetAiConfig(Constants.HomeAssistantVirtualUserId).Should().BeEquivalentTo(
+                new AiConfig { ConnectionMode = AiConnectionMode.Direct, DirectEndpoint = "http://llm", DirectModel = "m" });
+            users.GetAiConfig(UserId.New()).Should().BeNull();
+            users.IsSetupComplete().Should().BeFalse();
+        }
+    }
+
+    [Fact]
     public void RemovingAllAccountsDoesNotReopenSetupAfterRestart()
     {
         using (var context = Open())

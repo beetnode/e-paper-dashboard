@@ -76,7 +76,7 @@ public class HomeAssistantAddonStrategy : IDeploymentStrategy
 
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, Constants.HomeAssistantAdminUserId),
+            new Claim(ClaimTypes.NameIdentifier, Constants.HomeAssistantVirtualUserId.ToString()),
             new Claim(ClaimTypes.Name, Constants.HomeAssistantAdminUserName),
             new Claim(Constants.IsSuperUserClaim, "true"),
             new Claim(Constants.HomeAssistantIngressClaim, "true")

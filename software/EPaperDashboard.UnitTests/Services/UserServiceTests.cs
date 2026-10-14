@@ -2,6 +2,7 @@ using CSharpFunctionalExtensions;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services;
+using EPaperDashboard.Utilities;
 using FluentAssertions;
 using Moq;
 using Xunit;
@@ -140,5 +141,85 @@ public class UserServiceTests
         result.Should().BeTrue();
         user.PasswordHash.Should().Be(UserService.ComputeSha256Hash("brand-new"));
         users.Verify(r => r.Update(user), Times.Once);
+    }
+
+    [Fact]
+    public void GetAiConfig_HomeAssistantAddonUser_ReadsServiceStateWithoutAccount()
+    {
+        var (sut, users, _) = CreateSut();
+        var config = new AiConfig { ConnectionMode = AiConnectionMode.HomeAssistant };
+        users.Setup(r => r.GetAiConfig(Constants.HomeAssistantVirtualUserId)).Returns(config);
+
+        sut.HasAccount(Constants.HomeAssistantVirtualUserId).Should().BeTrue();
+        sut.GetAiConfig(Constants.HomeAssistantVirtualUserId).Should().BeSameAs(config);
+        users.Verify(r => r.FindById(It.IsAny<UserId>()), Times.Never);
+    }
+
+    [Fact]
+    public void TryUpdateAiConfig_HomeAssistantAddonUser_StoresServiceState()
+    {
+        var (sut, users, _) = CreateSut();
+        var config = new AiConfig { ConnectionMode = AiConnectionMode.HomeAssistant };
+
+        sut.TryUpdateAiConfig(Constants.HomeAssistantVirtualUserId, config).Should().BeTrue();
+
+        users.Verify(r => r.SetAiConfig(Constants.HomeAssistantVirtualUserId, config), Times.Once);
+        users.Verify(r => r.Update(It.IsAny<User>()), Times.Never);
+    }
+
+    [Fact]
+    public void TryUpdateAiConfig_ExistingUser_UpdatesAccount()
+    {
+        var (sut, users, _) = CreateSut();
+        var user = new User { Id = UserId.New(), Username = "alice" };
+        var config = new AiConfig { ConnectionMode = AiConnectionMode.Direct };
+        users.Setup(r => r.FindById(user.Id)).Returns(user);
+
+        sut.TryUpdateAiConfig(user.Id, config).Should().BeTrue();
+
+        sut.GetAiConfig(user.Id).Should().BeSameAs(config);
+        users.Verify(r => r.Update(user), Times.Once);
+        users.Verify(r => r.SetAiConfig(It.IsAny<UserId>(), It.IsAny<AiConfig>()), Times.Never);
+    }
+
+    [Fact]
+    public void TryUpdateAiConfig_UnknownUser_ReturnsFalse()
+    {
+        var (sut, users, _) = CreateSut();
+        var id = UserId.New();
+        users.Setup(r => r.FindById(id)).Returns(Maybe<User>.None);
+
+        sut.HasAccount(id).Should().BeFalse();
+        sut.GetAiConfig(id).Should().BeNull();
+        sut.TryUpdateAiConfig(id, new AiConfig()).Should().BeFalse();
+        users.Verify(r => r.Update(It.IsAny<User>()), Times.Never);
+    }
+
+    [Fact]
+    public void HasAccount_AddonMode_AcceptsOnlyIngressUser()
+    {
+        var users = new Mock<IUserRepository>();
+        var deployment = new Mock<IDeploymentStrategy>();
+        deployment.SetupGet(d => d.Mode).Returns(DeploymentMode.Addon);
+        var stored = new User { Id = UserId.New(), Username = "left-over", AiConfig = new AiConfig() };
+        users.Setup(r => r.FindById(stored.Id)).Returns(stored);
+        var sut = new UserService(users.Object, Mock.Of<IDashboardRepository>(), deployment: deployment.Object);
+
+        sut.HasAccount(Constants.HomeAssistantVirtualUserId).Should().BeTrue();
+        sut.HasAccount(stored.Id).Should().BeFalse();
+        sut.GetAiConfig(stored.Id).Should().BeNull();
+        sut.TryUpdateAiConfig(stored.Id, new AiConfig()).Should().BeFalse();
+        sut.TrySetRenderingEnabled(stored.Id, true).Should().BeFalse();
+        users.Verify(r => r.SetRenderingEnabled(It.IsAny<UserId>(), It.IsAny<bool>()), Times.Never);
+    }
+
+    [Fact]
+    public void HasAccount_EmptyId_ReturnsFalseWithoutLookup()
+    {
+        var (sut, users, _) = CreateSut();
+
+        sut.HasAccount(UserId.Empty).Should().BeFalse();
+
+        users.Verify(r => r.FindById(It.IsAny<UserId>()), Times.Never);
     }
 }

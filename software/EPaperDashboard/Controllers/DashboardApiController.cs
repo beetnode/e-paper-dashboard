@@ -19,24 +19,13 @@ public class DashboardApiController(DashboardService dashboardService, UserServi
     [HttpGet]
     public IActionResult GetDashboards()
     {
-        UserId userId;
-        
-        if (IsHomeAssistantIngress)
+        if (!_userService.HasAccount(CurrentUserId))
         {
-            userId = CurrentUserId;
-        }
-        else
-        {
-            var user = _userService.GetUserById(CurrentUserId);
-            if (user.HasNoValue)
-            {
-                return Unauthorized();
-            }
-            userId = user.Value.Id;
+            return Unauthorized();
         }
 
         // Never return persisted dashboards directly: responses expose only the fields the client needs.
-        var dashboards = _dashboardService.GetDashboardsForUser(userId)
+        var dashboards = _dashboardService.GetDashboardsForUser(CurrentUserId)
             .Select(dashboard => DashboardResponseDto.FromDashboard(dashboard, ResolveEffectiveAiConfigMode(dashboard)))
             .ToList();
         return Ok(dashboards);
@@ -67,13 +56,9 @@ public class DashboardApiController(DashboardService dashboardService, UserServi
     [HttpPost]
     public IActionResult CreateDashboard([FromBody] CreateDashboardRequest request)
     {
-        if (!IsHomeAssistantIngress)
+        if (!_userService.HasAccount(CurrentUserId))
         {
-            var user = _userService.GetUserById(CurrentUserId);
-            if (user.HasNoValue)
-            {
-                return Unauthorized();
-            }
+            return Unauthorized();
         }
 
         var dashboard = new Dashboard
@@ -270,10 +255,10 @@ public class DashboardApiController(DashboardService dashboardService, UserServi
             return dashboard.AiConfig.ConnectionMode.ToString();
         }
 
-        var user = _userService.GetUserById(dashboard.UserId);
-        if (user.HasValue && user.Value.AiConfig != null && user.Value.AiConfig.ConnectionMode != AiConnectionMode.None)
+        var globalConfig = _userService.GetAiConfig(dashboard.UserId);
+        if (globalConfig != null && globalConfig.ConnectionMode != AiConnectionMode.None)
         {
-            return user.Value.AiConfig.ConnectionMode.ToString();
+            return globalConfig.ConnectionMode.ToString();
         }
 
         return AiConnectionMode.None.ToString();

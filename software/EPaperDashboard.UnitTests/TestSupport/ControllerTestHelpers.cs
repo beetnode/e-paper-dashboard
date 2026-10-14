@@ -47,14 +47,13 @@ internal static class ControllerTestHelpers
     }
 
     /// <summary>
-    /// Simulates a Home Assistant ingress request: NameIdentifier is the fixed "ha-admin" string
-    /// claim value, which BaseApiController.CurrentUserId translates to HomeAssistantVirtualUserId.
+    /// Simulates a Home Assistant ingress request, authenticated as the add-on's HomeAssistantVirtualUserId.
     /// </summary>
     public static T WithHomeAssistantIngressUser<T>(this T controller) where T : ControllerBase
     {
         var claims = new List<Claim>
         {
-            new(ClaimTypes.NameIdentifier, Constants.HomeAssistantAdminUserId),
+            new(ClaimTypes.NameIdentifier, Constants.HomeAssistantVirtualUserId.ToString()),
             new(Constants.HomeAssistantIngressClaim, "true")
         };
         controller.ControllerContext = new ControllerContext

@@ -83,7 +83,7 @@ public class HomeAssistantAddonStrategyTests : IDisposable
         var principal = sut.AuthenticateViaIngress(context);
 
         principal.Should().NotBeNull();
-        principal!.FindFirst(ClaimTypes.NameIdentifier)!.Value.Should().Be(Constants.HomeAssistantAdminUserId);
+        principal!.FindFirst(ClaimTypes.NameIdentifier)!.Value.Should().Be(Constants.HomeAssistantVirtualUserId.ToString());
         principal.FindFirst(Constants.IsSuperUserClaim)!.Value.Should().Be("true");
         principal.FindFirst(Constants.HomeAssistantIngressClaim)!.Value.Should().Be("true");
     }

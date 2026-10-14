@@ -163,17 +163,7 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
         }
 
         // In standalone/host mode, get full user details from database
-        if (string.IsNullOrEmpty(userId))
-        {
-            return Unauthorized();
-        }
-
-        if (!UserId.TryParse(userId, out var typedUserId))
-        {
-            return Unauthorized();
-        }
-
-        var user = _userService.GetUserById(typedUserId);
+        var user = _userService.GetUserById(CurrentUserId);
         if (user.HasNoValue)
         {
             return Unauthorized();

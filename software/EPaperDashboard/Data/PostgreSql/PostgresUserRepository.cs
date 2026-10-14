@@ -46,6 +46,14 @@ internal sealed class PostgresUserRepository(PostgresDbContext context) : IUserR
 
     private sealed record RenderingPreference(bool Enabled);
 
+    public AiConfig? GetAiConfig(UserId id) => context.FindOne<AiConfig>(
+        "SELECT document FROM izboard_service_state WHERE id = @id AND document IS NOT NULL",
+        PostgresDbContext.Parameter("id", "ai:" + id.Value));
+
+    public void SetAiConfig(UserId id, AiConfig config) => context.Execute(
+        "INSERT INTO izboard_service_state (id, document) VALUES (@id, @document) ON CONFLICT (id) DO UPDATE SET document = EXCLUDED.document",
+        PostgresDbContext.Parameter("id", "ai:" + id.Value), PostgresDbContext.DocumentParameter(config));
+
     public bool TryInsert(User user)
     {
         try { Insert(user); return true; }

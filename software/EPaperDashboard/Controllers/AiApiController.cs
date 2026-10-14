@@ -22,20 +22,18 @@ public sealed class AiApiController(
     [HttpGet("config")]
     public IActionResult GetGlobalAiConfig()
     {
-        var user = userService.GetUserById(CurrentUserId);
-        if (user.HasNoValue)
+        if (!userService.HasAccount(CurrentUserId))
         {
             return NotFound("User not found");
         }
 
-        return Ok(user.Value.AiConfig ?? new AiConfig());
+        return Ok(userService.GetAiConfig(CurrentUserId) ?? new AiConfig());
     }
 
     [HttpPut("config")]
     public IActionResult UpdateGlobalAiConfig([FromBody] AiConfig config)
     {
-        var user = userService.GetUserById(CurrentUserId);
-        if (user.HasNoValue)
+        if (!userService.HasAccount(CurrentUserId))
         {
             return NotFound("User not found");
         }
@@ -46,12 +44,14 @@ public sealed class AiApiController(
             return BadRequest(validationError);
         }
 
-        user.Value.AiConfig = config;
-        userService.UpdateUser(user.Value);
+        if (!userService.TryUpdateAiConfig(CurrentUserId, config))
+        {
+            return NotFound("User not found");
+        }
 
         if (config.ConnectionMode == AiConnectionMode.None)
         {
-            DisableAiOnDashboardsWithoutOverride(user.Value.Id);
+            DisableAiOnDashboardsWithoutOverride(CurrentUserId);
         }
 
         return Ok(config);
@@ -182,8 +182,7 @@ public sealed class AiApiController(
 
         if (config.ConnectionMode == AiConnectionMode.None && dashboard.IsAiEnabled)
         {
-            var user = userService.GetUserById(CurrentUserId);
-            var globalConfig = user.HasValue ? user.Value.AiConfig : null;
+            var globalConfig = userService.GetAiConfig(CurrentUserId);
             if (globalConfig == null || globalConfig.ConnectionMode == AiConnectionMode.None)
             {
                 dashboard.IsAiEnabled = false;
@@ -443,10 +442,8 @@ public sealed class AiApiController(
             return true;
         }
 
-        var user = userService.GetUserById(dashboard.UserId);
-        return user.HasValue
-            && user.Value.AiConfig != null
-            && user.Value.AiConfig.ConnectionMode != AiConnectionMode.None;
+        var globalConfig = userService.GetAiConfig(dashboard.UserId);
+        return globalConfig != null && globalConfig.ConnectionMode != AiConnectionMode.None;
     }
 }
 
