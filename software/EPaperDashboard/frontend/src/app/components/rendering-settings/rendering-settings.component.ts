@@ -12,7 +12,7 @@ import { ToastService } from '../../services/toast.service';
   template: `
     <div class="app-page">
       <div class="app-page-header"><div>
-        <h1 class="app-page-title">Rendering</h1>
+        <h2 class="app-page-title">Rendering</h2>
         <p class="app-page-description">Capture Home Assistant dashboards for your displays. Custom layouts work without it.</p>
       </div></div>
       @if (status(); as value) {

@@ -85,7 +85,7 @@ interface DashboardKind {
             @if (!status.enabled || !status.component.ready) {
               <div class="alert alert-warning small" role="alert">
                 <strong>Rendering is not ready.</strong> Home Assistant dashboards are captured by the rendering component.
-                <a routerLink="/rendering" target="_blank" rel="noopener" class="alert-link">Enable it in Rendering settings</a>; you can finish setup later.
+                <a routerLink="/settings" target="_blank" rel="noopener" class="alert-link">Enable it in Rendering settings</a>; you can finish setup later.
               </div>
             }
           }

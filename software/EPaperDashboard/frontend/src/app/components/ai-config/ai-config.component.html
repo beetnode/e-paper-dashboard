@@ -1,27 +1,9 @@
 <div class="app-page">
   <div class="app-page-header">
     <div>
-      <h1 class="app-page-title">AI provider</h1>
+      <h2 class="app-page-title">AI provider</h2>
       <p class="app-page-description">The default provider for AI generated widgets. A dashboard can use a Home Assistant conversation agent instead.</p>
     </div>
-    @if (!isLoading() && !loadError()) {
-      <div class="app-page-actions">
-        <span class="visually-hidden" aria-live="polite">{{ isDirty() ? 'Unsaved changes' : '' }}</span>
-        @if (isDirty() || isSaving()) {
-          <button type="submit" form="aiConfigForm" class="btn btn-primary" [disabled]="isSaving() || !isConfigValid()" aria-label="Save">
-            @if (isSaving()) {
-              <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-            } @else {
-              <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
-            }
-            <span class="d-none d-sm-inline">Save</span>
-          </button>
-          <button type="button" class="btn btn-outline-secondary" (click)="discardChanges()" [disabled]="isSaving()" title="Discard unsaved changes" aria-label="Discard unsaved changes">
-            <i class="fa-solid fa-rotate-left" aria-hidden="true"></i><span class="d-none d-sm-inline">Discard</span>
-          </button>
-        }
-      </div>
-    }
   </div>
 
     @if (isLoading()) {

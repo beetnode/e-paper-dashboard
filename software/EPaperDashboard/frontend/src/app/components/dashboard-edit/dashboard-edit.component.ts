@@ -121,7 +121,7 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
                 @if (!renderingEnabled() || !playwrightStatus()?.ready) {
                   <div class="alert alert-warning small" role="alert">
                     <strong>Rendering is not ready.</strong> Home Assistant dashboards are captured by the rendering component.
-                    <a routerLink="/rendering" target="_blank" rel="noopener" class="alert-link">Enable it in Rendering settings.</a>
+                    <a routerLink="/settings" target="_blank" rel="noopener" class="alert-link">Enable it in Rendering settings.</a>
                   </div>
                 }
                 <div class="row g-3 mb-3">
@@ -187,7 +187,7 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
             @if (previewModeValue === 'ssr') {
               <section class="app-section-card" aria-labelledby="aiSettingsTitle">
                 <h2 id="aiSettingsTitle" class="app-section-title">AI provider</h2>
-                <p class="app-section-description">Used for AI generated widgets. Defaults to the <a routerLink="/ai/config">global AI provider</a>.</p>
+                <p class="app-section-description">Used for AI generated widgets. Defaults to the <a routerLink="/settings">global AI provider</a>.</p>
                 <div [class.mb-3]="aiConfig().connectionMode === 'HomeAssistant'">
                   <label class="form-label fw-semibold" for="aiConnectionMode">Provider</label>
                   <select id="aiConnectionMode" class="form-select"
