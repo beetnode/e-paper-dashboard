@@ -78,7 +78,14 @@ public class PostgresRepositoryIntegrationTests
             sessions.Insert(session);
 
             users.FindByUsername(user.Username).Value.Id.Should().Be(user.Id);
+            users.ExistsByUsernameIgnoreCase(user.Username.ToUpperInvariant()).Should().BeTrue();
             users.ExistsSuperUser().Should().BeTrue();
+            var suspendedAdmin = new User { Username = $"suspended-{suffix}", IsSuperUser = true, IsSuspended = true };
+            users.Insert(suspendedAdmin);
+            users.ExistsOtherActiveSuperUser(suspendedAdmin.Id).Should().BeTrue();
+            var otherAdmins = users.GetAll().Where(u => u.IsSuperUser && !u.IsSuspended && u.Id != user.Id).ToList();
+            users.ExistsOtherActiveSuperUser(user.Id).Should().Be(otherAdmins.Count > 0);
+            users.Delete(suspendedAdmin.Id);
             dashboards.FindByUserId(user.Id).Should().ContainSingle();
             dashboards.FindById(dashboard.Id).Value.LayoutConfig!.Widgets[0].Config
                 .GetProperty("text").GetString().Should().Be("hello");
@@ -98,6 +105,22 @@ public class PostgresRepositoryIntegrationTests
             sessions.FindById(session.Id).Value.IsCompleted.Should().BeTrue();
             sessions.DeleteExpired(DateTimeOffset.UtcNow.AddHours(1));
             sessions.FindById(session.Id).HasValue.Should().BeFalse();
+
+            var otherUser = UserId.New();
+            var otherDevice = new Device { UserId = otherUser, DashboardId = dashboard.Id, DeviceIdentifier = $"other-{suffix}", ApiKey = $"other-key-{suffix}" };
+            devices.Insert(otherDevice);
+            var claimed = new PairingSession { Code = suffix[6..12].ToUpperInvariant(), UserId = user.Id, ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5) };
+            var otherSession = new PairingSession { Code = suffix[12..18].ToUpperInvariant(), UserId = otherUser, ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5) };
+            sessions.Insert(claimed);
+            sessions.Insert(otherSession);
+            devices.DeleteByUserId(user.Id);
+            sessions.DeleteByUserId(user.Id);
+            devices.FindByUserId(user.Id).Should().BeEmpty();
+            devices.FindById(otherDevice.Id).HasValue.Should().BeTrue();
+            sessions.FindById(claimed.Id).HasValue.Should().BeFalse();
+            sessions.FindById(otherSession.Id).HasValue.Should().BeTrue();
+            devices.Delete(otherDevice.Id);
+            sessions.DeleteExpired(DateTimeOffset.UtcNow.AddHours(1));
         }
         finally
         {
@@ -308,6 +331,24 @@ public class PostgresRepositoryIntegrationTests
                 WHERE table_schema = current_schema() AND table_name = 'izboard_pairing_sessions' AND column_name = 'expires_at'
                 """, connection);
             type.ExecuteScalar().Should().Be("timestamp with time zone");
+        });
+    }
+
+    [PostgresFact]
+    public void SetupCode_IsSharedAcrossConnectionsUntilSetupCompletes()
+    {
+        WithEmptySchema(connectionString =>
+        {
+            Migrate(connectionString);
+            using var first = CreateServices(connectionString);
+            using var second = CreateServices(connectionString);
+            var a = new PostgresUserRepository(first.GetRequiredService<PostgresDbContext>());
+            var b = new PostgresUserRepository(second.GetRequiredService<PostgresDbContext>());
+
+            a.GetOrCreateSetupCode("FIRST111").Should().Be("FIRST111");
+            b.GetOrCreateSetupCode("SECOND22").Should().Be("FIRST111");
+            a.TryCreateAdministrator(new User { Username = "admin" }).Should().BeTrue();
+            b.GetOrCreateSetupCode("THIRD333").Should().Be("THIRD333");
         });
     }
 

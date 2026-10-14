@@ -43,6 +43,19 @@ describe('RenderingSettingsComponent', () => {
     fixture.destroy();
   });
 
+  it('explains when an administrator turned rendering off and prevents enabling it', () => {
+    const fixture = TestBed.createComponent(RenderingSettingsComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/rendering').flush({ enabled: false, allowed: false, canManage: false,
+      component: { state: 'Installed', ready: true, supported: true } });
+    fixture.detectChanges();
+    const element: HTMLElement = fixture.nativeElement;
+    expect(element.textContent).toContain('An administrator turned off rendering for your account.');
+    const enable = Array.from(element.querySelectorAll('button')).find(b => b.textContent?.includes('Enable'))!;
+    expect(enable.disabled).toBe(true);
+    fixture.destroy();
+  });
+
   it('keeps the existing setting when an enable request fails', () => {
     const error = vi.spyOn(TestBed.inject(ToastService), 'error');
     const fixture = TestBed.createComponent(RenderingSettingsComponent);

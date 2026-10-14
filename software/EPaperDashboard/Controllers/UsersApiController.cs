@@ -1,5 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using EPaperDashboard.Authentication;
+using EPaperDashboard.Authorization;
 using EPaperDashboard.Guards;
 using EPaperDashboard.Services;
 using EPaperDashboard.Models;
@@ -11,7 +15,7 @@ namespace EPaperDashboard.Controllers;
 [Route("api/users")]
 [Authorize]
 [RequiresUserManagement]
-public class UsersApiController(UserService userService) : BaseApiController
+public class UsersApiController(UserService userService, ILogger<UsersApiController>? logger = null) : BaseApiController
 {
     [HttpPost("change-nickname")]
     public IActionResult ChangeNickname([FromBody] ChangeNicknameRequest request)
@@ -25,7 +29,8 @@ public class UsersApiController(UserService userService) : BaseApiController
     }
 
     [HttpPost("change-password")]
-    public IActionResult ChangePassword([FromBody] ChangePasswordRequest request)
+    [AllowedDuringPasswordChange]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.CurrentPassword) || 
             string.IsNullOrWhiteSpace(request.NewPassword) || 
@@ -41,6 +46,13 @@ public class UsersApiController(UserService userService) : BaseApiController
 
         if (userService.TryChangePassword(CurrentUserId, request.CurrentPassword, request.NewPassword))
         {
+            // The new security stamp ends every other session; reissue this one so the user stays signed in here.
+            var user = userService.GetUserById(CurrentUserId);
+            if (user.HasValue)
+            {
+                await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, UserClaims.Create(user.Value));
+            }
+
             return Ok(new { message = "Password changed successfully." });
         }
 
@@ -63,7 +75,7 @@ public class UsersApiController(UserService userService) : BaseApiController
     public IActionResult GetAllUsers()
     {
         var users = userService.GetAllUsers();
-        return Ok(users.Select(u => new { u.Id, u.Username, u.Nickname, u.IsSuperUser }));
+        return Ok(users.Select(u => new { u.Id, u.Username, u.Nickname, u.IsSuperUser, u.IsSuspended, u.MustChangePassword, RenderingAllowed = u.RenderingAllowed != false, u.CreatedAt }));
     }
 
     [HttpPost("add")]
@@ -73,32 +85,87 @@ public class UsersApiController(UserService userService) : BaseApiController
         var error = UserService.ValidateCredentials(request.Username, request.Password);
         if (error is not null) return BadRequest(new { message = error });
 
-        if (userService.TryCreateUser(request.Username.Trim(), request.Password))
+        if (userService.TryCreateUser(request.Username.Trim(), request.Password, request.MustChangePassword))
         {
+            Audit("added", request.Username.Trim());
             return Ok(new { message = "User added successfully." });
         }
 
         return BadRequest(new { message = "User already exists." });
     }
 
+    [HttpPut("{id}/role")]
+    [Authorize(Policy = "SuperUserOnly")]
+    public IActionResult SetRole(string id, [FromBody] SetRoleRequest request) =>
+        Administer(id, request.IsSuperUser ? "promoted" : "demoted",
+            target => userService.SetSuperUser(CurrentUserId, target, request.IsSuperUser),
+            request.IsSuperUser ? "User promoted to administrator." : "Administrator rights removed.");
+
+    [HttpPut("{id}/suspension")]
+    [Authorize(Policy = "SuperUserOnly")]
+    public IActionResult SetSuspension(string id, [FromBody] SetSuspensionRequest request) =>
+        Administer(id, request.Suspended ? "suspended" : "reinstated",
+            target => userService.SetSuspended(CurrentUserId, target, request.Suspended),
+            request.Suspended ? "User suspended." : "User reinstated.");
+
+    [HttpPut("{id}/rendering")]
+    [Authorize(Policy = "SuperUserOnly")]
+    public IActionResult SetRenderingAccess(string id, [FromBody] SetRenderingAccessRequest request) =>
+        Administer(id, request.Allowed ? "allowed rendering for" : "revoked rendering for",
+            target => userService.SetRenderingAllowed(CurrentUserId, target, request.Allowed),
+            request.Allowed ? "Rendering allowed." : "Rendering turned off for this user.");
+
+    [HttpPost("{id}/reset-password")]
+    [Authorize(Policy = "SuperUserOnly")]
+    public IActionResult ResetPassword(string id)
+    {
+        string? temporaryPassword = null;
+        var response = Administer(id, "reset the password of", target =>
+        {
+            var (result, password) = userService.ResetPassword(CurrentUserId, target);
+            temporaryPassword = password;
+            return result;
+        }, "Password reset.");
+
+        return temporaryPassword is null
+            ? response
+            : Ok(new { message = "Password reset. Share the temporary password with the user; it is shown only once.", temporaryPassword });
+    }
+
     [HttpDelete("{id}")]
     [Authorize(Policy = "SuperUserOnly")]
-    public IActionResult DeleteUser(string id)
+    public IActionResult DeleteUser(string id) =>
+        Administer(id, "deleted", target => userService.DeleteUserAsAdmin(CurrentUserId, target), "User deleted successfully.");
+
+    private IActionResult Administer(string id, string action, Func<UserId, AdminActionResult> change, string successMessage)
     {
-        if (!UserId.TryParse(id, out var userId))
+        if (!UserId.TryParse(id, out var target))
         {
             return BadRequest(new { message = "Invalid user id." });
         }
 
-        if (userService.TryDeleteUser(userId))
+        var result = change(target);
+        if (result == AdminActionResult.Done)
         {
-            return Ok(new { message = "User deleted successfully." });
+            Audit(action, target.ToString());
         }
 
-        return BadRequest(new { message = "Cannot delete user." });
+        return result switch
+        {
+            AdminActionResult.Done => Ok(new { message = successMessage }),
+            AdminActionResult.NotFound => NotFound(new { message = "User not found." }),
+            AdminActionResult.SelfNotAllowed => BadRequest(new { message = "Use your profile to change your own account." }),
+            _ => Conflict(new { message = "At least one active administrator must remain." })
+        };
     }
+
+    private void Audit(string action, string target) =>
+        logger?.LogInformation("Administrator {Actor} {Action} user {Target}", CurrentUserId, action, target);
 }
 
 public record ChangeNicknameRequest(string NewNickname);
 public record ChangePasswordRequest(string CurrentPassword, string NewPassword, string ConfirmNewPassword);
-public record AddUserRequest(string Username, string Password);
+public record AddUserRequest(string Username, string Password, bool MustChangePassword = true);
+public record SetRoleRequest(bool IsSuperUser);
+public record SetSuspensionRequest(bool Suspended);
+public record SetRenderingAccessRequest(bool Allowed);

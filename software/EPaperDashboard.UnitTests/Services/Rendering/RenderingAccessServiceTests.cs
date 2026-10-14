@@ -106,4 +106,34 @@ public sealed class RenderingAccessServiceTests
         access.SetEnabled(Constants.HomeAssistantVirtualUserId, false);
         _users.Verify(r => r.SetRenderingEnabled(Constants.HomeAssistantVirtualUserId, false), Times.Once);
     }
+
+    [Fact]
+    public void RevokedAccountsHaveNoAccessEvenWhenOptedIn()
+    {
+        var revoked = new User { Id = UserId.New(), RenderingAllowed = false };
+        _users.Setup(r => r.FindById(revoked.Id)).Returns(revoked);
+        _users.Setup(r => r.GetRenderingEnabled(revoked.Id)).Returns(true);
+
+        Create().IsEnabled(revoked.Id).Should().BeFalse();
+    }
+
+    [Fact]
+    public void AddonOwnerIsNeverRevoked()
+    {
+        _users.Setup(r => r.GetRenderingEnabled(Constants.HomeAssistantVirtualUserId)).Returns(true);
+
+        Create().IsEnabled(Constants.HomeAssistantVirtualUserId).Should().BeTrue();
+    }
+
+    [Fact]
+    public void RevokedAccountsCannotOptIn()
+    {
+        var revoked = new User { Id = UserId.New(), RenderingAllowed = false };
+        _users.Setup(r => r.FindById(revoked.Id)).Returns(revoked);
+
+        var access = Create();
+        access.IsAllowed(revoked.Id).Should().BeFalse();
+        FluentActions.Invoking(() => access.SetEnabled(revoked.Id, true)).Should().Throw<RenderingRequestException>();
+        _users.Verify(r => r.SetRenderingEnabled(revoked.Id, true), Times.Never);
+    }
 }

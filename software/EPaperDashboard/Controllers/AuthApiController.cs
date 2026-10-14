@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
+using EPaperDashboard.Authentication;
+using EPaperDashboard.Authorization;
 using EPaperDashboard.Services;
 using EPaperDashboard.Models;
 using EPaperDashboard.Utilities;
@@ -12,7 +14,8 @@ namespace EPaperDashboard.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public class AuthApiController(UserService userService, IDeploymentStrategy deploymentStrategy) : BaseApiController
+[AllowedDuringPasswordChange]
+public class AuthApiController(UserService userService, IDeploymentStrategy deploymentStrategy, SetupCodeProvider setupCodes) : BaseApiController
 {
     private readonly UserService _userService = userService;
     private readonly IDeploymentStrategy _deploymentStrategy = deploymentStrategy;
@@ -33,11 +36,15 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
     [HttpPost("setup")]
     [AllowAnonymous]
     [EnableRateLimiting("AccountCreation")]
-    public async Task<IActionResult> Setup([FromBody] RegisterRequest request)
+    public async Task<IActionResult> Setup([FromBody] SetupRequest request)
     {
         if (!_deploymentStrategy.IsUserManagementEnabled) return Forbid();
         var error = UserService.ValidateCredentials(request.Username, request.Password);
         if (error is not null) return BadRequest(new { message = error });
+        if (_userService.IsSetupComplete())
+            return Conflict(new { message = "Service setup is already complete. Sign in or create a regular account." });
+        if (!setupCodes.Matches(request.SetupCode))
+            return BadRequest(new { code = "invalid_setup_code", message = "The setup code is incorrect. Find the current code in the service log." });
         if (!_userService.TryCreateAdministrator(request.Username, request.Password))
             return Conflict(new { message = "Service setup is already complete. Sign in or create a regular account." });
         return await Login(new LoginRequest(request.Username.Trim(), request.Password));
@@ -45,33 +52,26 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
 
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("Login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         if (!_deploymentStrategy.IsUserManagementEnabled) return Forbid();
         if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrEmpty(request.Password))
             return Unauthorized(new { message = "Invalid username or password." });
-        if (!_userService.IsUserValid(request.Username, request.Password))
-        {
-            return Unauthorized(new { message = "Invalid username or password." });
-        }
-
-        var user = _userService.GetUserByUsername(request.Username);
+        var user = _userService.VerifyCredentials(request.Username, request.Password);
         if (user.HasNoValue)
         {
             return Unauthorized(new { message = "Invalid username or password." });
         }
-
-        var claims = new List<Claim>
+        if (user.Value.IsSuspended)
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Value.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.Value.Username),
-            new Claim(Constants.IsSuperUserClaim, user.Value.IsSuperUser.ToString().ToLower())
-        };
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        var principal = new ClaimsPrincipal(identity);
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+            return StatusCode(StatusCodes.Status403Forbidden,
+                new { code = "account_suspended", message = "This account is suspended. Contact the administrator." });
+        }
 
-        return Ok(UserResponse(user.Value.Id.ToString(), user.Value.Username, user.Value.Nickname, user.Value.IsSuperUser));
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, UserClaims.Create(user.Value));
+
+        return Ok(UserResponse(user.Value.Id.ToString(), user.Value.Username, user.Value.Nickname, user.Value.IsSuperUser, user.Value.MustChangePassword));
     }
 
     [HttpPost("register")]
@@ -85,13 +85,12 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
         var error = UserService.ValidateCredentials(request.Username, request.Password);
         if (error is not null) return BadRequest(new { message = error });
         request = request with { Username = request.Username.Trim() };
-        var existingUser = _userService.GetUserByUsername(request.Username);
-        if (existingUser.HasValue)
+        if (_userService.IsUsernameTaken(request.Username))
         {
             return BadRequest(new { message = "Username already exists." });
         }
 
-        if (!_userService.TryCreateUser(request.Username, request.Password, isSuperUser: false))
+        if (!_userService.TryCreateUser(request.Username, request.Password))
         {
             return BadRequest(new { message = "Failed to create user." });
         }
@@ -102,17 +101,9 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
             return BadRequest(new { message = "Failed to retrieve created user." });
         }
 
-        var claims = new List<Claim>
-        {
-            new Claim(ClaimTypes.NameIdentifier, user.Value.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.Value.Username),
-            new Claim(Constants.IsSuperUserClaim, user.Value.IsSuperUser.ToString().ToLower())
-        };
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        var principal = new ClaimsPrincipal(identity);
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, UserClaims.Create(user.Value));
 
-        return Ok(UserResponse(user.Value.Id.ToString(), user.Value.Username, user.Value.Nickname, user.Value.IsSuperUser));
+        return Ok(UserResponse(user.Value.Id.ToString(), user.Value.Username, user.Value.Nickname, user.Value.IsSuperUser, user.Value.MustChangePassword));
     }
 
     [HttpPost("logout")]
@@ -148,16 +139,17 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
             return Unauthorized();
         }
 
-        return Ok(UserResponse(user.Value.Id.ToString(), user.Value.Username, user.Value.Nickname, user.Value.IsSuperUser));
+        return Ok(UserResponse(user.Value.Id.ToString(), user.Value.Username, user.Value.Nickname, user.Value.IsSuperUser, user.Value.MustChangePassword));
     }
 
     // The deployment's capabilities travel with the user, so the UI never has to infer them from a mode name.
-    private object UserResponse(string? id, string? username, string? nickname, bool isSuperUser) => new
+    private object UserResponse(string? id, string? username, string? nickname, bool isSuperUser, bool mustChangePassword = false) => new
     {
         id,
         username,
         nickname,
         isSuperUser,
+        mustChangePassword,
         userManagementEnabled = _deploymentStrategy.IsUserManagementEnabled,
         hasDefaultHomeAssistantConnection = _deploymentStrategy.DefaultHomeAssistant is not null
     };
@@ -165,3 +157,4 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
 
 public record LoginRequest(string Username, string Password);
 public record RegisterRequest(string Username, string Password);
+public record SetupRequest(string Username, string Password, string? SetupCode);

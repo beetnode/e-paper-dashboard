@@ -15,10 +15,20 @@ import { AuthService } from '../../services/auth.service';
           <p class="app-page-description mx-auto">{{ isSetup ? 'This account manages the service and its users. You can create a separate account for your dashboards.' : 'Create your own e-paper dashboards.' }}</p>
         </div>
         <form (ngSubmit)="onSubmit()" class="app-form-card" novalidate>
+        @if (isSetup) {
+        <div class="mb-3">
+          <label class="form-label fw-semibold" for="setupCode">Setup code</label>
+          <input id="setupCode" type="text" class="form-control font-monospace text-uppercase" [(ngModel)]="setupCode" name="setupCode"
+            autocomplete="one-time-code" spellcheck="false" placeholder="XXXX-XXXX" aria-describedby="setupCodeHelp" required autofocus>
+          <small id="setupCodeHelp" class="form-text text-muted">
+            Printed in the service log at startup, for example with <code>docker logs &lt;container&gt;</code>.
+          </small>
+        </div>
+        }
         <div class="mb-3">
           <label class="form-label fw-semibold" for="registerUsername">Username</label>
           <input id="registerUsername" type="text" class="form-control" [(ngModel)]="username" name="username"
-            autocomplete="username" minlength="3" aria-describedby="registerUsernameHelp" required autofocus>
+            autocomplete="username" minlength="3" aria-describedby="registerUsernameHelp" required [autofocus]="!isSetup">
           <small id="registerUsernameHelp" class="form-text text-muted">At least 3 characters</small>
         </div>
         <div class="mb-3">
@@ -65,6 +75,7 @@ export class RegisterComponent {
   readonly isSetup = inject(ActivatedRoute).snapshot.data['setup'] === true;
   readonly registrationAllowed = signal(false);
 
+  setupCode = '';
   username = '';
   password = '';
   confirmPassword = '';
@@ -94,6 +105,11 @@ export class RegisterComponent {
   onSubmit(): void {
     if (!this.registrationAllowed()) return;
     const username = this.username.trim();
+    if (this.isSetup && !this.setupCode.trim()) {
+      this.errorMessage.set('Enter the setup code from the service log.');
+      return;
+    }
+
     if (!username || !this.password || !this.confirmPassword) {
       this.errorMessage.set('Please fill in all fields.');
       return;
@@ -118,7 +134,9 @@ export class RegisterComponent {
     this.errorMessage.set('');
 
     const request = { username, password: this.password };
-    (this.isSetup ? this.authService.setup(request) : this.authService.register(request)).subscribe({
+    (this.isSetup
+      ? this.authService.setup({ ...request, setupCode: this.setupCode.trim() })
+      : this.authService.register(request)).subscribe({
       next: () => {
         this.router.navigate([this.isSetup ? '/users/manage' : '/dashboards']);
       },

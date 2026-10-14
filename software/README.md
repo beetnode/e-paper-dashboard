@@ -13,7 +13,7 @@ The server component of the izBoard system. An ASP.NET Core web application with
 - E-Paper optimized image processing
 - Device management, claim-code pairing, and OTA firmware delivery
 - Configurable update schedules
-- Multi-user accounts with one-time administrator setup (standalone mode)
+- Multi-user accounts with one-time administrator setup, account administration and recovery (standalone mode)
 - LiteDB storage by default, or PostgreSQL for hosted deployments
 - Deployable as standalone Docker or Home Assistant Add-on
 - Optional Home Assistant dashboard screenshots through an on-demand, sandboxed rendering component
@@ -48,15 +48,46 @@ services:
 
 ### First-start accounts
 
-Open the web UI and create the **service administrator** through the one-time setup page.
-Complete setup before exposing a fresh installation to other people: the first successful setup request claims administration.
-The administrator manages accounts and shared server components. Ordinary users register separately and never receive administrator permissions.
+Open the web UI and create the **service administrator** through the one-time setup page. Setup asks for a **setup code**
+that the service writes to its log at every start until setup is complete, so only someone who can read the logs can
+claim a fresh instance:
+
+```bash
+docker compose -f docker-compose.base.yml logs app | grep -i "setup code"
+```
+
+The administrator manages accounts and shared server components. Ordinary users register separately and are never
+administrators by default. Administrators manage accounts under **Users**: they can make another account an administrator
+or remove those rights, suspend and reinstate accounts, issue a temporary password, and delete accounts. At least one
+active administrator always remains. Administrators never see other users' dashboards, devices or connections.
+Suspending an account signs it out and stops its devices from receiving updates. Administrators can also turn off
+browser rendering for an account, which takes precedence over that user's own setting.
+
+Each account can create up to 50 dashboards, pair up to 20 devices and add up to 20 connections. Existing items above a
+limit are kept; only new ones are refused. Usernames are unique regardless of letter case. The add-on is not limited.
 Existing accounts, administrator permissions, dashboards, and devices are preserved. Existing installations do not reopen setup,
 even if their accounts are later deleted. The old superuser environment variables are no longer read or required.
 Home Assistant add-on deployments continue using ingress authentication and disable local account setup and registration.
 The add-on uses one shared identity: its rendering setting and queue apply to everyone accessing that add-on.
 
 PostgreSQL upgrades require the maintenance migration described below; it records durable setup state and rendering preferences.
+
+#### Account recovery
+
+There is no email-based password reset. If no administrator can sign in, run the recovery command inside the service's
+container. It promotes an account to an active administrator, or prints a temporary password that must be changed at the
+next sign-in:
+
+```bash
+docker compose -f docker-compose.base.yml run --rm --no-deps app dotnet EPaperDashboard.dll --users promote alice
+docker compose -f docker-compose.base.yml run --rm --no-deps app dotnet EPaperDashboard.dll --users reset-password alice
+```
+
+With the default LiteDB database, stop the service first (`docker compose -f docker-compose.base.yml stop app`), because the database file is
+opened exclusively. With PostgreSQL the command can run while the service is up; running sessions pick up the change
+within 30 seconds.
+
+Behind TLS the sign-in cookie is marked secure automatically. Hosted instances should only be served over HTTPS.
 
 ### Home Assistant Add-on
 
@@ -215,7 +246,7 @@ component; each replica must be prepared by the administrator. Replicas must hav
 directories and private renderer sockets. User preferences are shared through PostgreSQL; queue limits are per replica, not cluster-wide.
 
 The service administrator retains global component installation/removal and diagnostic controls under **Settings → System**. Removing a shared
-component affects all users on that replica; an enabled user's next render can prepare it again. Use deployment configuration to take
+component affects all users on that replica until the administrator installs it again. Use deployment configuration to take
 a renderer offline for maintenance. Users only enable/disable their own capability and cannot remove shared files.
 
 Fresh processes, browser contexts, temporary directories, stripped environments, and ownership checks provide application-level
@@ -224,7 +255,7 @@ hard per-user resource boundary, or enforced per-job network-egress policy. Host
 sandboxing.
 
 Only the single-user Home Assistant add-on retains an in-app-container compatibility worker with browser sandboxing disabled.
-Standalone and host deployments require the isolated sidecar and browser sandboxing; they never fall back to compatibility mode.
+Standalone deployments require the isolated sidecar and browser sandboxing; they never fall back to compatibility mode.
 
 Stop the stack and remove its isolated test data and generated component artifacts with:
 

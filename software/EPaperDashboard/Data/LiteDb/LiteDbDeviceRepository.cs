@@ -34,4 +34,7 @@ internal sealed class LiteDbDeviceRepository(LiteDbContext context) : IDeviceRep
 
     public void Delete(DeviceId id) =>
         context.Devices.Delete(new ObjectId(id.Value));
+
+    public void DeleteByUserId(UserId userId) =>
+        context.Devices.DeleteMany(d => d.UserId == userId);
 }

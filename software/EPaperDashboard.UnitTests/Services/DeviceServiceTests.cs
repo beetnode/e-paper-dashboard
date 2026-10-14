@@ -71,4 +71,27 @@ public class DeviceServiceTests
 
         repo.Verify(r => r.Delete(id), Times.Once);
     }
+
+    [Fact]
+    public void GetDeviceByApiKey_OwnerSuspended_ReturnsNone()
+    {
+        var owner = new User { Id = UserId.New(), IsSuspended = true };
+        var repo = new Mock<IDeviceRepository>();
+        repo.Setup(r => r.FindByApiKey("key")).Returns(new Device { UserId = owner.Id });
+        var users = new Mock<IUserRepository>();
+        users.Setup(r => r.FindById(owner.Id)).Returns(owner);
+
+        new DeviceService(repo.Object, users.Object).GetDeviceByApiKey("key").HasValue.Should().BeFalse();
+    }
+
+    [Fact]
+    public void GetDeviceByApiKey_OwnerWithoutAccountRecord_ReturnsDevice()
+    {
+        var repo = new Mock<IDeviceRepository>();
+        repo.Setup(r => r.FindByApiKey("key")).Returns(new Device { UserId = UserId.New() });
+        var users = new Mock<IUserRepository>();
+        users.Setup(r => r.FindById(It.IsAny<UserId>())).Returns(Maybe<User>.None);
+
+        new DeviceService(repo.Object, users.Object).GetDeviceByApiKey("key").HasValue.Should().BeTrue();
+    }
 }

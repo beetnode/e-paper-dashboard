@@ -1,3 +1,4 @@
+using EPaperDashboard.Utilities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
@@ -59,6 +60,12 @@ public class DashboardApiController(DashboardService dashboardService, UserServi
         if (!_userService.HasAccount(CurrentUserId))
         {
             return Unauthorized();
+        }
+
+        if (UserLimits.AppliesTo(CurrentUserId)
+            && _dashboardService.GetDashboardsForUser(CurrentUserId).Count >= UserLimits.MaxDashboards)
+        {
+            return BadRequest(new { message = $"You can create up to {UserLimits.MaxDashboards} dashboards." });
         }
 
         var dashboard = new Dashboard

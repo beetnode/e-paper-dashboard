@@ -26,7 +26,9 @@ import { ToastService } from '../../services/toast.service';
             </div>
             <span class="app-status-chip" [ngClass]="'app-status-chip-' + state(value).tone" role="status">{{ state(value).label }}</span>
           </div>
-          @if (!value.component.supported) {
+          @if (value.allowed === false) {
+            <p class="small text-muted">An administrator turned off rendering for your account. Contact them to have it restored.</p>
+          } @else if (!value.component.supported) {
             <p class="small text-muted">Browser rendering requires a Linux x64 or arm64 server.</p>
           } @else if (!value.canManage && value.enabled && !value.component.ready) {
             <p class="small text-muted">{{ value.component.state === 'Installing'
@@ -35,7 +37,7 @@ import { ToastService } from '../../services/toast.service';
           }
           <div class="d-flex flex-wrap gap-2">
             <button type="button" class="btn" [class.btn-primary]="!value.enabled" [class.btn-outline-secondary]="value.enabled"
-              [disabled]="busy() || (!value.enabled && !value.component.supported)" (click)="setEnabled(!value.enabled)">
+              [disabled]="busy() || (!value.enabled && (!value.component.supported || value.allowed === false))" (click)="setEnabled(!value.enabled)">
               {{ value.enabled ? 'Disable' : 'Enable' }} {{ isSharedAccount() ? 'for this add-on' : 'for my account' }}
             </button>
             @if (value.canManage && value.enabled && !value.component.ready && value.component.state !== 'Installing' && value.component.supported) {
@@ -76,6 +78,7 @@ export class RenderingSettingsComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void { if (this.timer) clearTimeout(this.timer); }
 
   state(value: UserRenderingStatus): { label: string; tone: 'success' | 'info' | 'warning' | 'muted' } {
+    if (value.allowed === false) return { label: 'Turned off by administrator', tone: 'muted' };
     if (!value.enabled) return { label: 'Disabled', tone: 'muted' };
     if (value.component.ready) return { label: 'Ready', tone: 'success' };
     if (value.component.state === 'Installing') return { label: 'Preparing…', tone: 'info' };

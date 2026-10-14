@@ -4,7 +4,7 @@ using EPaperDashboard.Models;
 
 namespace EPaperDashboard.Services;
 
-public sealed class DeviceService(IDeviceRepository deviceRepository)
+public sealed class DeviceService(IDeviceRepository deviceRepository, IUserRepository? users = null)
 {
     public List<Device> GetDevicesForDashboard(DashboardId dashboardId) =>
         deviceRepository.FindByDashboardId(dashboardId);
@@ -27,6 +27,8 @@ public sealed class DeviceService(IDeviceRepository deviceRepository)
     public Maybe<Device> GetDeviceByIdentifier(string deviceIdentifier) =>
         deviceRepository.FindByIdentifier(deviceIdentifier);
 
+    /// <summary>Finds the device a key belongs to; keys of devices whose owner is suspended stop working.</summary>
     public Maybe<Device> GetDeviceByApiKey(string apiKey) =>
-        deviceRepository.FindByApiKey(apiKey);
+        deviceRepository.FindByApiKey(apiKey)
+            .Where(device => users?.FindById(device.UserId).Map(owner => owner.IsSuspended).GetValueOrDefault() != true);
 }

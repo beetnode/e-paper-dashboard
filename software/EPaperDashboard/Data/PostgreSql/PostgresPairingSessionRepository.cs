@@ -36,6 +36,10 @@ internal sealed class PostgresPairingSessionRepository(PostgresDbContext context
         "DELETE FROM izboard_pairing_sessions WHERE expires_at <= @before",
         PostgresDbContext.Parameter("before", before.ToUniversalTime()));
 
+    public void DeleteByUserId(UserId userId) => context.Execute(
+        "DELETE FROM izboard_pairing_sessions WHERE document->>'UserId' = @user_id",
+        PostgresDbContext.Parameter("user_id", userId.Value));
+
     public bool HasActiveSessions(DateTimeOffset now) => context.Exists("""
         SELECT EXISTS (SELECT 1 FROM izboard_pairing_sessions
             WHERE NOT is_completed AND expires_at > @now)

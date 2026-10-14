@@ -32,7 +32,7 @@ public sealed class RenderingSettingsControllerTests : IDisposable
         var controller = Create();
         var result = (OkObjectResult)await controller.GetStatus();
         var json = JsonSerializer.SerializeToElement(result.Value, new JsonSerializerOptions(JsonSerializerDefaults.Web));
-        json.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo("enabled", "canManage", "component");
+        json.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo("enabled", "allowed", "canManage", "component");
         json.GetProperty("component").EnumerateObject().Select(p => p.Name)
             .Should().BeEquivalentTo("state", "supported", "ready");
     }

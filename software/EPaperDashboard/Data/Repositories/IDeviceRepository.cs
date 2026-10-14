@@ -13,4 +13,5 @@ public interface IDeviceRepository
     void Insert(Device device);
     void Update(Device device);
     void Delete(DeviceId id);
+    void DeleteByUserId(UserId userId);
 }

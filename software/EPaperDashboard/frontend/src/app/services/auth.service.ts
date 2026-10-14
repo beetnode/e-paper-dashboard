@@ -1,7 +1,7 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
-import { User, LoginRequest, RegisterRequest } from '../models/types';
+import { User, LoginRequest, RegisterRequest, SetupRequest } from '../models/types';
 
 @Injectable({
   providedIn: 'root'
@@ -16,6 +16,7 @@ export class AuthService {
   readonly authReady = this.authReadySignal.asReadonly();
   readonly isAuthenticated = computed(() => this.currentUserSignal() !== null);
   readonly isAuthReady = computed(() => this.authReadySignal());
+  readonly mustChangePassword = computed(() => this.currentUserSignal()?.mustChangePassword === true);
   readonly isUserManagementDisabled = computed(() => this.currentUserSignal()?.userManagementEnabled === false);
   readonly hasDefaultHomeAssistantConnection = computed(() => this.currentUserSignal()?.hasDefaultHomeAssistantConnection === true);
 
@@ -23,7 +24,7 @@ export class AuthService {
     return this.http.get<{ setupRequired: boolean; registrationEnabled: boolean }>('/api/auth/setup');
   }
 
-  setup(credentials: RegisterRequest): Observable<User> {
+  setup(credentials: SetupRequest): Observable<User> {
     return this.http.post<User>('/api/auth/setup', credentials).pipe(tap(user => {
       this.currentUserSignal.set(user);
       this.authReadySignal.set(true);

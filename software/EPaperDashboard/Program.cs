@@ -37,6 +37,12 @@ if (args.Contains("--maintenance"))
     return;
 }
 
+if (args.Contains("--users"))
+{
+    Environment.ExitCode = UserAdminCommand.Run(new EnvironmentConfigurationWrapper(), args);
+    return;
+}
+
 // The same slim image runs the restricted sidecar, keeping both hosts on the exact app build.
 // Exit before app configuration, databases, authentication, or application routes are initialized.
 if (args.Contains("--rendering-host"))
@@ -95,7 +101,7 @@ builder.Services.AddDataProtection()
 	.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysDir));
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddControllers()
+builder.Services.AddControllers(options => options.Filters.Add<PasswordChangeRequiredFilter>())
 	.AddJsonOptions(options =>
 	{
 		options.JsonSerializerOptions.Converters.Add(new TimeOnlyJsonConverter());
@@ -104,17 +110,18 @@ builder.Services.AddControllers()
 builder.Services.AddRateLimiter(options =>
 {
 	options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-	options.AddPolicy("AccountCreation", context => PairingRateLimit(context, 10));
-	options.AddPolicy("PairingAnnounce", context => PairingRateLimit(context, 10));
-	options.AddPolicy("PairingStatus", context => PairingRateLimit(context, 240));
-	options.AddPolicy("PairingClaim", context => PairingRateLimit(context, 10));
+	options.AddPolicy("AccountCreation", context => IpRateLimit(context, 10));
+	options.AddPolicy("Login", context => IpRateLimit(context, 10));
+	options.AddPolicy("PairingAnnounce", context => IpRateLimit(context, 10));
+	options.AddPolicy("PairingStatus", context => IpRateLimit(context, 240));
+	options.AddPolicy("PairingClaim", context => IpRateLimit(context, 10));
 	options.OnRejected = (context, _) =>
 	{
 		context.HttpContext.Response.Headers.RetryAfter = "5";
 		return ValueTask.CompletedTask;
 	};
 
-	static RateLimitPartition<string> PairingRateLimit(HttpContext context, int permitsPerMinute) =>
+	static RateLimitPartition<string> IpRateLimit(HttpContext context, int permitsPerMinute) =>
 		RateLimitPartition.GetFixedWindowLimiter(
 			context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
 			_ => new FixedWindowRateLimiterOptions
@@ -167,7 +174,9 @@ builder.Services
 	.AddSingleton<RenderingAccessService>()
 	.AddHostedService(sp => sp.GetRequiredService<PlaywrightComponentManager>())
 	.AddSingleton<IImageFactory, ImageFactory>()
+	.AddSingleton<UserSessionValidator>()
 	.AddSingleton<UserService>()
+	.AddSingleton<SetupCodeProvider>()
 	.AddSingleton<DashboardService>()
 	.AddSingleton<DeviceService>()
 	.AddSingleton<PairingService>()
@@ -263,8 +272,29 @@ builder.Services.AddAuthentication(DefaultAuthenticationScheme)
 	options.LogoutPath = "/Logout";
 	options.AccessDeniedPath = "/AccessDenied";
 	options.Cookie.HttpOnly = true;
+	options.Cookie.SameSite = SameSiteMode.Lax;
+	// Self-hosted instances often run plain HTTP on the LAN; behind TLS the cookie is marked Secure automatically.
+	options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+	options.ExpireTimeSpan = TimeSpan.FromDays(14);
+	options.SlidingExpiration = true;
 	options.Events.OnRedirectToLogin = ReturnForbiddenInsteadOfRedirect;
 	options.Events.OnRedirectToAccessDenied = ReturnForbiddenInsteadOfRedirect;
+	options.Events.OnValidatePrincipal = async context =>
+	{
+		if (context.Principal is null) return;
+		var check = context.HttpContext.RequestServices.GetRequiredService<UserSessionValidator>().Validate(context.Principal);
+		switch (check.State)
+		{
+			case SessionState.Reject:
+				context.RejectPrincipal();
+				await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+				break;
+			case SessionState.Refresh:
+				context.ReplacePrincipal(check.Principal!);
+				context.ShouldRenew = true;
+				break;
+		}
+	};
 
 	static Task ReturnForbiddenInsteadOfRedirect(Microsoft.AspNetCore.Authentication.RedirectContext<CookieAuthenticationOptions> context)
 	{
@@ -320,6 +350,7 @@ catch (Exception exception)
 app.Services.GetRequiredService<LegacyHomeAssistantSettingsMigration>().Run();
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
+app.Services.GetRequiredService<SetupCodeProvider>().AnnounceIfPending(logger);
 var strategy = app.Services.GetRequiredService<IDeploymentStrategy>();
 
 // Only loopback proxies are trusted: ingress requests are recognized by the Supervisor's own address.

@@ -72,9 +72,15 @@ export class LoginComponent implements OnInit {
         this.authService.isAuthReady() &&
         this.authService.isAuthenticated()) {
         this.hasRedirected = true;
-        this.router.navigate([this.returnUrl === '/dashboards' && this.authService.currentUser()?.isSuperUser ? '/users/manage' : this.returnUrl]);
+        this.router.navigate([this.landingUrl()]);
       }
     });
+  }
+
+  private landingUrl(): string {
+    const user = this.authService.currentUser();
+    if (user?.mustChangePassword) return '/users/profile';
+    return this.returnUrl === '/dashboards' && user?.isSuperUser ? '/users/manage' : this.returnUrl;
   }
 
   ngOnInit(): void {
@@ -93,7 +99,7 @@ export class LoginComponent implements OnInit {
 
     this.authService.login({ username, password: this.password }).subscribe({
       next: () => {
-        this.router.navigate([this.returnUrl === '/dashboards' && this.authService.currentUser()?.isSuperUser ? '/users/manage' : this.returnUrl]);
+        this.router.navigate([this.landingUrl()]);
       },
       error: (error) => {
         this.errorMessage.set(error.error?.message || 'Invalid username or password.');

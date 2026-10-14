@@ -18,11 +18,7 @@ export const authGuard: CanActivateFn = (route, state) => {
           clearInterval(checkInterval);
           if (!resolved) {
             resolved = true;
-            const canActivate = authService.isAuthenticated();
-            if (!canActivate) {
-              router.navigate(['/login'], { queryParams: { returnUrl: state.url } });
-            }
-            resolve(canActivate);
+            resolve(decide());
           }
         } else if (attempts >= maxAttempts) {
           clearInterval(checkInterval);
@@ -36,9 +32,20 @@ export const authGuard: CanActivateFn = (route, state) => {
     });
   }
 
-  const canActivate = authService.isAuthenticated();
-  if (!canActivate) {
-    router.navigate(['/login'], { queryParams: { returnUrl: state.url } });
+  return decide();
+
+  function decide(): boolean {
+    if (!authService.isAuthenticated()) {
+      router.navigate(['/login'], { queryParams: { returnUrl: state.url } });
+      return false;
+    }
+    // A temporary password from an administrator has to be replaced before anything else.
+    if (authService.mustChangePassword() && !state.url.startsWith(PROFILE_URL)) {
+      router.navigate([PROFILE_URL]);
+      return false;
+    }
+    return true;
   }
-  return canActivate;
 };
+
+const PROFILE_URL = '/users/profile';
