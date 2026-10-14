@@ -2,7 +2,6 @@ import { Routes } from '@angular/router';
 import { authGuard } from './guards/auth.guard';
 import { superUserGuard } from './guards/superuser.guard';
 import { unsavedChangesGuard } from './guards/unsaved-changes.guard';
-import { systemAdminGuard } from './guards/system-admin.guard';
 
 export const routes: Routes = [
   { path: 'connections', canActivate: [authGuard], loadComponent: () => import('./components/provider-connections/provider-connections.component').then(m => m.ProviderConnectionsComponent) },
@@ -19,11 +18,6 @@ export const routes: Routes = [
     path: 'setup',
     data: { setup: true },
     loadComponent: () => import('./components/register/register.component').then(m => m.RegisterComponent)
-  },
-  {
-    path: 'rendering',
-    canActivate: [authGuard],
-    loadComponent: () => import('./components/rendering-settings/rendering-settings.component').then(m => m.RenderingSettingsComponent)
   },
   {
     path: 'register',
@@ -63,21 +57,20 @@ export const routes: Routes = [
     loadComponent: () => import('./components/profile/profile.component').then(m => m.ProfileComponent)
   },
   {
-    path: 'ai/config',
+    path: 'settings',
     canActivate: [authGuard],
     canDeactivate: [unsavedChangesGuard],
-    loadComponent: () => import('./components/ai-config/ai-config.component').then(m => m.AiConfigComponent)
+    loadComponent: () => import('./components/settings/settings.component').then(m => m.SettingsComponent)
   },
   {
     path: 'users/manage',
     canActivate: [authGuard, superUserGuard],
     loadComponent: () => import('./components/users-management/users-management.component').then(m => m.UsersManagementComponent)
   },
-  {
-    path: 'system',
-    canActivate: [authGuard, systemAdminGuard],
-    loadComponent: () => import('./components/system-settings/system-settings.component').then(m => m.SystemSettingsComponent)
-  },
+  // Pre-settings-page URLs, kept so bookmarks keep working.
+  { path: 'ai/config', redirectTo: '/settings', pathMatch: 'full' },
+  { path: 'rendering', redirectTo: '/settings', pathMatch: 'full' },
+  { path: 'system', redirectTo: '/settings', pathMatch: 'full' },
   {
     path: 'privacy',
     loadComponent: () => import('./components/privacy/privacy.component').then(m => m.PrivacyComponent)
