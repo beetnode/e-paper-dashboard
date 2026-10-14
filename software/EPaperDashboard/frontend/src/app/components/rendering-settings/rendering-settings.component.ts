@@ -22,19 +22,23 @@ import { ToastService } from '../../services/toast.service';
               <h2 id="renderingTitle" class="app-section-title">{{ isSharedAccount() ? 'Add-on rendering' : 'Rendering for your account' }}</h2>
               <p class="app-section-description">{{ isSharedAccount()
                 ? 'Rendering is shared by everyone using this add-on. Disabling it affects the whole add-on.'
-                : 'Each render uses a fresh browser session. Disabling rendering affects only your account.' }}</p>
+                : 'Each render uses a fresh browser session. Enabling or disabling rendering affects only your account.' }}</p>
             </div>
             <span class="app-status-chip" [ngClass]="'app-status-chip-' + state(value).tone" role="status">{{ state(value).label }}</span>
           </div>
           @if (!value.component.supported) {
             <p class="small text-muted">Browser rendering requires a Linux x64 or arm64 server.</p>
+          } @else if (!value.canManage && value.enabled && !value.component.ready) {
+            <p class="small text-muted">{{ value.component.state === 'Installing'
+              ? 'Rendering is being prepared on this server. It will be ready shortly.'
+              : 'Rendering is not available on this server yet.' }}</p>
           }
           <div class="d-flex flex-wrap gap-2">
             <button type="button" class="btn" [class.btn-primary]="!value.enabled" [class.btn-outline-secondary]="value.enabled"
               [disabled]="busy() || (!value.enabled && !value.component.supported)" (click)="setEnabled(!value.enabled)">
               {{ value.enabled ? 'Disable' : 'Enable' }} {{ isSharedAccount() ? 'for this add-on' : 'for my account' }}
             </button>
-            @if (value.enabled && !value.component.ready && value.component.state !== 'Installing' && value.component.supported) {
+            @if (value.canManage && value.enabled && !value.component.ready && value.component.state !== 'Installing' && value.component.supported) {
               <button type="button" class="btn btn-outline-primary" [disabled]="busy()" (click)="setEnabled(true)">Prepare rendering</button>
             }
             @if (value.enabled && value.component.ready) {
@@ -105,6 +109,9 @@ export class RenderingSettingsComponent implements OnInit, OnDestroy {
   private accept(status: UserRenderingStatus): void {
     this.status.set(status);
     if (this.timer) clearTimeout(this.timer);
-    if (status.enabled && !status.component.ready) this.timer = setTimeout(() => this.refresh(), 2000);
+    // Installation and a restarting renderer change on their own; missing or failed components wait for an administrator.
+    if (!status.enabled || status.component.ready) return;
+    if (status.component.state === 'Installing') this.timer = setTimeout(() => this.refresh(), 3000);
+    else if (status.component.state === 'Installed') this.timer = setTimeout(() => this.refresh(), 10000);
   }
 }

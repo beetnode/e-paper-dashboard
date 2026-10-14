@@ -55,4 +55,43 @@ describe('RenderingSettingsComponent', () => {
     expect(fixture.componentInstance.busy()).toBe(false);
     fixture.destroy();
   });
+
+  it('tells a regular user rendering is unavailable instead of preparing the shared component', () => {
+    vi.useFakeTimers();
+    const fixture = TestBed.createComponent(RenderingSettingsComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/rendering').flush({ enabled: true, canManage: false, component: { state: 'NotInstalled', ready: false, supported: true } });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('Prepare rendering');
+    expect(fixture.nativeElement.textContent).toContain('not available on this server');
+    vi.advanceTimersByTime(30000);
+    http.expectNone('/api/rendering');
+    fixture.destroy();
+    vi.useRealTimers();
+  });
+
+  it('lets an administrator prepare the component', () => {
+    const fixture = TestBed.createComponent(RenderingSettingsComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/rendering').flush({ enabled: true, canManage: true, component: { state: 'Failed', ready: false, supported: true } });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Prepare rendering');
+    expect(fixture.nativeElement.textContent).not.toContain('not available on this server');
+    fixture.destroy();
+  });
+
+  it('refreshes the status while the component is being prepared', () => {
+    vi.useFakeTimers();
+    const fixture = TestBed.createComponent(RenderingSettingsComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/rendering').flush({ enabled: true, canManage: false, component: { state: 'Installing', ready: false, supported: true } });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('being prepared');
+    vi.advanceTimersByTime(3000);
+    http.expectOne('/api/rendering').flush({ enabled: true, canManage: false, component: { state: 'Installed', ready: true, supported: true } });
+    vi.advanceTimersByTime(30000);
+    http.expectNone('/api/rendering');
+    fixture.destroy();
+    vi.useRealTimers();
+  });
 });
