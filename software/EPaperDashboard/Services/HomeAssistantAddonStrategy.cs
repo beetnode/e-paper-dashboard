@@ -4,6 +4,7 @@ using CSharpFunctionalExtensions;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Encodings.Web;
+using Microsoft.Extensions.Primitives;
 
 namespace EPaperDashboard.Services;
 
@@ -38,6 +39,9 @@ public class HomeAssistantAddonStrategy : IDeploymentStrategy
     // long-lived tokens: rendering a Home Assistant dashboard needs a connection with a user's own token.
     public HomeAssistantEndpoint? DefaultHomeAssistant => new(Constants.SupervisorCoreUrl, _supervisorToken, "/websocket");
 
+    // Supervisor add-ons run as a single container, so there is no rendering sidecar.
+    public bool RunsRendererInProcess => true;
+
     public string GetConfigDirectory() => _environmentConfiguration.ConfigDir;
 
     public UnitResult<string> ValidateConfiguration()
@@ -55,26 +59,53 @@ public class HomeAssistantAddonStrategy : IDeploymentStrategy
 
     public bool IsIngressRequest(HttpContext context) => TryGetIngressPath(context, out _);
 
-    public Uri? GetOAuthClientUri(HttpContext? context = null)
+    public Result<HomeAssistantOAuthClient, string> GetHomeAssistantOAuthClient(HttpContext? context)
     {
-        if (context is not null && TryGetIngressPath(context, out var ingressPath))
+        if (context is null || !TryGetIngressPath(context, out var ingressPath) || BrowserOrigin(context) is not { } origin)
         {
-            var browserOrigin = context.Items["BrowserOrigin"]?.ToString()?.TrimEnd('/')
-                ?? "http://homeassistant";
-            var ingressUrl = $"{browserOrigin}{ingressPath}";
-            _logger.LogDebug("Using ingress URL from request context: {IngressUrl}", ingressUrl);
-            return new Uri(ingressUrl);
+            _logger.LogWarning("Home Assistant sign-in needs a request through ingress that names the browser's origin.");
+            return "Could not determine ingress URL from request. Ensure you're accessing the addon through Home Assistant ingress.";
         }
 
-        _logger.LogWarning("OAuth client URI not available - no ingress header in request context.");
+        // Home Assistant accepts redirect URIs on the client ID's origin. Under ingress that origin is Home Assistant's.
+        return new HomeAssistantOAuthClient(origin + ingressPath, origin);
+    }
+
+    /// <summary>
+    /// The origin the browser uses for Home Assistant: browsers send it on the POST that starts sign-in, and
+    /// Home Assistant forwards the scheme and host it was reached on.
+    /// </summary>
+    internal static string? BrowserOrigin(HttpContext context)
+    {
+        var headers = context.Request.Headers;
+        var forwardedProto = FirstValue(headers["X-Forwarded-Proto"]);
+        var forwardedHost = FirstValue(headers["X-Forwarded-Host"]);
+        string?[] candidates =
+        [
+            headers.Origin.ToString(),
+            forwardedProto is null || forwardedHost is null ? null : $"{forwardedProto}://{forwardedHost}"
+        ];
+
+        foreach (var candidate in candidates)
+        {
+            if (Uri.TryCreate(candidate, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https"
+                && string.IsNullOrEmpty(uri.UserInfo) && uri.PathAndQuery == "/" && string.IsNullOrEmpty(uri.Fragment))
+            {
+                return uri.GetLeftPart(UriPartial.Authority);
+            }
+        }
+
         return null;
     }
+
+    private static string? FirstValue(StringValues values) =>
+        values.ToString().Split(',')[0].Trim() is { Length: > 0 } value ? value : null;
 
     public void PerformInitialSetup(IServiceProvider serviceProvider)
     {
     }
 
-    public void ApplyMiddleware(IApplicationBuilder app, IWebHostEnvironment environment)
+    public void UseBeforeRouting(IApplicationBuilder app, IWebHostEnvironment environment)
     {
         app.Use(async (context, next) =>
         {
@@ -87,7 +118,7 @@ public class HomeAssistantAddonStrategy : IDeploymentStrategy
         });
     }
 
-    public void ApplyPostStaticFilesMiddleware(IApplicationBuilder app, IWebHostEnvironment environment)
+    public void UseBeforeStaticFiles(IApplicationBuilder app, IWebHostEnvironment environment)
     {
         app.Use(async (context, next) =>
         {

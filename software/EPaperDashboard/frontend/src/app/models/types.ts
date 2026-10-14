@@ -1,11 +1,12 @@
-export type DeploymentMode = 'addon' | 'standalone';
-
 export interface User {
   id: string;
   username: string;
   nickname?: string;
   isSuperUser: boolean;
-  deploymentMode?: DeploymentMode;
+  /** False when the deployment signs everyone in as one shared user (the Home Assistant add-on). */
+  userManagementEnabled?: boolean;
+  /** The deployment provides a Home Assistant connection of its own (the add-on's server). */
+  hasDefaultHomeAssistantConnection?: boolean;
 }
 
 export interface LoginRequest {

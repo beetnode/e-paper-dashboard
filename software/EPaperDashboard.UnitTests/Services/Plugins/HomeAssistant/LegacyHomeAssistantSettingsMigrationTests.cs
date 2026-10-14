@@ -28,13 +28,11 @@ public class LegacyHomeAssistantSettingsMigrationTests
         _dashboards.Setup(r => r.FindById(It.IsAny<DashboardId>()))
             .Returns((DashboardId id) => _stored.TryGetValue(id, out var d) ? Maybe.From(d) : Maybe<Dashboard>.None);
         _dashboards.Setup(r => r.Update(It.IsAny<Dashboard>())).Callback((Dashboard d) => _stored[d.Id] = d);
-        _deployment.SetupGet(d => d.Mode).Returns(DeploymentMode.Standalone);
         _connections = InMemoryProviderConnectionRepository.CreateStore(new HomeAssistantAddonConnection(_deployment.Object));
     }
 
     private void UseAddon()
     {
-        _deployment.SetupGet(d => d.Mode).Returns(DeploymentMode.Addon);
         _deployment.SetupGet(d => d.DefaultHomeAssistant).Returns(new HomeAssistantEndpoint("http://supervisor/core", "supervisor", "/websocket"));
     }
 

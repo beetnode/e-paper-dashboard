@@ -388,7 +388,6 @@ public class PostgresRepositoryIntegrationTests
             // Instances share data protection keys in production; one ephemeral provider stands in for them.
             var protection = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
             var deployment = new Moq.Mock<EPaperDashboard.Services.IDeploymentStrategy>();
-            deployment.SetupGet(d => d.Mode).Returns(EPaperDashboard.Utilities.DeploymentMode.Standalone);
 
             Parallel.For(0, 3, _ =>
             {

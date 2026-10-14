@@ -13,12 +13,14 @@ public interface IDeploymentStrategy
     /// It backs every user's default Home Assistant connection; null when the deployment has none.
     /// </summary>
     HomeAssistantEndpoint? DefaultHomeAssistant { get; }
+    /// <summary>Whether browser rendering runs inside the app instead of the restricted rendering sidecar.</summary>
+    bool RunsRendererInProcess { get; }
     UnitResult<string> ValidateConfiguration();
     string GetConfigDirectory();
     /// <summary>Whether the request came through Home Assistant ingress, which signs it in as the add-on's shared user.</summary>
     bool IsIngressRequest(HttpContext context);
-    Uri? GetOAuthClientUri(HttpContext? context = null);
+    Result<HomeAssistantOAuthClient, string> GetHomeAssistantOAuthClient(HttpContext? context);
     void PerformInitialSetup(IServiceProvider serviceProvider);
-    void ApplyMiddleware(IApplicationBuilder app, IWebHostEnvironment environment);
-    void ApplyPostStaticFilesMiddleware(IApplicationBuilder app, IWebHostEnvironment environment);
+    void UseBeforeRouting(IApplicationBuilder app, IWebHostEnvironment environment);
+    void UseBeforeStaticFiles(IApplicationBuilder app, IWebHostEnvironment environment);
 }

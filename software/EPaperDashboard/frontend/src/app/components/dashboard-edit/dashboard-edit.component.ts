@@ -207,7 +207,7 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
                         [ngModel]="aiConfig().homeAssistantConnectionId || ''"
                         (ngModelChange)="onAiHomeAssistantConnectionChange($event)"
                         [ngModelOptions]="{standalone: true}">
-                        @if (isAddonMode()) {
+                        @if (hasDefaultHomeAssistantConnection()) {
                           <option value="">Home Assistant add-on</option>
                         } @else {
                           <option value="" disabled>Select a connection</option>
@@ -301,7 +301,7 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
   private readonly playwrightComponentService = inject(PlaywrightComponentService);
   private readonly dataProviderService = inject(DataProviderService);
 
-  readonly isAddonMode = this.authService.isAddonMode;
+  readonly hasDefaultHomeAssistantConnection = this.authService.hasDefaultHomeAssistantConnection;
 
   readonly dashboard = signal<Dashboard | null>(null);
   readonly isLoading = signal(false);
@@ -580,9 +580,9 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
     this.aiConfig.update(c => ({ ...c, connectionMode: mode }));
     this.dashboardForm.markAsDirty();
     if (mode === 'HomeAssistant') {
-      // Outside the add-on, a named connection is required; start with a signed-in one.
+      // Without a default connection, a named one is required; start with a signed-in one.
       const currentDashboard = this.dashboard();
-      if (!this.aiConfig().homeAssistantConnectionId && !this.isAddonMode()) {
+      if (!this.aiConfig().homeAssistantConnectionId && !this.hasDefaultHomeAssistantConnection()) {
         const connection = this.homeAssistantConnections().find(c => c.connected);
         if (connection) this.aiConfig.update(c => ({ ...c, homeAssistantConnectionId: connection.id }));
       }

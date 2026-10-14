@@ -70,8 +70,6 @@ public static class EnvironmentConfiguration
 
 	public static DeploymentMode AppMode => _appMode.Value;
 
-	public static bool IsAddonMode => AppMode == DeploymentMode.Addon;
-
 	public static Uri? ClientUri => _clientUri.Value;
 
 

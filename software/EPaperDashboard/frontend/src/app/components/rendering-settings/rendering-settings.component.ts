@@ -19,8 +19,8 @@ import { ToastService } from '../../services/toast.service';
         <section class="app-section-card" aria-labelledby="renderingTitle">
           <div class="app-section-header">
             <div>
-              <h2 id="renderingTitle" class="app-section-title">{{ isAddonMode() ? 'Add-on rendering' : 'Rendering for your account' }}</h2>
-              <p class="app-section-description">{{ isAddonMode()
+              <h2 id="renderingTitle" class="app-section-title">{{ isSharedAccount() ? 'Add-on rendering' : 'Rendering for your account' }}</h2>
+              <p class="app-section-description">{{ isSharedAccount()
                 ? 'Rendering is shared by everyone using this add-on. Disabling it affects the whole add-on.'
                 : 'Each render uses a fresh browser session. Disabling rendering affects only your account.' }}</p>
             </div>
@@ -32,7 +32,7 @@ import { ToastService } from '../../services/toast.service';
           <div class="d-flex flex-wrap gap-2">
             <button type="button" class="btn" [class.btn-primary]="!value.enabled" [class.btn-outline-secondary]="value.enabled"
               [disabled]="busy() || (!value.enabled && !value.component.supported)" (click)="setEnabled(!value.enabled)">
-              {{ value.enabled ? 'Disable' : 'Enable' }} {{ isAddonMode() ? 'for this add-on' : 'for my account' }}
+              {{ value.enabled ? 'Disable' : 'Enable' }} {{ isSharedAccount() ? 'for this add-on' : 'for my account' }}
             </button>
             @if (value.enabled && !value.component.ready && value.component.state !== 'Installing' && value.component.supported) {
               <button type="button" class="btn btn-outline-primary" [disabled]="busy()" (click)="setEnabled(true)">Prepare rendering</button>
@@ -62,7 +62,7 @@ export class RenderingSettingsComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly destroyRef = inject(DestroyRef);
   private readonly toastService = inject(ToastService);
-  readonly isAddonMode = inject(AuthService).isAddonMode;
+  readonly isSharedAccount = inject(AuthService).isUserManagementDisabled;
   private timer?: ReturnType<typeof setTimeout>;
   readonly status = signal<UserRenderingStatus | null>(null);
   readonly busy = signal(false);

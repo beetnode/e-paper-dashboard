@@ -351,7 +351,7 @@ if (!app.Environment.IsDevelopment())
 	app.UseHsts();
 }
 
-strategy.ApplyMiddleware(app, app.Environment);
+strategy.UseBeforeRouting(app, app.Environment);
 
 app.UseRouting();
 app.UseRateLimiter();
@@ -423,7 +423,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-strategy.ApplyPostStaticFilesMiddleware(app, app.Environment);
+strategy.UseBeforeStaticFiles(app, app.Environment);
 
 app.UseStaticFiles();
 

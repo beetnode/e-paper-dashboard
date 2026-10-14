@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Security.Claims;
 using CSharpFunctionalExtensions;
 using EPaperDashboard.Controllers;
@@ -190,13 +191,26 @@ public class AuthApiControllerTests
     [Fact]
     public void GetCurrentUser_HomeAssistantIngress_ReturnsSimplifiedInfoWithoutUserLookup()
     {
-        _deploymentStrategy.SetupGet(d => d.Mode).Returns(DeploymentMode.Addon);
         var sut = CreateSut(Constants.HomeAssistantVirtualUserId, isHomeAssistantIngress: true);
 
         var result = sut.GetCurrentUser();
 
         result.Should().BeOfType<OkObjectResult>();
         _userRepository.Verify(r => r.FindById(It.IsAny<UserId>()), Times.Never);
+    }
+
+    [Fact]
+    public void GetCurrentUser_ReportsTheDeploymentCapabilities()
+    {
+        var sut = CreateSut(Constants.HomeAssistantVirtualUserId, isHomeAssistantIngress: true);
+        _deploymentStrategy.SetupGet(d => d.IsUserManagementEnabled).Returns(false);
+        _deploymentStrategy.SetupGet(d => d.DefaultHomeAssistant).Returns(new HomeAssistantEndpoint("http://supervisor/core", "token", "/websocket"));
+
+        var body = JsonSerializer.SerializeToElement(sut.GetCurrentUser().Should().BeOfType<OkObjectResult>().Subject.Value);
+
+        body.GetProperty("userManagementEnabled").GetBoolean().Should().BeFalse();
+        body.GetProperty("hasDefaultHomeAssistantConnection").GetBoolean().Should().BeTrue();
+        body.TryGetProperty("deploymentMode", out _).Should().BeFalse();
     }
 
     [Fact]
@@ -216,7 +230,6 @@ public class AuthApiControllerTests
     {
         var userId = UserId.New();
         _userRepository.Setup(r => r.FindById(userId)).Returns(new User { Id = userId, Username = "alice" });
-        _deploymentStrategy.SetupGet(d => d.Mode).Returns(DeploymentMode.Standalone);
         var sut = CreateSut(userId);
 
         var result = sut.GetCurrentUser();

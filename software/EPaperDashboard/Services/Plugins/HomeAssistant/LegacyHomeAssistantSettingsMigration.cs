@@ -91,11 +91,9 @@ public sealed class LegacyHomeAssistantSettingsMigration(
 
     private string? ServerUrl(Dashboard dashboard)
     {
-        var host = deployment.Mode switch
-        {
-            DeploymentMode.Addon when string.IsNullOrWhiteSpace(dashboard.Host) => AddonHomeAssistantUrl,
-            _ => dashboard.Host?.Trim()
-        };
+        var host = deployment.DefaultHomeAssistant is not null && string.IsNullOrWhiteSpace(dashboard.Host)
+            ? AddonHomeAssistantUrl
+            : dashboard.Host?.Trim();
         return Uri.TryCreate(host, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" && string.IsNullOrEmpty(uri.UserInfo)
             ? host!.TrimEnd('/')
             : null;

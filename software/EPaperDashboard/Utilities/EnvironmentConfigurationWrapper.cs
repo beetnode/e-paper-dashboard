@@ -9,7 +9,6 @@ namespace EPaperDashboard.Utilities;
 public sealed class EnvironmentConfigurationWrapper : IEnvironmentConfiguration
 {
     public DeploymentMode AppMode => EnvironmentConfiguration.AppMode;
-    public bool IsAddonMode => EnvironmentConfiguration.IsAddonMode;
     public Uri? ClientUri => EnvironmentConfiguration.ClientUri;
     public TimeSpan DashboardScheduleCheckInterval => EnvironmentConfiguration.DashboardScheduleCheckInterval;
     public TimeSpan DashboardMissedScheduleTolerance => EnvironmentConfiguration.DashboardMissedScheduleTolerance;

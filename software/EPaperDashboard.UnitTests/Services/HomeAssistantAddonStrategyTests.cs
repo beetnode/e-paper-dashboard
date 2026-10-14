@@ -39,25 +39,55 @@ public class HomeAssistantAddonStrategyTests : IDisposable
     }
 
     [Fact]
-    public void GetOAuthClientUri_NoIngressHeader_ReturnsNull()
+    public void GetHomeAssistantOAuthClient_NotAnIngressRequest_Fails()
     {
-        var sut = CreateSut();
         var context = new DefaultHttpContext();
+        context.Request.Headers.Origin = "http://homeassistant.local:8123";
 
-        sut.GetOAuthClientUri(context).Should().BeNull();
+        CreateSut().GetHomeAssistantOAuthClient(context).Error.Should().Contain("ingress");
     }
 
     [Fact]
-    public void GetOAuthClientUri_IngressHeaderPresent_BuildsUriFromBrowserOriginAndIngressPath()
+    public void GetHomeAssistantOAuthClient_UsesTheBrowserOrigin()
     {
-        var sut = CreateSut();
         var context = IngressContext();
-        context.Items["BrowserOrigin"] = "http://homeassistant.local:8123";
+        context.Request.Headers.Origin = "https://ha.example.test:8123";
 
-        var result = sut.GetOAuthClientUri(context);
+        var client = CreateSut().GetHomeAssistantOAuthClient(context);
 
-        result!.ToString().Should().Be("http://homeassistant.local:8123/api/hassio_ingress/abc123");
+        client.Value.Should().Be(new HomeAssistantOAuthClient(
+            "https://ha.example.test:8123/api/hassio_ingress/abc123", "https://ha.example.test:8123"));
     }
+
+    [Fact]
+    public void GetHomeAssistantOAuthClient_WithoutOrigin_UsesTheForwardedHost()
+    {
+        var context = IngressContext();
+        context.Request.Headers["X-Forwarded-Proto"] = "https";
+        context.Request.Headers["X-Forwarded-Host"] = "ha.example.test, 172.30.32.1";
+
+        CreateSut().GetHomeAssistantOAuthClient(context).Value.ClientId.Should().Be("https://ha.example.test");
+    }
+
+    [Fact]
+    public void GetHomeAssistantOAuthClient_OpaqueOrigin_UsesTheForwardedHost()
+    {
+        var context = IngressContext();
+        context.Request.Headers.Origin = "null";
+        context.Request.Headers["X-Forwarded-Proto"] = "http";
+        context.Request.Headers["X-Forwarded-Host"] = "homeassistant.local:8123";
+
+        CreateSut().GetHomeAssistantOAuthClient(context).Value.ClientId.Should().Be("http://homeassistant.local:8123");
+    }
+
+    [Fact]
+    public void GetHomeAssistantOAuthClient_UnknownBrowserOrigin_Fails()
+    {
+        CreateSut().GetHomeAssistantOAuthClient(IngressContext()).IsFailure.Should().BeTrue();
+    }
+
+    [Fact]
+    public void RunsRendererInProcess_IsTrue() => CreateSut().RunsRendererInProcess.Should().BeTrue();
 
     [Fact]
     public void IsIngressRequest_FromSupervisor_ReturnsTrue()

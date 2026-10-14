@@ -15,7 +15,7 @@ public sealed class RenderingAccessServiceTests
     private readonly Mock<IUserRepository> _users = new();
     private readonly Mock<IDashboardRepository> _dashboards = new();
     private readonly Mock<IDeploymentStrategy> _deployment = new();
-    public RenderingAccessServiceTests() => _deployment.SetupGet(d => d.Mode).Returns(DeploymentMode.Standalone);
+    public RenderingAccessServiceTests() => _deployment.SetupGet(d => d.IsUserManagementEnabled).Returns(true);
 
     private RenderingAccessService Create() => new(
         new UserService(_users.Object, _dashboards.Object, deployment: _deployment.Object), _dashboards.Object,
@@ -97,7 +97,7 @@ public sealed class RenderingAccessServiceTests
     [Fact]
     public void AddonAllowsOnlyItsIngressIdentity()
     {
-        _deployment.SetupGet(d => d.Mode).Returns(DeploymentMode.Addon);
+        _deployment.SetupGet(d => d.IsUserManagementEnabled).Returns(false);
         var access = Create();
         access.IsEnabled(Constants.HomeAssistantVirtualUserId).Should().BeFalse();
         _users.Setup(r => r.GetRenderingEnabled(Constants.HomeAssistantVirtualUserId)).Returns(true);
