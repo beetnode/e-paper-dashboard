@@ -16,7 +16,6 @@ export interface PlaywrightComponentStatus {
   supported: boolean;
   ready: boolean;
   installedVersion?: string;
-  expectedVersion: string;
   bytesDownloaded: number;
   totalBytes?: number;
   error?: string;

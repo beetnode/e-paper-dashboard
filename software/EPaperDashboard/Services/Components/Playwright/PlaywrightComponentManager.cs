@@ -10,7 +10,7 @@ namespace EPaperDashboard.Services.Components.Playwright;
 
 public sealed class PlaywrightComponentManager : BackgroundService
 {
-    private const int ManifestSchemaVersion = 3;
+    private const int ManifestSchemaVersion = 2;
     private const long MaximumComponentBytes = 1_500_000_000;
     private const long MaximumExtractedBytes = 3_000_000_000;
     private const string DefaultRepository = "beetnode/izBoard";
@@ -27,8 +27,6 @@ public sealed class PlaywrightComponentManager : BackgroundService
     private readonly PlaywrightComponentRuntime _runtime;
     private readonly CancellationTokenSource _shutdown = new();
     private volatile bool _uninstalling;
-    // A compatible component stays in use when its replacement fails; retrying waits for a restart or manual install.
-    private volatile bool _replacementFailed;
     private Task? _installationTask;
     private PlaywrightComponentStatus _status;
 
@@ -48,7 +46,7 @@ public sealed class PlaywrightComponentManager : BackgroundService
             ?? DefaultRepository;
         var releaseTag = configuration["RENDERING_COMPONENT_RELEASE_TAG"]
             ?? configuration["PLAYWRIGHT_COMPONENT_RELEASE_TAG"];
-        _releaseTag = string.IsNullOrWhiteSpace(releaseTag) ? GetDefaultReleaseTag(RenderingComponentInfo.Version) : releaseTag;
+        _releaseTag = string.IsNullOrWhiteSpace(releaseTag) ? GetDefaultReleaseTag(Constants.AppVersion) : releaseTag;
         _componentBaseUri = ParseComponentBaseUri(
             configuration["RENDERING_COMPONENT_BASE_URL"]
             ?? configuration["PLAYWRIGHT_COMPONENT_BASE_URL"]);
@@ -112,9 +110,7 @@ public sealed class PlaywrightComponentManager : BackgroundService
         var status = GetStatus();
         return IsRuntimeSupported()
             && (File.Exists(Path.Combine(_componentRoot, "requested")) || Directory.Exists(GetActiveDirectory()))
-            && (status.State is PlaywrightComponentState.Incompatible or PlaywrightComponentState.Failed
-                || (status.State == PlaywrightComponentState.Installed && !_replacementFailed
-                    && !IsExpectedRelease(status.InstalledVersion)));
+            && status.State is PlaywrightComponentState.Incompatible or PlaywrightComponentState.Failed;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -124,7 +120,7 @@ public sealed class PlaywrightComponentManager : BackgroundService
             try
             {
                 if (ShouldAutomaticallyUpdate() && StartInstallation())
-                    _logger.LogInformation("Updating the installed rendering component to release {ComponentVersion}", RenderingComponentInfo.Version);
+                    _logger.LogInformation("Updating the installed rendering component to match izBoard {AppVersion}", Constants.AppVersion);
             }
             catch (Exception exception)
             {
@@ -194,9 +190,6 @@ public sealed class PlaywrightComponentManager : BackgroundService
             Directory.CreateDirectory(extractPath);
             await ExtractArchiveAsync(archivePath, extractPath, token);
             var candidate = ReadAndValidateComponent(extractPath);
-            if (!IsExpectedRelease(candidate.Manifest.ComponentVersion))
-                throw new InvalidOperationException(
-                    $"The release contains component {candidate.Manifest.ComponentVersion}, not {RenderingComponentInfo.Version}.");
             using (await _runtime.AcquireExclusiveAsync(token))
             {
                 var image = await _runtime.RunAsync(candidate, new RenderRequest(
@@ -207,7 +200,6 @@ public sealed class PlaywrightComponentManager : BackgroundService
             }
 
             var active = ReadAndValidateComponent(GetActiveDirectory());
-            _replacementFailed = false;
             SetStatus(NewStatus(
                 PlaywrightComponentState.Installed,
                 installedVersion: active.Manifest.ComponentVersion));
@@ -220,7 +212,6 @@ public sealed class PlaywrightComponentManager : BackgroundService
         {
             _logger.LogError(exception, "Failed to install the rendering component");
             var previous = ReadInstalledStatus();
-            _replacementFailed = previous.State == PlaywrightComponentState.Installed;
             SetStatus(previous.State == PlaywrightComponentState.Installed
                 ? previous with { Error = "The replacement could not be installed; the existing component remains ready." }
                 : previous with { State = PlaywrightComponentState.Failed, Error = exception.Message });
@@ -381,7 +372,7 @@ public sealed class PlaywrightComponentManager : BackgroundService
     private void Activate(string extractedPath)
     {
         var activePath = GetActiveDirectory();
-        var versionDirectory = $".version-{NormalizeVersion(RenderingComponentInfo.Version)}-{Guid.NewGuid():N}";
+        var versionDirectory = $".version-{NormalizeVersion(Constants.AppVersion)}-{Guid.NewGuid():N}";
         var newPath = Path.Combine(_componentRoot, versionDirectory);
         var pointerPath = Path.Combine(_componentRoot, $".active-{Guid.NewGuid():N}");
         Directory.Move(extractedPath, newPath);
@@ -414,7 +405,7 @@ public sealed class PlaywrightComponentManager : BackgroundService
                 : NewStatus(
                     PlaywrightComponentState.Incompatible,
                     installedVersion: active.Manifest.ComponentVersion,
-                    error: $"Component protocol {active.Manifest.ProtocolVersion} does not match izBoard protocol {RenderingComponentInfo.ProtocolVersion}.");
+                    error: $"Component version {active.Manifest.ComponentVersion} does not match izBoard {Constants.AppVersion}.");
         }
         catch (Exception exception)
         {
@@ -437,7 +428,7 @@ public sealed class PlaywrightComponentManager : BackgroundService
                 $"The component targets {manifest.RuntimeIdentifier}, not {GetRuntimeIdentifier()}.");
         if (requireCompatibleVersion && !IsVersionCompatible(manifest))
             throw new InvalidOperationException(
-                $"Component protocol {manifest.ProtocolVersion} does not match izBoard protocol {RenderingComponentInfo.ProtocolVersion}.");
+                $"Component version {manifest.ComponentVersion} does not match izBoard {Constants.AppVersion}.");
 
         var worker = ResolveComponentPath(root, manifest.WorkerAssembly);
         var browser = ResolveComponentPath(root, manifest.BrowserPath);
@@ -452,13 +443,9 @@ public sealed class PlaywrightComponentManager : BackgroundService
         return new ActivePlaywrightComponent(root, worker, browser, libraries, data, fontConfig, manifest);
     }
 
-    // Any component speaking this protocol can render; the release built with this application is preferred.
     private static bool IsVersionCompatible(PlaywrightComponentManifest manifest) =>
-        manifest.ProtocolVersion == RenderingComponentInfo.ProtocolVersion;
-
-    private static bool IsExpectedRelease(string? componentVersion) =>
-        componentVersion is not null && string.Equals(
-            GetCompatibilityVersion(componentVersion), GetCompatibilityVersion(RenderingComponentInfo.Version), StringComparison.Ordinal);
+        string.Equals(manifest.AppVersion, GetCompatibilityVersion(Constants.AppVersion), StringComparison.Ordinal)
+        && string.Equals(NormalizeVersion(manifest.ComponentVersion), NormalizeVersion(Constants.AppVersion), StringComparison.Ordinal);
 
     private static string ResolveComponentPath(string root, string relativePath)
     {
@@ -540,8 +527,10 @@ public sealed class PlaywrightComponentManager : BackgroundService
         string? error = null) =>
         new(state, Constants.AppVersion, GetRuntimeIdentifier(), IsRuntimeSupported(), installedVersion, Error: error);
 
-    internal static string GetDefaultReleaseTag(string componentVersion) =>
-        $"rendering-v{GetCompatibilityVersion(componentVersion)}";
+    internal static string GetDefaultReleaseTag(string appVersion)
+    {
+        return $"rendering-v{NormalizeVersion(appVersion)}";
+    }
 
     internal static string NormalizeVersion(string version)
     {

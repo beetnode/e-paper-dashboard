@@ -10,7 +10,10 @@ permissions:
   packages: write
 
 jobs:
-  # Build all components. Firmware is released on its own (firmware-release.yml).
+  # Build all components
+  build-firmware:
+    uses: ./.github/workflows/firmware-build.yml
+    
   build-software:
     uses: ./.github/workflows/docker-build.yml
     with:
@@ -24,7 +27,7 @@ jobs:
     
   # Create unified release with all artifacts
   create-release:
-    needs: [build-software, build-packaging]
+    needs: [build-firmware, build-software, build-packaging]
     runs-on: ubuntu-latest
     
     steps:
@@ -39,6 +42,12 @@ jobs:
         echo "tag=$TAG" >> $GITHUB_OUTPUT
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Release version: $VERSION"
+        
+    - name: Download firmware artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: firmware-esp32-${{ needs.build-firmware.outputs.version }}
+        path: ./release/firmware/
         
     - name: Download STL artifacts
       uses: actions/download-artifact@v4
@@ -58,6 +67,14 @@ jobs:
         mkdir -p release
         cd release
         VERSION=${{ steps.tag.outputs.version }}
+        if [ -d firmware ]; then
+          zip -r ../firmware-${VERSION}.zip firmware
+          # Standalone binary: servers pick the OTA image by matching FIRMWARE_ASSET_PATTERN (*.bin)
+          # against release asset names, so it cannot live only inside the zip.
+          cp firmware/*.bin ../firmware-${VERSION}.bin
+        else
+          echo "No firmware artifacts found"
+        fi
         if [ -d stl ]; then
           zip -r ../stl-${VERSION}.zip stl
         else
@@ -93,6 +110,8 @@ jobs:
         generate_release_notes: true
         body_path: release_body.md
         files: |
+          firmware-${{ steps.tag.outputs.version }}.zip
+          firmware-${{ steps.tag.outputs.version }}.bin
           stl-${{ steps.tag.outputs.version }}.zip
           release/rendering/rendering-component-linux-x64.tar.gz
           release/rendering/rendering-component-linux-x64.tar.gz.sha256
@@ -109,6 +128,7 @@ jobs:
         echo "**Tag:** ${{ steps.tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "#### Artifacts:" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Firmware (ESP32) — attached as firmware.zip and standalone firmware.bin for OTA" >> $GITHUB_STEP_SUMMARY
         echo "- ✅ Docker Image: \`izdevdigital/e-paper-dashboard:${{ steps.tag.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
         echo "- ✅ Add-on Image: \`izdevdigital/izboard-addon:${{ steps.tag.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
         echo "- ✅ Optional rendering components (amd64 + arm64)" >> $GITHUB_STEP_SUMMARY

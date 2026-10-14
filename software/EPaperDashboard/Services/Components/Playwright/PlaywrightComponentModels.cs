@@ -1,4 +1,3 @@
-using EPaperDashboard.RenderingComponent;
 using System.Text.Json.Serialization;
 
 namespace EPaperDashboard.Services.Components.Playwright;
@@ -22,12 +21,11 @@ public sealed record PlaywrightComponentStatus(
     long BytesDownloaded = 0,
     long? TotalBytes = null,
     string? Error = null,
-    bool Ready = false,
-    string ExpectedVersion = RenderingComponentInfo.Version);
+    bool Ready = false);
 
 internal sealed record PlaywrightComponentManifest(
     int SchemaVersion,
-    int ProtocolVersion,
+    string AppVersion,
     string ComponentVersion,
     string RuntimeIdentifier,
     string WorkerAssembly,

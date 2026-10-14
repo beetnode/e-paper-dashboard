@@ -24,7 +24,7 @@ internal static class RenderingComponentHost
         builder.Services.AddSingleton<RemoteRenderJobs>();
         var app = builder.Build();
         app.MapGet("/health", () => new RenderingHostHealth(
-            Constants.AppVersion, PlaywrightComponentManager.GetRuntimeIdentifier(), RenderingComponentInfo.ProtocolVersion, true, true));
+            Constants.AppVersion, PlaywrightComponentManager.GetRuntimeIdentifier(), 2, true, true));
         app.MapPost("/drain", async (PlaywrightComponentRuntime runtime, HttpContext context) =>
         {
             using var lease = await runtime.AcquireExclusiveAsync(context.RequestAborted);

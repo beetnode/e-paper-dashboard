@@ -1,4 +1,3 @@
-using EPaperDashboard.RenderingComponent;
 using EPaperDashboard.Services.Components.Playwright;
 using EPaperDashboard.Utilities;
 using FluentAssertions;
@@ -23,60 +22,47 @@ public sealed class PlaywrightComponentManagerTests : IDisposable
     }
 
     [Fact]
-    public void GetStatus_WhenComponentSpeaksAnotherProtocol_ReturnsIncompatible()
+    public void GetStatus_WhenComponentTargetsAnotherAppVersion_ReturnsIncompatible()
     {
-        CreateComponent(999, RenderingComponentInfo.Version);
+        CreateComponent("999.0.0", "999.0.0");
         var manager = CreateManager();
 
         var status = manager.GetStatus();
 
         status.State.Should().Be(PlaywrightComponentState.Incompatible);
-        status.InstalledVersion.Should().Be(RenderingComponentInfo.Version);
-        status.Error.Should().Contain("protocol");
+        status.InstalledVersion.Should().Be("999.0.0");
+        status.Error.Should().Contain(PlaywrightComponentManager.GetCompatibilityVersion(Constants.AppVersion));
         manager.ShouldAutomaticallyUpdate().Should().Be(manager.GetStatus().Supported);
     }
 
-    [Theory]
-    [InlineData(RenderingComponentInfo.Version)]
-    [InlineData(RenderingComponentInfo.Version + ".900")]
-    public void GetStatus_WhenComponentMatchesExpectedRelease_ReturnsInstalledWithoutUpdate(string componentVersion)
+    [Fact]
+    public void GetStatus_WhenComponentMatchesAppVersion_ReturnsInstalled()
     {
-        CreateComponent(RenderingComponentInfo.ProtocolVersion, componentVersion);
+        CreateComponent(PlaywrightComponentManager.GetCompatibilityVersion(Constants.AppVersion), Constants.AppVersion);
         var manager = CreateManager();
 
         var status = manager.GetStatus();
 
         status.State.Should().Be(PlaywrightComponentState.Installed);
-        status.InstalledVersion.Should().Be(componentVersion);
+        status.InstalledVersion.Should().Be(Constants.AppVersion);
         manager.GetActiveComponent().Should().NotBeNull();
         manager.ShouldAutomaticallyUpdate().Should().BeFalse();
     }
 
     [Fact]
-    public void GetStatus_WhenCompatibleComponentIsAnotherRelease_StaysUsableAndUpdates()
+    public void GetStatus_WhenComponentBuildDoesNotMatch_ReturnsIncompatible()
     {
-        CreateComponent(RenderingComponentInfo.ProtocolVersion, "0.0.1");
+        CreateComponent(PlaywrightComponentManager.GetCompatibilityVersion(Constants.AppVersion), "0.0.0.1");
         var manager = CreateManager();
 
-        manager.GetStatus().State.Should().Be(PlaywrightComponentState.Installed);
-        manager.GetActiveComponent().Should().NotBeNull();
-        manager.ShouldAutomaticallyUpdate().Should().Be(manager.GetStatus().Supported);
-    }
-
-    [Fact]
-    public void GetStatus_WhenComponentUsesApplicationVersionedManifest_IsReplaced()
-    {
-        CreateComponent(RenderingComponentInfo.ProtocolVersion, "0.5.0.849", schemaVersion: 2);
-        var manager = CreateManager();
-
-        manager.GetStatus().State.Should().NotBe(PlaywrightComponentState.Installed);
+        manager.GetStatus().State.Should().Be(PlaywrightComponentState.Incompatible);
         manager.ShouldAutomaticallyUpdate().Should().Be(manager.GetStatus().Supported);
     }
 
     [Fact]
     public async Task UninstallAsync_RemovesEntireComponentDirectory()
     {
-        CreateComponent(RenderingComponentInfo.ProtocolVersion, RenderingComponentInfo.Version);
+        CreateComponent(PlaywrightComponentManager.GetCompatibilityVersion(Constants.AppVersion), Constants.AppVersion);
         var componentRoot = Path.Combine(_dataDirectory, "components", "playwright");
         File.WriteAllText(Path.Combine(componentRoot, "unused-download"), "test");
         var manager = CreateManager();
@@ -105,12 +91,22 @@ public sealed class PlaywrightComponentManagerTests : IDisposable
     }
 
     [Theory]
-    [InlineData("1.0.0", "rendering-v1.0.0")]
-    [InlineData("1.0.0.42", "rendering-v1.0.0")]
-    [InlineData("1.0.0+abcdef", "rendering-v1.0.0")]
-    public void GetDefaultReleaseTag_AddressesComponentRelease(string version, string expected)
+    [InlineData("0.4.1", "rendering-v0.4.1.0")]
+    [InlineData("0.4.1.0", "rendering-v0.4.1.0")]
+    [InlineData("0.4.1.42", "rendering-v0.4.1.42")]
+    [InlineData("not-a-version", "rendering-vnot-a-version")]
+    public void GetDefaultReleaseTag_ReturnsExpectedChannel(string version, string expected)
     {
         PlaywrightComponentManager.GetDefaultReleaseTag(version).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("0.4.1", "0.4.1")]
+    [InlineData("0.4.1.42", "0.4.1")]
+    [InlineData("0.4.1+abcdef", "0.4.1")]
+    public void GetCompatibilityVersion_DropsBuildMetadata(string version, string expected)
+    {
+        PlaywrightComponentManager.GetCompatibilityVersion(version).Should().Be(expected);
     }
 
     public void Dispose()
@@ -131,7 +127,7 @@ public sealed class PlaywrightComponentManagerTests : IDisposable
             NullLogger<PlaywrightComponentManager>.Instance);
     }
 
-    private void CreateComponent(int protocolVersion, string componentVersion, int schemaVersion = 3)
+    private void CreateComponent(string appVersion, string componentVersion)
     {
         var root = Path.Combine(_dataDirectory, "components", "playwright", "current");
         Directory.CreateDirectory(Path.Combine(root, "worker"));
@@ -140,9 +136,8 @@ public sealed class PlaywrightComponentManagerTests : IDisposable
         File.WriteAllText(Path.Combine(root, "worker", "EPaperDashboard.PlaywrightComponent.dll"), "test");
         File.WriteAllText(Path.Combine(root, "component-manifest.json"), $$"""
             {
-              "schemaVersion": {{schemaVersion}},
-              "protocolVersion": {{protocolVersion}},
-              "appVersion": "0.5.0",
+              "schemaVersion": 2,
+              "appVersion": "{{appVersion}}",
               "componentVersion": "{{componentVersion}}",
               "runtimeIdentifier": "{{PlaywrightComponentManager.GetRuntimeIdentifier()}}",
               "workerAssembly": "worker/EPaperDashboard.PlaywrightComponent.dll",

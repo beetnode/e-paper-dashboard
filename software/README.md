@@ -160,20 +160,19 @@ and unrelated internal services. Container/browser isolation does not by itself 
 The default image does not include the browser-rendering runtime or browser binaries. Custom layouts work without them.
 To render an existing Home Assistant dashboard, sign in with your own account, open **Settings → Rendering**, and select **Enable for my account**.
 In add-on mode, open the same page through Home Assistant ingress; the control applies to the whole add-on.
-izBoard downloads the component release it was built with for the current CPU architecture from the project's GitHub releases, verifies its
+izBoard downloads the version-matched component for the current CPU architecture from the project's GitHub release, verifies its
 SHA-256 checksum, performs a browser readiness test, and activates it immediately. The component is stored in the persistent `/data` volume, so it survives image
-updates when `/data` is mounted as documented above. The component is versioned independently of izBoard, so most application
-updates keep the installed component. An installed component that speaks the application's rendering protocol stays in use while
-izBoard replaces it in the background with the component release it was built with; a component with another protocol is replaced
-before Home Assistant screenshots work again. Custom layouts remain available while an offline update waits for the matching component. Removing the component waits for running
+updates when `/data` is mounted as documented above. If izBoard is updated while the component is installed, izBoard automatically
+updates the component to the exact application build as well. Custom layouts remain available while an offline update waits for
+the matching component; Home Assistant screenshots are unavailable until it is ready. Removing the component waits for running
 renders and deletes all of its files from `/data`. Activation atomically switches between version directories, and interrupted
 installation/removal cleanup is completed on startup.
 
-CI builds and publishes component archives, but does not run renderer deployment/browser tests. Each component version has a retained,
-version-addressed GitHub release (`rendering-v<major.minor.patch>`, from `RenderingComponentInfo.Version` in `RenderingComponentProtocol.cs`)
-published before the first application image that uses it. Existing component releases are never overwritten, so released installations do
-not depend on mutable releases. Development (`latest`) images install from the `rendering-latest` release, which every master build replaces;
-development installations pick up a new component only when its version changes.
+CI builds and publishes component archives, but does not run renderer deployment/browser tests. Each release has a retained,
+version-addressed component GitHub release (`rendering-v<major.minor.patch.build>`) published before its application image. Existing
+component releases are never overwritten, so released installations do not depend on mutable releases. Development (`latest`) images
+install from the `rendering-latest` release, which every master build replaces; an older development image reports a version
+mismatch once a newer build has replaced it.
 Developers manually verify deployments by setting `RENDERING_COMPONENT_BASE_URL` to a directory served over HTTP that contains the
 architecture-specific `.tar.gz` archive and its `.sha256` file.
 
@@ -189,13 +188,13 @@ docker compose -f docker-compose.base.yml -f docker-compose.rendering.yml up --b
 
 Set `CLIENT_URL=http://localhost:8128` in your local `.env` for this test. Open `http://localhost:8128`,
 complete administrator setup, then register a regular account. Open **Settings → Rendering** and select
-**Enable for my account**, followed by **Test rendering**. Set `IZBOARD_VERSION` to override the default application test version; the
-component always uses `RenderingComponentInfo.Version`.
+**Enable for my account**, followed by **Test rendering**. Set `IZBOARD_VERSION` to override the default test version; the application
+and component builds always receive the same value.
 
 Before publishing, keep the pinned browser-runtime dependency current and manually verify installation, **Test component**,
 a real Home Assistant dashboard (including authentication), and custom layouts. Old manifest/protocol revisions are replaced,
 not treated as ready. Restart the app and confirm rendering still works. Rebuild with a different `IZBOARD_VERSION` and confirm the
-installed component is kept; rebuild with a different `RenderingComponentInfo.Version` and confirm it updates automatically. Repeat with the artifact server stopped: custom layouts must still work, and Home
+installed component updates automatically. Repeat with the artifact server stopped: custom layouts must still work, and Home
 Assistant rendering must recover after the matching artifacts become reachable. Test simultaneous requests, cancelled requests,
 and removal during rendering; after removal inspect `/data/components` in the app container to confirm the files are gone.
 

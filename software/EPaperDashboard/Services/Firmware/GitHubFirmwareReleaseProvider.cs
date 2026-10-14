@@ -5,8 +5,6 @@ namespace EPaperDashboard.Services.Firmware;
 
 /// <summary>
 /// Firmware release provider that fetches releases from GitHub Releases API.
-/// Firmware is released independently of the application under <c>firmware-v*</c> tags; older
-/// application releases (<c>v*</c>) that still carry a firmware binary remain valid candidates.
 /// Looks for binary assets matching the configured pattern (default: *.bin).
 /// </summary>
 public sealed class GitHubFirmwareReleaseProvider(
@@ -14,8 +12,6 @@ public sealed class GitHubFirmwareReleaseProvider(
     IEnvironmentConfiguration environmentConfiguration,
     ILogger<GitHubFirmwareReleaseProvider> logger) : IFirmwareReleaseProvider
 {
-    private const string FirmwareTagPrefix = "firmware-v";
-    private const string LegacyTagPrefix = "v";
     private readonly string _repository = environmentConfiguration.FirmwareGitHubRepo;
     private readonly string _assetPattern = environmentConfiguration.FirmwareAssetPattern;
 
@@ -30,8 +26,7 @@ public sealed class GitHubFirmwareReleaseProvider(
         try
         {
             var client = httpClientFactory.CreateClient(Constants.FirmwareHttpClientName);
-            // "Latest" is the application release, so firmware is chosen from the recent releases instead.
-            var url = $"https://api.github.com/repos/{_repository}/releases?per_page=100";
+            var url = $"https://api.github.com/repos/{_repository}/releases/latest";
 
             var response = await client.GetAsync(url, cancellationToken);
             if (!response.IsSuccessStatusCode)
@@ -42,64 +37,49 @@ public sealed class GitHubFirmwareReleaseProvider(
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
             using var doc = JsonDocument.Parse(json);
-            var release = SelectLatestRelease(doc.RootElement);
-            if (release is null)
-                logger.LogWarning("No firmware release found in GitHub repository {Repository}", _repository);
-            else
-                logger.LogInformation("Found GitHub firmware release: v{Version} (asset: {HasAsset})",
-                    release.Version, release.DownloadUrl is not null ? "available" : "not found");
-            return release;
+            var root = doc.RootElement;
+
+            var tagName = root.GetProperty("tag_name").GetString() ?? "";
+            var version = tagName.TrimStart('v', 'V');
+
+            var releaseNotes = root.TryGetProperty("body", out var bodyEl) ? bodyEl.GetString() : null;
+
+            DateTimeOffset? publishedAt = null;
+            if (root.TryGetProperty("published_at", out var pubEl) &&
+                DateTimeOffset.TryParse(pubEl.GetString(), out var dt))
+            {
+                publishedAt = dt;
+            }
+
+            // Find firmware binary asset matching the configured pattern
+            string? downloadUrl = null;
+            long? fileSize = null;
+
+            if (root.TryGetProperty("assets", out var assets))
+            {
+                foreach (var asset in assets.EnumerateArray())
+                {
+                    var assetName = asset.GetProperty("name").GetString() ?? "";
+                    if (MatchesAssetPattern(assetName))
+                    {
+                        downloadUrl = asset.GetProperty("browser_download_url").GetString();
+                        fileSize = asset.TryGetProperty("size", out var sizeEl) ? sizeEl.GetInt64() : null;
+                        break;
+                    }
+                }
+            }
+
+            logger.LogInformation("Found GitHub release: v{Version} (asset: {HasAsset})",
+                version, downloadUrl is not null ? "available" : "not found");
+
+            return new FirmwareReleaseInfo(version, releaseNotes, publishedAt, downloadUrl, fileSize);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to fetch firmware releases from GitHub repository {Repository}", _repository);
+            logger.LogError(ex, "Failed to fetch latest release from GitHub repository {Repository}", _repository);
             return null;
         }
     }
-
-    internal FirmwareReleaseInfo? SelectLatestRelease(JsonElement releases)
-    {
-        FirmwareReleaseInfo? latest = null;
-        Version? latestVersion = null;
-        foreach (var release in releases.EnumerateArray())
-        {
-            if (IsTrue(release, "draft") || IsTrue(release, "prerelease")) continue;
-            var tagName = release.TryGetProperty("tag_name", out var tagEl) ? tagEl.GetString() ?? "" : "";
-            var isFirmwareTag = tagName.StartsWith(FirmwareTagPrefix, StringComparison.Ordinal);
-            var versionText = isFirmwareTag ? tagName[FirmwareTagPrefix.Length..]
-                : tagName.StartsWith(LegacyTagPrefix, StringComparison.OrdinalIgnoreCase) ? tagName[LegacyTagPrefix.Length..]
-                : null;
-            if (versionText is null || !Version.TryParse(versionText, out var version)) continue;
-
-            var (downloadUrl, fileSize) = FindAsset(release);
-            // Application releases stopped carrying firmware once it was released on its own.
-            if (!isFirmwareTag && downloadUrl is null) continue;
-            if (latestVersion is not null && version <= latestVersion) continue;
-
-            var releaseNotes = release.TryGetProperty("body", out var bodyEl) ? bodyEl.GetString() : null;
-            DateTimeOffset? publishedAt = release.TryGetProperty("published_at", out var pubEl)
-                && DateTimeOffset.TryParse(pubEl.GetString(), out var dt) ? dt : null;
-            latest = new FirmwareReleaseInfo(versionText, releaseNotes, publishedAt, downloadUrl, fileSize);
-            latestVersion = version;
-        }
-        return latest;
-    }
-
-    private (string? DownloadUrl, long? FileSize) FindAsset(JsonElement release)
-    {
-        if (!release.TryGetProperty("assets", out var assets)) return (null, null);
-        foreach (var asset in assets.EnumerateArray())
-        {
-            var assetName = asset.GetProperty("name").GetString() ?? "";
-            if (MatchesAssetPattern(assetName))
-                return (asset.GetProperty("browser_download_url").GetString(),
-                    asset.TryGetProperty("size", out var sizeEl) ? sizeEl.GetInt64() : null);
-        }
-        return (null, null);
-    }
-
-    private static bool IsTrue(JsonElement element, string property) =>
-        element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.True;
 
     public async Task<byte[]?> DownloadFirmwareBinaryAsync(string downloadUrl, CancellationToken cancellationToken = default)
     {

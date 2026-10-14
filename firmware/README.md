@@ -64,7 +64,7 @@ Using VS Code:
 
 ## Versioning
 
-Firmware is versioned independently of the server. `FIRMWARE_VERSION` in `src/version.h` must match the firmware release tag (for example `0.5.1` for `firmware-v0.5.1`). The server offers the highest `firmware-v*` GitHub release, and a device updates over the air when that release is newer than its own version. Bump the version only when the firmware changes.
+`FIRMWARE_VERSION` in `src/version.h` must match the release tag (for example `0.5.0` for `v0.5.0`). The server offers the firmware from the latest GitHub release, and a device updates over the air when that release is newer than its own version.
 
 ## Dependencies
 
