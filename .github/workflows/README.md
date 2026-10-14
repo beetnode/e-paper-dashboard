@@ -26,15 +26,15 @@ git push origin v0.5.0
 
 The release workflow automatically:
 - Builds all artifacts (firmware, Docker images, STL files)
-- Publishes a retained, version-addressed rendering component release (`rendering-v<major.minor.patch.build>`) before the application image
-- Creates a GitHub release with all files attached
+- Creates the `v<version>` GitHub release with the rendering component attached before the application images are pushed, so images never point at a missing component
+- Completes that release with the firmware, STL files and release notes, and marks it latest
 - Pushes `izdevdigital/e-paper-dashboard` and `izdevdigital/izboard-addon` images to Docker Hub
 
 ## Build Numbers
 
 Builds are versioned `<Version>.<build>`, where `<build>` is the commit count of the built commit (`git rev-list --count HEAD`). It only grows along master and is the same for every workflow, so a release tagged on a master commit gets the same build number as that commit's dev build. The workflows check out full history (`fetch-depth: 0`) to compute it.
 
-Master builds publish the rendering component to a single `rendering-latest` release that is deleted and recreated on every build, like the `dev` release, and the `latest` images install from it. Only release builds create version-addressed `rendering-v<version>` component releases.
+Master builds publish the rendering component to a single `rendering-latest` release that is deleted and recreated on every build, like the `dev` release, and the `latest` images install from it. Release builds attach the component to the application release instead; there are no separate component releases.
 
 Pull request builds count the temporary merge commit GitHub creates for the PR, so their build number can repeat a master build's number or be skipped by master later. They never publish images, component releases, or the dev release, so the numbers do not collide with published builds; do not distribute PR build artifacts as versioned builds.
 

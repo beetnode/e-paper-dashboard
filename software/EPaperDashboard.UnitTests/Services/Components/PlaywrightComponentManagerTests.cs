@@ -91,11 +91,11 @@ public sealed class PlaywrightComponentManagerTests : IDisposable
     }
 
     [Theory]
-    [InlineData("0.4.1", "rendering-v0.4.1.0")]
-    [InlineData("0.4.1.0", "rendering-v0.4.1.0")]
-    [InlineData("0.4.1.42", "rendering-v0.4.1.42")]
-    [InlineData("not-a-version", "rendering-vnot-a-version")]
-    public void GetDefaultReleaseTag_ReturnsExpectedChannel(string version, string expected)
+    [InlineData("0.6.0", "v0.6.0")]
+    [InlineData("0.6.0.900", "v0.6.0")]
+    [InlineData("0.6.0+abcdef", "v0.6.0")]
+    [InlineData("not-a-version", "vnot-a-version")]
+    public void GetDefaultReleaseTag_ReturnsApplicationRelease(string version, string expected)
     {
         PlaywrightComponentManager.GetDefaultReleaseTag(version).Should().Be(expected);
     }

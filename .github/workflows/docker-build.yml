@@ -42,10 +42,10 @@ jobs:
           # per-workflow run number, so a release continues the dev build sequence.
           version="$base.$(git rev-list --count HEAD)"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          # Releases get a retained, version-addressed component; development builds share one
-          # mutable release that is replaced on every build, like the dev release.
+          # Releases attach the component to the application release itself; development builds share
+          # one mutable release that is replaced on every build, like the dev release.
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            echo "component_tag=rendering-v$version" >> "$GITHUB_OUTPUT"
+            echo "component_tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
           else
             echo "component_tag=rendering-latest" >> "$GITHUB_OUTPUT"
           fi
@@ -88,15 +88,17 @@ jobs:
               --notes "Optional rendering component for development build $COMPONENT_VERSION. Replaced on every master build." \
               --prerelease --latest=false
           elif gh release view "$COMPONENT_TAG" >/dev/null 2>&1; then
-            # A rerun must never replace an existing version's downloadable payload.
-            commit=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$COMPONENT_TAG" --jq '.object.sha')
-            test "$commit" = "$GITHUB_SHA"
-            echo "Keeping existing component release $COMPONENT_TAG"
+            # A rerun must never replace a published release's downloadable payload.
+            if gh release view "$COMPONENT_TAG" --json assets --jq '.assets[].name' | grep -q '^rendering-component-'; then
+              echo "Keeping the rendering component already attached to $COMPONENT_TAG"
+            else
+              gh release upload "$COMPONENT_TAG" component-artifacts/*
+            fi
           else
+            # The release workflow completes this release with the remaining artifacts and notes.
             gh release create "$COMPONENT_TAG" component-artifacts/* \
-              --target "$GITHUB_SHA" --title "Rendering component $COMPONENT_VERSION" \
-              --notes "Optional rendering component for application release $COMPONENT_VERSION." \
-              --prerelease --latest=false
+              --verify-tag --title "Release ${COMPONENT_TAG#v}" \
+              --notes "Release $COMPONENT_VERSION is being published." --latest=false
           fi
 
   build-and-push:
