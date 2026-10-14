@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using EPaperDashboard.Authentication;
 using EPaperDashboard.Guards;
 using EPaperDashboard.Services;
 using EPaperDashboard.Models;
@@ -25,7 +28,7 @@ public class UsersApiController(UserService userService) : BaseApiController
     }
 
     [HttpPost("change-password")]
-    public IActionResult ChangePassword([FromBody] ChangePasswordRequest request)
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.CurrentPassword) || 
             string.IsNullOrWhiteSpace(request.NewPassword) || 
@@ -41,6 +44,13 @@ public class UsersApiController(UserService userService) : BaseApiController
 
         if (userService.TryChangePassword(CurrentUserId, request.CurrentPassword, request.NewPassword))
         {
+            // The new security stamp ends every other session; reissue this one so the user stays signed in here.
+            var user = userService.GetUserById(CurrentUserId);
+            if (user.HasValue)
+            {
+                await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, UserClaims.Create(user.Value));
+            }
+
             return Ok(new { message = "Password changed successfully." });
         }
 

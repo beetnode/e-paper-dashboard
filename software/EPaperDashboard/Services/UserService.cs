@@ -1,7 +1,9 @@
 using CSharpFunctionalExtensions;
+using EPaperDashboard.Authentication;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 using EPaperDashboard.Utilities;
+using System.Security.Cryptography;
 
 namespace EPaperDashboard.Services;
 
@@ -12,7 +14,8 @@ public sealed class UserService(
     IDeploymentStrategy? deployment = null,
     IDeviceRepository? devices = null,
     IPairingSessionRepository? pairingSessions = null,
-    IUnitOfWork? unitOfWork = null)
+    IUnitOfWork? unitOfWork = null,
+    UserSessionValidator? sessions = null)
 {
     public Maybe<User> GetUserByUsername(string username) =>
         userRepository.FindByUsername(username);
@@ -79,7 +82,8 @@ public sealed class UserService(
         userRepository.TryCreateAdministrator(new User
         {
             Username = username.Trim(), PasswordHash = PasswordHashing.Hash(password),
-            IsSuperUser = true, RenderingEnabled = false
+            IsSuperUser = true, RenderingEnabled = false,
+            SecurityStamp = NewSecurityStamp(), CreatedAt = DateTimeOffset.UtcNow
         });
 
     public static string? ValidateCredentials(string? username, string? password) =>
@@ -109,6 +113,7 @@ public sealed class UserService(
                     devices?.DeleteByUserId(u.Id);
                     pairingSessions?.DeleteByUserId(u.Id);
                     userRepository.Delete(u.Id);
+                    sessions?.Invalidate(u.Id);
                     return true;
                 },
                 () => false
@@ -154,7 +159,9 @@ public sealed class UserService(
             Username = username,
             PasswordHash = PasswordHashing.Hash(password),
             IsSuperUser = isSuperUser,
-            RenderingEnabled = false
+            RenderingEnabled = false,
+            SecurityStamp = NewSecurityStamp(),
+            CreatedAt = DateTimeOffset.UtcNow
         };
 
         return userRepository.TryInsert(user);
@@ -183,9 +190,13 @@ public sealed class UserService(
                     }
 
                     user.PasswordHash = PasswordHashing.Hash(newPassword);
+                    user.SecurityStamp = NewSecurityStamp();
                     userRepository.Update(user);
+                    sessions?.Invalidate(user.Id);
                     return true;
                 },
                 () => false
             );
+
+    private static string NewSecurityStamp() => Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
 }

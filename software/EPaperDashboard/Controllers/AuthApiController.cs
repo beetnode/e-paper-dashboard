@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
+using EPaperDashboard.Authentication;
 using EPaperDashboard.Services;
 using EPaperDashboard.Models;
 using EPaperDashboard.Utilities;
@@ -57,15 +58,7 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
             return Unauthorized(new { message = "Invalid username or password." });
         }
 
-        var claims = new List<Claim>
-        {
-            new Claim(ClaimTypes.NameIdentifier, user.Value.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.Value.Username),
-            new Claim(Constants.IsSuperUserClaim, user.Value.IsSuperUser.ToString().ToLower())
-        };
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        var principal = new ClaimsPrincipal(identity);
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, UserClaims.Create(user.Value));
 
         return Ok(UserResponse(user.Value.Id.ToString(), user.Value.Username, user.Value.Nickname, user.Value.IsSuperUser));
     }
@@ -98,15 +91,7 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
             return BadRequest(new { message = "Failed to retrieve created user." });
         }
 
-        var claims = new List<Claim>
-        {
-            new Claim(ClaimTypes.NameIdentifier, user.Value.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.Value.Username),
-            new Claim(Constants.IsSuperUserClaim, user.Value.IsSuperUser.ToString().ToLower())
-        };
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        var principal = new ClaimsPrincipal(identity);
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, UserClaims.Create(user.Value));
 
         return Ok(UserResponse(user.Value.Id.ToString(), user.Value.Username, user.Value.Nickname, user.Value.IsSuperUser));
     }

@@ -4,7 +4,13 @@ using EPaperDashboard.Models;
 using EPaperDashboard.Services;
 using EPaperDashboard.UnitTests.TestSupport;
 using FluentAssertions;
+using System.Security.Claims;
+using EPaperDashboard.Utilities;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Xunit;
 
@@ -43,50 +49,56 @@ public class UsersApiControllerTests
     }
 
     [Fact]
-    public void ChangePassword_MissingFields_ReturnsBadRequest()
+    public async Task ChangePassword_MissingFields_ReturnsBadRequest()
     {
         var sut = CreateSut().WithUser(UserId.New());
 
-        var result = sut.ChangePassword(new ChangePasswordRequest("", "new", "new"));
+        var result = await sut.ChangePassword(new ChangePasswordRequest("", "new", "new"));
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
-    public void ChangePassword_ConfirmationDoesNotMatch_ReturnsBadRequest()
+    public async Task ChangePassword_ConfirmationDoesNotMatch_ReturnsBadRequest()
     {
         var sut = CreateSut().WithUser(UserId.New());
 
-        var result = sut.ChangePassword(new ChangePasswordRequest("old", "new1", "new2"));
+        var result = await sut.ChangePassword(new ChangePasswordRequest("old", "new1", "new2"));
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
-    public void ChangePassword_WrongCurrentPassword_ReturnsBadRequest()
+    public async Task ChangePassword_WrongCurrentPassword_ReturnsBadRequest()
     {
         var userId = UserId.New();
         var user = new User { Id = userId, PasswordHash = PasswordHashing.LegacySha256("correct") };
         _userRepository.Setup(r => r.FindById(userId)).Returns(user);
         var sut = CreateSut().WithUser(userId);
 
-        var result = sut.ChangePassword(new ChangePasswordRequest("wrong", "newpass", "newpass"));
+        var result = await sut.ChangePassword(new ChangePasswordRequest("wrong", "newpass", "newpass"));
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
     [Fact]
-    public void ChangePassword_ValidChange_ReturnsOkAndUpdatesHash()
+    public async Task ChangePassword_ValidChange_ReturnsOkAndUpdatesHash()
     {
         var userId = UserId.New();
         var user = new User { Id = userId, PasswordHash = PasswordHashing.LegacySha256("correct") };
         _userRepository.Setup(r => r.FindById(userId)).Returns(user);
         var sut = CreateSut().WithUser(userId);
 
-        var result = sut.ChangePassword(new ChangePasswordRequest("correct", "newpass", "newpass"));
+        var authentication = new Mock<IAuthenticationService>();
+        sut.HttpContext.RequestServices = new ServiceCollection().AddSingleton(authentication.Object).BuildServiceProvider();
+
+        var result = await sut.ChangePassword(new ChangePasswordRequest("correct", "newpass", "newpass"));
 
         result.Should().BeOfType<OkObjectResult>();
         PasswordHashing.Verify(user.PasswordHash, "newpass").Should().Be(PasswordCheck.Valid);
+        authentication.Verify(a => a.SignInAsync(It.IsAny<HttpContext>(), CookieAuthenticationDefaults.AuthenticationScheme,
+            It.Is<ClaimsPrincipal>(p => p.FindFirst(Constants.SecurityStampClaim)!.Value == user.SecurityStamp),
+            It.IsAny<AuthenticationProperties>()), Times.Once);
     }
 
     [Fact]

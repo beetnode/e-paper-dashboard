@@ -168,6 +168,7 @@ builder.Services
 	.AddSingleton<RenderingAccessService>()
 	.AddHostedService(sp => sp.GetRequiredService<PlaywrightComponentManager>())
 	.AddSingleton<IImageFactory, ImageFactory>()
+	.AddSingleton<UserSessionValidator>()
 	.AddSingleton<UserService>()
 	.AddSingleton<DashboardService>()
 	.AddSingleton<DeviceService>()
@@ -264,8 +265,29 @@ builder.Services.AddAuthentication(DefaultAuthenticationScheme)
 	options.LogoutPath = "/Logout";
 	options.AccessDeniedPath = "/AccessDenied";
 	options.Cookie.HttpOnly = true;
+	options.Cookie.SameSite = SameSiteMode.Lax;
+	// Self-hosted instances often run plain HTTP on the LAN; behind TLS the cookie is marked Secure automatically.
+	options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+	options.ExpireTimeSpan = TimeSpan.FromDays(14);
+	options.SlidingExpiration = true;
 	options.Events.OnRedirectToLogin = ReturnForbiddenInsteadOfRedirect;
 	options.Events.OnRedirectToAccessDenied = ReturnForbiddenInsteadOfRedirect;
+	options.Events.OnValidatePrincipal = async context =>
+	{
+		if (context.Principal is null) return;
+		var check = context.HttpContext.RequestServices.GetRequiredService<UserSessionValidator>().Validate(context.Principal);
+		switch (check.State)
+		{
+			case SessionState.Reject:
+				context.RejectPrincipal();
+				await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+				break;
+			case SessionState.Refresh:
+				context.ReplacePrincipal(check.Principal!);
+				context.ShouldRenew = true;
+				break;
+		}
+	};
 
 	static Task ReturnForbiddenInsteadOfRedirect(Microsoft.AspNetCore.Authentication.RedirectContext<CookieAuthenticationOptions> context)
 	{

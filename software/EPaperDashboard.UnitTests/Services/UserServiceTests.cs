@@ -1,4 +1,5 @@
 using CSharpFunctionalExtensions;
+using EPaperDashboard.Authentication;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services;
@@ -226,6 +227,53 @@ public class UserServiceTests
         sut.TryCreateAdministrator("admin", "secret").Should().BeTrue();
 
         PasswordHashing.Verify(created!.PasswordHash, "secret").Should().Be(PasswordCheck.Valid);
+    }
+
+    [Fact]
+    public void TryCreateUser_GivesTheAccountAStampAndCreationTime()
+    {
+        var (sut, users, _) = CreateSut();
+        User? inserted = null;
+        users.Setup(r => r.TryInsert(It.IsAny<User>())).Callback<User>(u => inserted = u).Returns(true);
+
+        sut.TryCreateUser("bob", "password").Should().BeTrue();
+
+        inserted!.SecurityStamp.Should().NotBeNullOrEmpty();
+        inserted.CreatedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void TryChangePassword_RotatesTheStampAndDropsCachedSessions()
+    {
+        var users = new Mock<IUserRepository>();
+        var sessions = new UserSessionValidator(users.Object, TimeProvider.System);
+        var sut = new UserService(users.Object, new Mock<IDashboardRepository>().Object, sessions: sessions);
+        var user = new User { Id = UserId.New(), Username = "alice", PasswordHash = PasswordHashing.Hash("original"), SecurityStamp = "old" };
+        users.Setup(r => r.FindById(user.Id)).Returns(user);
+        var previousSession = UserClaims.Create(user);
+        sessions.Validate(previousSession);
+
+        sut.TryChangePassword(user.Id, "original", "brand-new").Should().BeTrue();
+
+        user.SecurityStamp.Should().NotBe("old").And.NotBeNullOrEmpty();
+        sessions.Validate(previousSession).State.Should().Be(SessionState.Reject);
+    }
+
+    [Fact]
+    public void TryDeleteUser_DropsCachedSessions()
+    {
+        var users = new Mock<IUserRepository>();
+        var sessions = new UserSessionValidator(users.Object, TimeProvider.System);
+        var sut = new UserService(users.Object, new Mock<IDashboardRepository>().Object, sessions: sessions);
+        var user = new User { Id = UserId.New(), Username = "bob", SecurityStamp = "s" };
+        users.Setup(r => r.FindById(user.Id)).Returns(user);
+        var session = UserClaims.Create(user);
+        sessions.Validate(session);
+
+        sut.TryDeleteUser(user.Id).Should().BeTrue();
+        users.Setup(r => r.FindById(user.Id)).Returns(Maybe<User>.None);
+
+        sessions.Validate(session).State.Should().Be(SessionState.Reject);
     }
 
     [Fact]
