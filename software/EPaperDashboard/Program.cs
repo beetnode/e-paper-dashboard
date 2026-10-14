@@ -322,12 +322,6 @@ app.Services.GetRequiredService<LegacyHomeAssistantSettingsMigration>().Run();
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 var strategy = app.Services.GetRequiredService<IDeploymentStrategy>();
 
-// Perform deployment-specific initial setup
-using (var scope = app.Services.CreateScope())
-{
-	strategy.PerformInitialSetup(scope.ServiceProvider);
-}
-
 // Only loopback proxies are trusted: ingress requests are recognized by the Supervisor's own address.
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {

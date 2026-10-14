@@ -9,8 +9,8 @@ using Xunit;
 
 namespace EPaperDashboard.UnitTests.Services;
 
-// The strategy's constructor requires SUPERVISOR_TOKEN to be set (it throws otherwise), so each
-// test sets it for the duration of the test instance and restores the previous value afterward.
+// The strategy reads SUPERVISOR_TOKEN when it is created, so each test sets it for the duration
+// of the test instance and restores the previous value afterward.
 public class HomeAssistantAddonStrategyTests : IDisposable
 {
     private readonly string? _originalSupervisorToken = Environment.GetEnvironmentVariable("SUPERVISOR_TOKEN");
@@ -147,13 +147,14 @@ public class HomeAssistantAddonStrategyTests : IDisposable
     }
 
     [Fact]
-    public void GetConfigDirectory_ReturnsInjectedEnvironmentConfigurationValue()
+    public void ValidateConfiguration_WithoutSupervisorToken_FailsInsteadOfThrowing()
     {
-        var environmentConfiguration = new Mock<IEnvironmentConfiguration>();
-        environmentConfiguration.SetupGet(c => c.ConfigDir).Returns("/custom/data");
-        var sut = new HomeAssistantAddonStrategy(NullLogger<HomeAssistantAddonStrategy>.Instance, environmentConfiguration.Object);
+        Environment.SetEnvironmentVariable("SUPERVISOR_TOKEN", null);
 
-        sut.GetConfigDirectory().Should().Be("/custom/data");
+        var sut = CreateSut();
+
+        sut.ValidateConfiguration().Error.Should().Contain("SUPERVISOR_TOKEN");
+        sut.DefaultHomeAssistant.Should().BeNull();
     }
 
     [Fact]

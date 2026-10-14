@@ -23,8 +23,6 @@ public class StandaloneStrategy : IDeploymentStrategy
 
     public bool RunsRendererInProcess => false;
 
-    public string GetConfigDirectory() => _environmentConfiguration.ConfigDir;
-
     public Result<HomeAssistantOAuthClient, string> GetHomeAssistantOAuthClient(HttpContext? context)
     {
         if (_environmentConfiguration.ClientUri is not { } clientUri)
@@ -59,11 +57,6 @@ public class StandaloneStrategy : IDeploymentStrategy
     }
 
     public bool IsIngressRequest(HttpContext context) => false;
-
-    public void PerformInitialSetup(IServiceProvider serviceProvider)
-    {
-
-    }
 
     public void UseBeforeRouting(IApplicationBuilder app, IWebHostEnvironment environment)
     {

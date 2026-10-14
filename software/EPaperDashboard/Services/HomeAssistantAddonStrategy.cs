@@ -14,7 +14,7 @@ public class HomeAssistantAddonStrategy : IDeploymentStrategy
     private readonly IEnvironmentConfiguration _environmentConfiguration;
     private readonly int _devicePort;
     private readonly bool _allowLoopbackIngress;
-    private readonly string _supervisorToken;
+    private readonly string? _supervisorToken;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _cachedIndexHtml = new();
 
     public HomeAssistantAddonStrategy(
@@ -27,8 +27,7 @@ public class HomeAssistantAddonStrategy : IDeploymentStrategy
         _environmentConfiguration = environmentConfiguration;
         _devicePort = devicePort;
         _allowLoopbackIngress = allowLoopbackIngress;
-        _supervisorToken = Environment.GetEnvironmentVariable("SUPERVISOR_TOKEN")
-            ?? throw new InvalidOperationException("SUPERVISOR_TOKEN not found");
+        _supervisorToken = Environment.GetEnvironmentVariable("SUPERVISOR_TOKEN");
     }
 
     public DeploymentMode Mode => DeploymentMode.Addon;
@@ -37,15 +36,20 @@ public class HomeAssistantAddonStrategy : IDeploymentStrategy
 
     // The supervisor proxies Home Assistant Core's API and WebSocket with a token it provides, but cannot issue
     // long-lived tokens: rendering a Home Assistant dashboard needs a connection with a user's own token.
-    public HomeAssistantEndpoint? DefaultHomeAssistant => new(Constants.SupervisorCoreUrl, _supervisorToken, "/websocket");
+    public HomeAssistantEndpoint? DefaultHomeAssistant => _supervisorToken is null
+        ? null
+        : new(Constants.SupervisorCoreUrl, _supervisorToken, "/websocket");
 
     // Supervisor add-ons run as a single container, so there is no rendering sidecar.
     public bool RunsRendererInProcess => true;
 
-    public string GetConfigDirectory() => _environmentConfiguration.ConfigDir;
-
     public UnitResult<string> ValidateConfiguration()
     {
+        if (string.IsNullOrWhiteSpace(_supervisorToken))
+        {
+            return UnitResult.Failure("SUPERVISOR_TOKEN not found. The add-on mode runs only under the Home Assistant Supervisor.");
+        }
+
         // Ingress is browser-only. The display needs a reachable device API URL
         // served through the add-on's exposed port.
         var clientUrlError = ClientUrlValidator.GetValidationError(_environmentConfiguration.ClientUri);
@@ -100,10 +104,6 @@ public class HomeAssistantAddonStrategy : IDeploymentStrategy
 
     private static string? FirstValue(StringValues values) =>
         values.ToString().Split(',')[0].Trim() is { Length: > 0 } value ? value : null;
-
-    public void PerformInitialSetup(IServiceProvider serviceProvider)
-    {
-    }
 
     public void UseBeforeRouting(IApplicationBuilder app, IWebHostEnvironment environment)
     {
