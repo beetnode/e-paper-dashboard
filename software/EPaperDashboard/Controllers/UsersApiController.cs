@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using EPaperDashboard.Guards;
 using EPaperDashboard.Services;
 using EPaperDashboard.Models;
 using System.Security.Claims;
@@ -9,6 +10,7 @@ namespace EPaperDashboard.Controllers;
 [ApiController]
 [Route("api/users")]
 [Authorize]
+[RequiresUserManagement]
 public class UsersApiController(UserService userService) : BaseApiController
 {
     [HttpPost("change-nickname")]

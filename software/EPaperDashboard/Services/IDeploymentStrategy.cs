@@ -1,7 +1,6 @@
 using EPaperDashboard.Models;
 using EPaperDashboard.Utilities;
 using CSharpFunctionalExtensions;
-using System.Security.Claims;
 
 namespace EPaperDashboard.Services;
 
@@ -16,11 +15,10 @@ public interface IDeploymentStrategy
     HomeAssistantEndpoint? DefaultHomeAssistant { get; }
     UnitResult<string> ValidateConfiguration();
     string GetConfigDirectory();
-    ClaimsPrincipal? AuthenticateViaIngress(HttpContext context);
+    /// <summary>Whether the request came through Home Assistant ingress, which signs it in as the add-on's shared user.</summary>
+    bool IsIngressRequest(HttpContext context);
     Uri? GetOAuthClientUri(HttpContext? context = null);
-    Task<bool> ProcessIngressPathAsync(HttpContext context, IWebHostEnvironment environment);
     void PerformInitialSetup(IServiceProvider serviceProvider);
     void ApplyMiddleware(IApplicationBuilder app, IWebHostEnvironment environment);
-    void ApplyPostAuthenticationMiddleware(IApplicationBuilder app, IWebHostEnvironment environment);
     void ApplyPostStaticFilesMiddleware(IApplicationBuilder app, IWebHostEnvironment environment);
 }

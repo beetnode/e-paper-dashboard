@@ -1,10 +1,9 @@
 using EPaperDashboard.Models;
 using EPaperDashboard.Utilities;
 using CSharpFunctionalExtensions;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.Extensions.FileProviders;
+using System.Text.Encodings.Web;
 
 namespace EPaperDashboard.Services;
 
@@ -12,15 +11,21 @@ public class HomeAssistantAddonStrategy : IDeploymentStrategy
 {
     private readonly ILogger<HomeAssistantAddonStrategy> _logger;
     private readonly IEnvironmentConfiguration _environmentConfiguration;
+    private readonly int _devicePort;
+    private readonly bool _allowLoopbackIngress;
     private readonly string _supervisorToken;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _cachedIndexHtml = new();
 
     public HomeAssistantAddonStrategy(
         ILogger<HomeAssistantAddonStrategy> logger,
-        IEnvironmentConfiguration environmentConfiguration)
+        IEnvironmentConfiguration environmentConfiguration,
+        int devicePort = Constants.DefaultDevicePort,
+        bool allowLoopbackIngress = false)
     {
         _logger = logger;
         _environmentConfiguration = environmentConfiguration;
+        _devicePort = devicePort;
+        _allowLoopbackIngress = allowLoopbackIngress;
         _supervisorToken = Environment.GetEnvironmentVariable("SUPERVISOR_TOKEN")
             ?? throw new InvalidOperationException("SUPERVISOR_TOKEN not found");
     }
@@ -48,79 +53,21 @@ public class HomeAssistantAddonStrategy : IDeploymentStrategy
         return UnitResult.Success<string>();
     }
 
+    public bool IsIngressRequest(HttpContext context) => TryGetIngressPath(context, out _);
+
     public Uri? GetOAuthClientUri(HttpContext? context = null)
     {
-        if (context?.Request.Headers.TryGetValue(Constants.IngressPathHeader, out var ingressPathValues) == true)
+        if (context is not null && TryGetIngressPath(context, out var ingressPath))
         {
-            var ingressPath = ingressPathValues.ToString();
-            if (!string.IsNullOrWhiteSpace(ingressPath))
-            {
-                var browserOrigin = context.Items["BrowserOrigin"]?.ToString()?.TrimEnd('/')
-                    ?? "http://homeassistant";
-                var ingressUrl = $"{browserOrigin}{ingressPath.TrimEnd('/')}";
-                _logger.LogDebug("Using ingress URL from request context: {IngressUrl}", ingressUrl);
-                return new Uri(ingressUrl);
-            }
+            var browserOrigin = context.Items["BrowserOrigin"]?.ToString()?.TrimEnd('/')
+                ?? "http://homeassistant";
+            var ingressUrl = $"{browserOrigin}{ingressPath}";
+            _logger.LogDebug("Using ingress URL from request context: {IngressUrl}", ingressUrl);
+            return new Uri(ingressUrl);
         }
 
         _logger.LogWarning("OAuth client URI not available - no ingress header in request context.");
         return null;
-    }
-
-    public ClaimsPrincipal? AuthenticateViaIngress(HttpContext context)
-    {
-        if (!context.Request.Headers.ContainsKey(Constants.IngressPathHeader))
-        {
-            return null;
-        }
-
-        var claims = new List<Claim>
-        {
-            new Claim(ClaimTypes.NameIdentifier, Constants.HomeAssistantVirtualUserId.ToString()),
-            new Claim(ClaimTypes.Name, Constants.HomeAssistantAdminUserName),
-            new Claim(Constants.IsSuperUserClaim, "true"),
-            new Claim(Constants.HomeAssistantIngressClaim, "true")
-        };
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        return new ClaimsPrincipal(identity);
-    }
-
-    public Task<bool> ProcessIngressPathAsync(HttpContext context, IWebHostEnvironment environment)
-    {
-        if (!context.Request.Headers.TryGetValue(Constants.IngressPathHeader, out var ingressPathValues))
-        {
-            return Task.FromResult(false);
-        }
-
-        var ingressPath = ingressPathValues.ToString();
-        if (string.IsNullOrWhiteSpace(ingressPath))
-        {
-            return Task.FromResult(false);
-        }
-
-        if (!ingressPath.StartsWith('/'))
-        {
-            ingressPath = "/" + ingressPath;
-        }
-
-        ingressPath = ingressPath.TrimEnd('/');
-        
-        var originalPath = context.Request.Path.Value ?? "/";
-        context.Request.PathBase = new PathString(ingressPath);
-        
-        if (originalPath.StartsWith(ingressPath, StringComparison.OrdinalIgnoreCase))
-        {
-            var newPath = originalPath.Substring(ingressPath.Length);
-            if (string.IsNullOrEmpty(newPath))
-            {
-                newPath = "/";
-            }
-            context.Request.Path = new PathString(newPath);
-        }
-        
-        context.Items["IngressPath"] = ingressPath;
-        
-        return Task.FromResult(false);
     }
 
     public void PerformInitialSetup(IServiceProvider serviceProvider)
@@ -131,47 +78,11 @@ public class HomeAssistantAddonStrategy : IDeploymentStrategy
     {
         app.Use(async (context, next) =>
         {
-            if (environment.IsDevelopment())
+            if (!environment.IsDevelopment() && TryGetIngressPath(context, out var ingressPath))
             {
-                await next();
-                return;
+                RewriteIngressPath(context, ingressPath);
             }
 
-            await ProcessIngressPathAsync(context, environment);
-            await next();
-        });
-    }
-
-    public void ApplyPostAuthenticationMiddleware(IApplicationBuilder app, IWebHostEnvironment environment)
-    {
-        app.Use(async (context, next) =>
-        {
-            var principal = AuthenticateViaIngress(context);
-            if (principal == null)
-            {
-                await next();
-                return;
-            }
-
-            context.User = principal;
-
-            if (IsUserManagementEnabled)
-            {
-                await next();
-                return;
-            }
-
-            var path = context.Request.Path.Value?.ToLowerInvariant() ?? "";
-            var isUserManagementEndpoint = path.StartsWith("/api/auth/") || path.StartsWith("/api/users/");
-            
-            var isSetupStatus = path == "/api/auth/setup" && HttpMethods.IsGet(context.Request.Method);
-            if (isUserManagementEndpoint && path != "/api/auth/current" && !isSetupStatus)
-            {
-                context.Response.StatusCode = 403;
-                await context.Response.WriteAsJsonAsync(new { message = "User management is disabled in Home Assistant add-on mode" });
-                return;
-            }
-            
             await next();
         });
     }
@@ -180,14 +91,14 @@ public class HomeAssistantAddonStrategy : IDeploymentStrategy
     {
         app.Use(async (context, next) =>
         {
-            if (!context.Request.Headers.TryGetValue(Constants.IngressPathHeader, out var headerValue))
+            if (!TryGetIngressPath(context, out var ingressPath))
             {
                 await next();
                 return;
             }
 
             var path = context.Request.Path.Value ?? "";
-            
+
             // Skip API requests and static file requests (files with extensions)
             if (path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase) ||
                 (path.Contains('.') && !path.EndsWith(".html", StringComparison.OrdinalIgnoreCase)))
@@ -195,19 +106,6 @@ public class HomeAssistantAddonStrategy : IDeploymentStrategy
                 await next();
                 return;
             }
-
-            var ingressPath = headerValue.ToString();
-            if (string.IsNullOrWhiteSpace(ingressPath))
-            {
-                await next();
-                return;
-            }
-            
-            if (!ingressPath.StartsWith('/'))
-            {
-                ingressPath = "/" + ingressPath;
-            }
-            ingressPath = ingressPath.TrimEnd('/');
 
             var html = _cachedIndexHtml.GetOrAdd(ingressPath, key =>
             {
@@ -218,9 +116,7 @@ public class HomeAssistantAddonStrategy : IDeploymentStrategy
                     return string.Empty;
                 }
 
-                var content = File.ReadAllText(indexPath);
-                var baseHref = key + "/";
-                return content.Replace("<base href=\"/\">", $"<base href=\"{baseHref}\">");
+                return WithBaseHref(File.ReadAllText(indexPath), key);
             });
 
             if (string.IsNullOrEmpty(html))
@@ -228,11 +124,33 @@ public class HomeAssistantAddonStrategy : IDeploymentStrategy
                 await next();
                 return;
             }
-            
+
             context.Response.ContentType = "text/html; charset=utf-8";
             context.Response.ContentLength = Encoding.UTF8.GetByteCount(html);
             await context.Response.WriteAsync(html);
-            return; // Don't call next() after serving the response
         });
+    }
+
+    internal static void RewriteIngressPath(HttpContext context, string ingressPath)
+    {
+        var originalPath = context.Request.Path.Value ?? "/";
+        context.Request.PathBase = new PathString(ingressPath);
+
+        if (originalPath.StartsWith(ingressPath, StringComparison.OrdinalIgnoreCase))
+        {
+            var newPath = originalPath.Substring(ingressPath.Length);
+            context.Request.Path = new PathString(string.IsNullOrEmpty(newPath) ? "/" : newPath);
+        }
+    }
+
+    internal static string WithBaseHref(string indexHtml, string ingressPath) =>
+        indexHtml.Replace("<base href=\"/\">", $"<base href=\"{HtmlEncoder.Default.Encode(ingressPath + "/")}\">");
+
+    // Only a trusted request with a well-formed path counts as ingress, so the path is safe to cache and embed.
+    private bool TryGetIngressPath(HttpContext context, [NotNullWhen(true)] out string? ingressPath)
+    {
+        ingressPath = null;
+        return HomeAssistantIngress.IsTrusted(context, _devicePort, _allowLoopbackIngress)
+            && HomeAssistantIngress.TryGetPath(context, out ingressPath);
     }
 }

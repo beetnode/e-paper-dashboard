@@ -1,7 +1,6 @@
 using EPaperDashboard.Models;
 using EPaperDashboard.Utilities;
 using CSharpFunctionalExtensions;
-using System.Security.Claims;
 
 namespace EPaperDashboard.Services;
 
@@ -51,15 +50,7 @@ public class StandaloneStrategy : IDeploymentStrategy
         return UnitResult.Success<string>();
     }
 
-    public ClaimsPrincipal? AuthenticateViaIngress(HttpContext context)
-    {
-        return null;
-    }
-
-    public Task<bool> ProcessIngressPathAsync(HttpContext context, IWebHostEnvironment environment)
-    {
-        return Task.FromResult(false);
-    }
+    public bool IsIngressRequest(HttpContext context) => false;
 
     public void PerformInitialSetup(IServiceProvider serviceProvider)
     {
@@ -67,10 +58,6 @@ public class StandaloneStrategy : IDeploymentStrategy
     }
 
     public void ApplyMiddleware(IApplicationBuilder app, IWebHostEnvironment environment)
-    {
-    }
-
-    public void ApplyPostAuthenticationMiddleware(IApplicationBuilder app, IWebHostEnvironment environment)
     {
     }
 
