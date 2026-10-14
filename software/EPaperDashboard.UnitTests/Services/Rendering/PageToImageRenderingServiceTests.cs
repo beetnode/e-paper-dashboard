@@ -52,7 +52,7 @@ public sealed class PageToImageRenderingServiceTests : IDisposable
             .RenderHtmlAsync(owner, "<html></html>", new Size(200, 100));
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Should().Be("Rendering is not installed on this server. Enable rendering in Rendering settings.");
+        result.Error.Should().Be("Rendering is not available on this server yet.");
         manager.GetStatus().State.Should().Be(PlaywrightComponentState.NotInstalled);
     }
 

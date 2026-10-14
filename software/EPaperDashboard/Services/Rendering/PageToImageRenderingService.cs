@@ -73,8 +73,8 @@ internal sealed class PageToImageRenderingService(
         // Installation is started only by opting in through Rendering settings, never by a render request.
         if (component is null)
             throw new RenderingRequestException(componentManager.GetStatus().State == PlaywrightComponentState.Installing
-                ? "Rendering is being prepared on this server. Try again shortly or check Rendering settings."
-                : "Rendering is not installed on this server. Enable rendering in Rendering settings.");
+                ? "Rendering is being prepared on this server. Try again shortly."
+                : "Rendering is not available on this server yet.");
         var screenshot = await runtime.RunAsync(component, request, token);
         return imageFactory.Load(screenshot, new Size(request.Width, request.Height));
     }, cancellationToken);

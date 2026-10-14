@@ -158,7 +158,10 @@ users' Home Assistant servers: operators should restrict outbound access to appr
 and unrelated internal services. Container/browser isolation does not by itself provide an SSRF/network-access policy.
 
 The default image does not include the browser-rendering runtime or browser binaries. Custom layouts work without them.
-To render an existing Home Assistant dashboard, sign in with your own account, open **Settings → Rendering**, and select **Enable for my account**.
+The component is shared by every account on the server, so only the service administrator installs it: either with
+**Prepare rendering** after enabling rendering in **Settings → Rendering**, or with **Install** under **Settings → System**.
+Other users only opt in with **Enable for my account**; until the administrator prepares the component, rendering is
+shown as not available and they cannot start the download themselves.
 In add-on mode, open the same page through Home Assistant ingress; the control applies to the whole add-on.
 izBoard downloads the version-matched component for the current CPU architecture from the project's GitHub release, verifies its
 SHA-256 checksum, performs a browser readiness test, and activates it immediately. The component is stored in the persistent `/data` volume, so it survives image
@@ -187,8 +190,8 @@ docker compose -f docker-compose.base.yml -f docker-compose.rendering.yml up --b
 ```
 
 Set `CLIENT_URL=http://localhost:8128` in your local `.env` for this test. Open `http://localhost:8128`,
-complete administrator setup, then register a regular account. Open **Settings → Rendering** and select
-**Enable for my account**, followed by **Test rendering**. Set `IZBOARD_VERSION` to override the default test version; the application
+complete administrator setup and prepare rendering in **Settings → Rendering**, then register a regular account. Open
+**Settings → Rendering** and select **Enable for my account**, followed by **Test rendering**. Set `IZBOARD_VERSION` to override the default test version; the application
 and component builds always receive the same value.
 
 Before publishing, keep the pinned browser-runtime dependency current and manually verify installation, **Test component**,
@@ -207,8 +210,8 @@ An accepted job has a five-minute total deadline; runtime queue waiting and work
 
 User rendering preferences are persisted in the database. New accounts start disabled; existing accounts retain access until they
 explicitly disable it. Disabling cancels that account's queued and active work without removing shared files or draining other users' jobs.
-Other replicas observe preference changes and account deletion through a one-second access check. A newly used replica prepares
-its own matching runtime on the first render; the caller can retry once preparation completes. Replicas must have separate component
+Other replicas observe preference changes and account deletion through a one-second access check. Render requests never install the
+component; each replica must be prepared by the administrator. Replicas must have separate component
 directories and private renderer sockets. User preferences are shared through PostgreSQL; queue limits are per replica, not cluster-wide.
 
 The service administrator retains global component installation/removal and diagnostic controls under **Settings → System**. Removing a shared
