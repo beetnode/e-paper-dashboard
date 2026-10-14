@@ -191,7 +191,7 @@ public sealed class PlaywrightComponentRuntime
         using var response = await client.GetAsync("http://renderer/health", token);
         response.EnsureSuccessStatusCode();
         var health = await response.Content.ReadFromJsonAsync<RenderingHostHealth>(token);
-        if (health is null || health.ProtocolVersion != 2 || !health.SandboxRequired || !health.SupportsJobCancellation
+        if (health is null || health.ProtocolVersion != RenderingComponentInfo.ProtocolVersion || !health.SandboxRequired || !health.SupportsJobCancellation
             || health.RuntimeIdentifier != PlaywrightComponentManager.GetRuntimeIdentifier()
             || PlaywrightComponentManager.NormalizeVersion(health.AppVersion) != PlaywrightComponentManager.NormalizeVersion(Constants.AppVersion))
             throw new InvalidOperationException("The renderer container must match the application build and require browser sandboxing.");
@@ -225,7 +225,7 @@ public sealed class PlaywrightComponentRuntime
             await process.WaitForExitAsync(token);
             var response = JsonSerializer.Deserialize<RenderResponse>(await output, JsonOptions);
             var browserLog = await error;
-            if (response?.ProtocolVersion != 2)
+            if (response?.ProtocolVersion != RenderingComponentInfo.ProtocolVersion)
                 throw new InvalidOperationException("The rendering component protocol is incompatible.");
             if (process.ExitCode != 0 || response.Success != true)
                 throw new RenderWorkerFailedException(LogWorkerErrors && browserLog.Length > 0

@@ -1,18 +1,9 @@
 name: Build Rendering Component
 
+# The component version and protocol are read from software/RenderingComponentProtocol.cs.
 on:
   workflow_call:
-    inputs:
-      version:
-        description: Component and compatible application version
-        required: true
-        type: string
   workflow_dispatch:
-    inputs:
-      version:
-        description: Component and compatible application version
-        required: true
-        type: string
 
 jobs:
   build:
@@ -36,7 +27,6 @@ jobs:
           file: ./software/EPaperDashboard.PlaywrightComponent/Dockerfile
           target: export
           platforms: ${{ matrix.platform }}
-          build-args: VERSION=${{ inputs.version }}
           outputs: type=local,dest=./component
           cache-from: type=gha,scope=playwright-${{ matrix.runtime }}
           cache-to: type=gha,mode=max,scope=playwright-${{ matrix.runtime }}

@@ -37,8 +37,10 @@
           <dd class="col-sm-9">{{ component.appVersion }}</dd>
           <dt class="col-sm-3">Platform</dt>
           <dd class="col-sm-9">{{ component.runtimeIdentifier }}</dd>
+          <dt class="col-sm-3">Required component</dt>
+          <dd class="col-sm-9">{{ component.expectedVersion }}</dd>
           @if (component.installedVersion) {
-            <dt class="col-sm-3">Component version</dt>
+            <dt class="col-sm-3">Installed component</dt>
             <dd class="col-sm-9">{{ component.installedVersion }}</dd>
           }
         </dl>

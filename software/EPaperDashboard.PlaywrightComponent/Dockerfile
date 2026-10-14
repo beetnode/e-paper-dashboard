@@ -2,7 +2,6 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0-noble AS component
 
 ARG TARGETARCH
-ARG VERSION=0.0.0
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PLAYWRIGHT_BROWSERS_PATH=/component/browsers
 
@@ -14,6 +13,11 @@ COPY EPaperDashboard.PlaywrightComponent/ ./EPaperDashboard.PlaywrightComponent/
 COPY RenderingComponentProtocol.cs ./RenderingComponentProtocol.cs
 COPY EPaperDashboard.PlaywrightComponent/packaging/ ./packaging/
 
+# The component is versioned independently of the application; both values live in the shared protocol file.
+RUN sed -n 's/.*const string Version = "\([^"]*\)".*/\1/p' RenderingComponentProtocol.cs > /tmp/component-version && \
+    sed -n 's/.*const int ProtocolVersion = \([0-9]*\).*/\1/p' RenderingComponentProtocol.cs > /tmp/protocol-version && \
+    grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' /tmp/component-version && grep -Eq '^[0-9]+$' /tmp/protocol-version
+
 RUN case "$TARGETARCH" in \
       amd64) RID=linux-x64 ;; \
       arm64) RID=linux-arm64 ;; \
@@ -21,7 +25,7 @@ RUN case "$TARGETARCH" in \
     esac && \
     dotnet publish EPaperDashboard.PlaywrightComponent/EPaperDashboard.PlaywrightComponent.csproj \
       -c Release -r "$RID" --self-contained false -o /component/worker \
-      /p:Version="$VERSION" /p:DebugType=none /p:DebugSymbols=false
+      /p:Version="$(cat /tmp/component-version)" /p:DebugType=none /p:DebugSymbols=false
 
 # Install the browser and its dependencies only in this packaging stage. The collector copies
 # the required native libraries into the downloadable component; none enter the base image.
@@ -32,8 +36,8 @@ RUN case "$TARGETARCH" in \
       arm64) COMPONENT_RUNTIME=linux-arm64 ;; \
     esac && \
     sed \
-      -e "s/__APP_VERSION__/$(echo "$VERSION" | cut -d. -f1-3)/g" \
-      -e "s/__COMPONENT_VERSION__/$VERSION/g" \
+      -e "s/__PROTOCOL_VERSION__/$(cat /tmp/protocol-version)/g" \
+      -e "s/__COMPONENT_VERSION__/$(cat /tmp/component-version)/g" \
       -e "s/__RUNTIME_IDENTIFIER__/$COMPONENT_RUNTIME/g" \
       /src/packaging/component-manifest.template.json > /component/component-manifest.json
 RUN cp /src/packaging/NOTICE /component/NOTICE

@@ -1,0 +1,64 @@
+name: Create Firmware Release
+
+# Firmware is versioned independently of the application: tag firmware-v<FIRMWARE_VERSION>.
+on:
+  push:
+    tags:
+      - 'firmware-v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-firmware:
+    uses: ./.github/workflows/firmware-build.yml
+
+  create-release:
+    needs: build-firmware
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check tag matches firmware version
+      id: tag
+      run: |
+        TAG=${GITHUB_REF#refs/tags/}
+        VERSION=${TAG#firmware-v}
+        FW_VERSION=$(grep 'FIRMWARE_VERSION' firmware/src/version.h | sed 's/.*"\([0-9.]*\)".*/\1/')
+        if [ "$VERSION" != "$FW_VERSION" ]; then
+          echo "Tag $TAG does not match FIRMWARE_VERSION $FW_VERSION in firmware/src/version.h" >&2
+          exit 1
+        fi
+        echo "tag=$TAG" >> $GITHUB_OUTPUT
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Download firmware artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: firmware-esp32-${{ needs.build-firmware.outputs.version }}
+        path: ./release/firmware/
+
+    - name: Create release assets
+      run: |
+        VERSION=${{ steps.tag.outputs.version }}
+        (cd release && zip -r ../firmware-${VERSION}.zip firmware)
+        # Standalone binary: servers pick the OTA image by matching FIRMWARE_ASSET_PATTERN (*.bin)
+        # against release asset names, so it cannot live only inside the zip.
+        cp release/firmware/*.bin firmware-${VERSION}.bin
+
+    # Not marked latest: the latest release stays the application release that Docker users follow.
+    - name: Create GitHub Release
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        TAG: ${{ steps.tag.outputs.tag }}
+        VERSION: ${{ steps.tag.outputs.version }}
+      run: |
+        gh release create "$TAG" "firmware-${VERSION}.zip" "firmware-${VERSION}.bin" \
+          --verify-tag --title "Firmware $VERSION" --generate-notes --latest=false
+
+    - name: Release Summary
+      run: |
+        echo "### Firmware ${{ steps.tag.outputs.version }} released" >> $GITHUB_STEP_SUMMARY
+        echo "Servers offer it to devices over the air once they refresh their firmware release cache." >> $GITHUB_STEP_SUMMARY

@@ -47,13 +47,13 @@ try
         });
     }
 
-    await Console.Out.WriteAsync(JsonSerializer.Serialize(new RenderResponse(true, null, 2), jsonOptions));
+    await Console.Out.WriteAsync(JsonSerializer.Serialize(new RenderResponse(true, null, RenderingComponentInfo.ProtocolVersion), jsonOptions));
     return 0;
 }
 catch (Exception exception)
 {
     await Console.Out.WriteAsync(JsonSerializer.Serialize(
-        new RenderResponse(false, exception.Message, 2), jsonOptions));
+        new RenderResponse(false, exception.Message, RenderingComponentInfo.ProtocolVersion), jsonOptions));
     return 1;
 }
 

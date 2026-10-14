@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 2,
-  "appVersion": "__APP_VERSION__",
+  "schemaVersion": 3,
+  "protocolVersion": __PROTOCOL_VERSION__,
   "componentVersion": "__COMPONENT_VERSION__",
   "runtimeIdentifier": "__RUNTIME_IDENTIFIER__",
   "workerAssembly": "worker/EPaperDashboard.PlaywrightComponent.dll",
