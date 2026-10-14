@@ -66,7 +66,7 @@ public class UsersApiControllerTests
     public void ChangePassword_WrongCurrentPassword_ReturnsBadRequest()
     {
         var userId = UserId.New();
-        var user = new User { Id = userId, PasswordHash = UserService.ComputeSha256Hash("correct") };
+        var user = new User { Id = userId, PasswordHash = PasswordHashing.LegacySha256("correct") };
         _userRepository.Setup(r => r.FindById(userId)).Returns(user);
         var sut = CreateSut().WithUser(userId);
 
@@ -79,14 +79,14 @@ public class UsersApiControllerTests
     public void ChangePassword_ValidChange_ReturnsOkAndUpdatesHash()
     {
         var userId = UserId.New();
-        var user = new User { Id = userId, PasswordHash = UserService.ComputeSha256Hash("correct") };
+        var user = new User { Id = userId, PasswordHash = PasswordHashing.LegacySha256("correct") };
         _userRepository.Setup(r => r.FindById(userId)).Returns(user);
         var sut = CreateSut().WithUser(userId);
 
         var result = sut.ChangePassword(new ChangePasswordRequest("correct", "newpass", "newpass"));
 
         result.Should().BeOfType<OkObjectResult>();
-        user.PasswordHash.Should().Be(UserService.ComputeSha256Hash("newpass"));
+        PasswordHashing.Verify(user.PasswordHash, "newpass").Should().Be(PasswordCheck.Valid);
     }
 
     [Fact]

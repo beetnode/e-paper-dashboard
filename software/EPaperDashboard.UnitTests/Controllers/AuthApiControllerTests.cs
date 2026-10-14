@@ -66,7 +66,7 @@ public class AuthApiControllerTests
     [Fact]
     public async Task Login_ValidCredentials_SignsInAndReturnsUserInfo()
     {
-        var user = new User { Username = "alice", PasswordHash = UserService.ComputeSha256Hash("secret") };
+        var user = new User { Username = "alice", PasswordHash = PasswordHashing.LegacySha256("secret") };
         _userRepository.Setup(r => r.FindByUsername("alice")).Returns(user);
         var sut = CreateSut();
 

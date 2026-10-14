@@ -51,12 +51,7 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
         if (!_deploymentStrategy.IsUserManagementEnabled) return Forbid();
         if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrEmpty(request.Password))
             return Unauthorized(new { message = "Invalid username or password." });
-        if (!_userService.IsUserValid(request.Username, request.Password))
-        {
-            return Unauthorized(new { message = "Invalid username or password." });
-        }
-
-        var user = _userService.GetUserByUsername(request.Username);
+        var user = _userService.VerifyCredentials(request.Username, request.Password);
         if (user.HasNoValue)
         {
             return Unauthorized(new { message = "Invalid username or password." });

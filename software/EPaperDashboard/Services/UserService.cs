@@ -2,8 +2,6 @@ using CSharpFunctionalExtensions;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 using EPaperDashboard.Utilities;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace EPaperDashboard.Services;
 
@@ -80,7 +78,7 @@ public sealed class UserService(
     public bool TryCreateAdministrator(string username, string password) =>
         userRepository.TryCreateAdministrator(new User
         {
-            Username = username.Trim(), PasswordHash = ComputeSha256Hash(password),
+            Username = username.Trim(), PasswordHash = PasswordHashing.Hash(password),
             IsSuperUser = true, RenderingEnabled = false
         });
 
@@ -121,10 +119,28 @@ public sealed class UserService(
 
     private const string UsersLock = "users";
 
-    public bool IsUserValid(string username, string password) =>
-        GetUserByUsername(username)
-        .Select(user => string.Equals(user.PasswordHash, ComputeSha256Hash(password), StringComparison.OrdinalIgnoreCase))
-        .GetValueOrDefault();
+    /// <summary>Returns the account when the password matches, upgrading a legacy password hash on the way.</summary>
+    public Maybe<User> VerifyCredentials(string username, string password)
+    {
+        var user = GetUserByUsername(username);
+        if (user.HasNoValue)
+        {
+            PasswordHashing.SimulateVerification(password);
+            return Maybe<User>.None;
+        }
+
+        switch (PasswordHashing.Verify(user.Value.PasswordHash, password))
+        {
+            case PasswordCheck.ValidNeedsRehash:
+                user.Value.PasswordHash = PasswordHashing.Hash(password);
+                userRepository.Update(user.Value);
+                return user;
+            case PasswordCheck.Valid:
+                return user;
+            default:
+                return Maybe<User>.None;
+        }
+    }
 
     public bool TryCreateUser(string username, string password, bool isSuperUser = false)
     {
@@ -136,7 +152,7 @@ public sealed class UserService(
         var user = new User
         {
             Username = username,
-            PasswordHash = ComputeSha256Hash(password),
+            PasswordHash = PasswordHashing.Hash(password),
             IsSuperUser = isSuperUser,
             RenderingEnabled = false
         };
@@ -157,32 +173,19 @@ public sealed class UserService(
 
     public bool TryChangePassword(UserId userId, string oldPassword, string newPassword) =>
         userRepository.FindById(userId)
-            .Where(user => string.Equals(user.PasswordHash, ComputeSha256Hash(oldPassword), StringComparison.Ordinal))
+            .Where(user => PasswordHashing.Verify(user.PasswordHash, oldPassword) != PasswordCheck.Failed)
             .Match(
                 user =>
                 {
-                    var newHash = ComputeSha256Hash(newPassword);
-                    if (string.Equals(user.PasswordHash, newHash, StringComparison.Ordinal))
+                    if (PasswordHashing.Verify(user.PasswordHash, newPassword) != PasswordCheck.Failed)
                     {
                         return false;
                     }
 
-                    user.PasswordHash = newHash;
+                    user.PasswordHash = PasswordHashing.Hash(newPassword);
                     userRepository.Update(user);
                     return true;
                 },
                 () => false
             );
-
-    public static string ComputeSha256Hash(string rawData)
-    {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(rawData));
-        var builder = new StringBuilder();
-        foreach (var b in bytes)
-        {
-            builder.Append(b.ToString("x2"));
-        }
-
-        return builder.ToString();
-    }
 }
