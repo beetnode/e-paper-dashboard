@@ -1,3 +1,4 @@
+using JsonSerializer = System.Text.Json.JsonSerializer;
 using CSharpFunctionalExtensions;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
@@ -50,6 +51,15 @@ internal sealed class LiteDbUserRepository(LiteDbContext context) : IUserReposit
 
     public void SetRenderingEnabled(UserId id, bool enabled) =>
         context.ServiceState.Upsert(new BsonDocument { ["_id"] = "rendering:" + id.Value, ["enabled"] = enabled });
+
+    public AiConfig? GetAiConfig(UserId id)
+    {
+        var state = context.ServiceState.FindById("ai:" + id.Value);
+        return state is null ? null : JsonSerializer.Deserialize<AiConfig>(state["config"].AsString);
+    }
+
+    public void SetAiConfig(UserId id, AiConfig config) =>
+        context.ServiceState.Upsert(new BsonDocument { ["_id"] = "ai:" + id.Value, ["config"] = JsonSerializer.Serialize(config) });
 
     public bool TryInsert(User user)
     {

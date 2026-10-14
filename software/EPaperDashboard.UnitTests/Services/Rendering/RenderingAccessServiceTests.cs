@@ -17,7 +17,8 @@ public sealed class RenderingAccessServiceTests
     private readonly Mock<IDeploymentStrategy> _deployment = new();
     public RenderingAccessServiceTests() => _deployment.SetupGet(d => d.Mode).Returns(DeploymentMode.Standalone);
 
-    private RenderingAccessService Create() => new(_users.Object, _dashboards.Object, _deployment.Object,
+    private RenderingAccessService Create() => new(
+        new UserService(_users.Object, _dashboards.Object, deployment: _deployment.Object), _dashboards.Object,
         new UserRenderScheduler(new ConfigurationBuilder().Build()));
 
     [Fact]

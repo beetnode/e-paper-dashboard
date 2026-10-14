@@ -9,7 +9,7 @@ namespace EPaperDashboard.Controllers;
 [ApiController, Authorize, Route("api/providers")]
 public sealed class ProviderConnectionsController(ProviderRegistry registry, ProviderConnectionStore connections, Services.UserService users) : BaseApiController
 {
-    private bool HasAccount => CurrentUserId != UserId.Empty && (IsHomeAssistantIngress || users.GetUserById(CurrentUserId).HasValue);
+    private bool HasAccount => users.HasAccount(CurrentUserId);
 
     [HttpGet]
     public IActionResult Plugins() => Ok(new

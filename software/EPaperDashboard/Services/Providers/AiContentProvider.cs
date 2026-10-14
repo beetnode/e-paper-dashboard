@@ -232,8 +232,7 @@ public sealed class AiContentProvider(
             return dashboard.AiConfig;
         }
 
-        var user = userService.GetUserById(dashboard.UserId);
-        return user.HasValue ? user.Value.AiConfig : null;
+        return userService.GetAiConfig(dashboard.UserId);
     }
 
     private static string? GetStringProp(JsonElement el, string prop) =>

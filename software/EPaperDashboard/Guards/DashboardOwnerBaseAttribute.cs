@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
-using System.Security.Claims;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services;
 using EPaperDashboard.Utilities;
@@ -26,31 +25,11 @@ public abstract class DashboardOwnerBaseAttribute : Attribute
             return;
         }
 
-        // Get user ID from claims
-        var userIdValue = context.HttpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrWhiteSpace(userIdValue))
+        var userId = context.HttpContext.User.GetUserId();
+        if (userId == UserId.Empty)
         {
             context.Result = new UnauthorizedResult();
             return;
-        }
-
-        // Check if this is Home Assistant ingress mode
-        var isHomeAssistantIngress = context.HttpContext.User.FindFirst(Constants.HomeAssistantIngressClaim)?.Value == "true";
-
-        UserId userId;
-        if (isHomeAssistantIngress && userIdValue == Constants.HomeAssistantAdminUserId)
-        {
-            // In Home Assistant mode, use virtual user ID
-            userId = Constants.HomeAssistantVirtualUserId;
-        }
-        else
-        {
-            // In standalone mode, parse user ID from database
-            if (!UserId.TryParse(userIdValue, out userId))
-            {
-                context.Result = new UnauthorizedResult();
-                return;
-            }
         }
 
         // Get services from DI
@@ -63,15 +42,10 @@ public abstract class DashboardOwnerBaseAttribute : Attribute
             return;
         }
 
-        // Verify user exists (skip check in Home Assistant mode)
-        if (!isHomeAssistantIngress)
+        if (!userService.HasAccount(userId))
         {
-            var user = userService.GetUserById(userId);
-            if (user.HasNoValue)
-            {
-                context.Result = new UnauthorizedResult();
-                return;
-            }
+            context.Result = new UnauthorizedResult();
+            return;
         }
 
         // Parse and validate dashboard ID

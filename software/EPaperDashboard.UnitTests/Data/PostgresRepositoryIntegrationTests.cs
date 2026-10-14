@@ -330,6 +330,11 @@ public class PostgresRepositoryIntegrationTests
             admin.IsSuperUser.Should().BeTrue();
             users.SetRenderingEnabled(admin.Id, false);
             users.GetRenderingEnabled(admin.Id).Should().BeFalse();
+            users.GetAiConfig(admin.Id).Should().BeNull();
+            users.SetAiConfig(admin.Id, new AiConfig { ConnectionMode = AiConnectionMode.HomeAssistant });
+            users.SetRenderingEnabled(admin.Id, true);
+            users.GetAiConfig(admin.Id)!.ConnectionMode.Should().Be(AiConnectionMode.HomeAssistant);
+            users.GetRenderingEnabled(admin.Id).Should().BeTrue();
             users.Delete(admin.Id);
             users.IsSetupComplete().Should().BeTrue();
             users.TryCreateAdministrator(new User { Username = "attacker" }).Should().BeFalse();

@@ -61,7 +61,8 @@ public sealed class RenderingSettingsControllerTests : IDisposable
         var users = new Mock<IUserRepository>();
         users.Setup(r => r.FindById(owner)).Returns(new User { Id = owner });
         var configuration = new ConfigurationBuilder().Build();
-        var access = new RenderingAccessService(users.Object, Mock.Of<IDashboardRepository>(), Mock.Of<IDeploymentStrategy>(),
+        var access = new RenderingAccessService(
+            new UserService(users.Object, Mock.Of<IDashboardRepository>(), deployment: Mock.Of<IDeploymentStrategy>()), Mock.Of<IDashboardRepository>(),
             new UserRenderScheduler(configuration));
         var environment = new Mock<IEnvironmentConfiguration>();
         environment.SetupGet(e => e.ConfigDir).Returns(_directory);

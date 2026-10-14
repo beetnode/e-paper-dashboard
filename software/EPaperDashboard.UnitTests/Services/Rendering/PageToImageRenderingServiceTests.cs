@@ -61,7 +61,8 @@ public sealed class PageToImageRenderingServiceTests : IDisposable
     {
         var deployment = new Mock<IDeploymentStrategy>();
         deployment.SetupGet(d => d.Mode).Returns(DeploymentMode.Standalone);
-        var access = new RenderingAccessService(users, Mock.Of<IDashboardRepository>(), deployment.Object,
+        var access = new RenderingAccessService(
+            new UserService(users, Mock.Of<IDashboardRepository>(), deployment: deployment.Object), Mock.Of<IDashboardRepository>(),
             new UserRenderScheduler(new ConfigurationBuilder().Build()));
         // Access failures occur before any component, HTTP, or image work is permitted.
         return new PageToImageRenderingService(Mock.Of<IHttpClientFactory>(), Mock.Of<IImageFactory>(), manager!, runtime!,

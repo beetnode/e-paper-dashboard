@@ -1,18 +1,76 @@
 using CSharpFunctionalExtensions;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
+using EPaperDashboard.Utilities;
 using System.Security.Cryptography;
 using System.Text;
 
 namespace EPaperDashboard.Services;
 
-public sealed class UserService(IUserRepository userRepository, IDashboardRepository dashboardRepository, IProviderConnectionRepository? connections = null)
+public sealed class UserService(
+    IUserRepository userRepository,
+    IDashboardRepository dashboardRepository,
+    IProviderConnectionRepository? connections = null,
+    IDeploymentStrategy? deployment = null)
 {
     public Maybe<User> GetUserByUsername(string username) =>
         userRepository.FindByUsername(username);
 
     public Maybe<User> GetUserById(UserId id) =>
         userRepository.FindById(id);
+
+    /// <summary>
+    /// Whether the owner is a known account. In add-on mode the only account is the Home Assistant ingress user
+    /// (<see cref="Constants.HomeAssistantVirtualUserId"/>), which has no user record: its settings are kept in
+    /// service state instead. Use the owner settings below rather than reading <see cref="User"/> fields directly,
+    /// so this owner is handled the same way as a regular account.
+    /// </summary>
+    public bool HasAccount(UserId id) =>
+        IsAddonOwner(id)
+        || (id != UserId.Empty && deployment?.Mode != DeploymentMode.Addon && userRepository.FindById(id).HasValue);
+
+    /// <summary>Returns the owner's global AI provider, or null when it is not configured or the owner has no account.</summary>
+    public AiConfig? GetAiConfig(UserId id) =>
+        IsAddonOwner(id) ? userRepository.GetAiConfig(id) : FindAccount(id).Map(user => user.AiConfig).GetValueOrDefault();
+
+    public bool TryUpdateAiConfig(UserId id, AiConfig config)
+    {
+        if (IsAddonOwner(id))
+        {
+            userRepository.SetAiConfig(id, config);
+            return true;
+        }
+
+        return FindAccount(id).Match(
+            user =>
+            {
+                user.AiConfig = config;
+                userRepository.Update(user);
+                return true;
+            },
+            () => false);
+    }
+
+    /// <summary>Rendering requires an explicit opt-in; owners without an account never have access.</summary>
+    public bool IsRenderingEnabled(UserId id) =>
+        HasAccount(id) && (userRepository.GetRenderingEnabled(id)
+            ?? FindAccount(id).Map(user => user.RenderingEnabled).GetValueOrDefault() ?? false);
+
+    public bool TrySetRenderingEnabled(UserId id, bool enabled)
+    {
+        if (!HasAccount(id))
+        {
+            return false;
+        }
+
+        userRepository.SetRenderingEnabled(id, enabled);
+        return true;
+    }
+
+    private static bool IsAddonOwner(UserId id) => id == Constants.HomeAssistantVirtualUserId;
+
+    private Maybe<User> FindAccount(UserId id) =>
+        HasAccount(id) ? userRepository.FindById(id) : Maybe<User>.None;
 
     public bool IsSetupComplete() => userRepository.IsSetupComplete();
 

@@ -168,7 +168,6 @@ public sealed class AiDashboardGenerationService(
             return dashboard.AiConfig;
         }
 
-        var user = userService.GetUserById(dashboard.UserId);
-        return user.HasValue ? user.Value.AiConfig : null;
+        return userService.GetAiConfig(dashboard.UserId);
     }
 }

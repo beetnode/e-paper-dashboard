@@ -204,9 +204,7 @@ public sealed class AiPreGenerationService(
             return true;
         }
 
-        var user = userService.GetUserById(dashboard.UserId);
-        return user.HasValue
-            && user.Value.AiConfig != null
-            && user.Value.AiConfig.ConnectionMode != AiConnectionMode.None;
+        var globalConfig = userService.GetAiConfig(dashboard.UserId);
+        return globalConfig != null && globalConfig.ConnectionMode != AiConnectionMode.None;
     }
 }

@@ -122,7 +122,7 @@ public class DashboardOwnerAttributeTests
         var dashboardId = DashboardId.New();
         var dashboard = new Dashboard { Id = dashboardId, UserId = Constants.HomeAssistantVirtualUserId };
         var context = AuthorizationFilterContextBuilder.Build(
-            userIdClaim: Constants.HomeAssistantAdminUserId,
+            userIdClaim: Constants.HomeAssistantVirtualUserId.ToString(),
             isHomeAssistantIngress: true,
             routeDashboardId: dashboardId.Value,
             configure: (_, dashboards) => dashboards.Setup(r => r.FindById(dashboardId)).Returns(dashboard));
