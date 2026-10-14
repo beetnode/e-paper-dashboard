@@ -104,17 +104,18 @@ builder.Services.AddControllers()
 builder.Services.AddRateLimiter(options =>
 {
 	options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-	options.AddPolicy("AccountCreation", context => PairingRateLimit(context, 10));
-	options.AddPolicy("PairingAnnounce", context => PairingRateLimit(context, 10));
-	options.AddPolicy("PairingStatus", context => PairingRateLimit(context, 240));
-	options.AddPolicy("PairingClaim", context => PairingRateLimit(context, 10));
+	options.AddPolicy("AccountCreation", context => IpRateLimit(context, 10));
+	options.AddPolicy("Login", context => IpRateLimit(context, 10));
+	options.AddPolicy("PairingAnnounce", context => IpRateLimit(context, 10));
+	options.AddPolicy("PairingStatus", context => IpRateLimit(context, 240));
+	options.AddPolicy("PairingClaim", context => IpRateLimit(context, 10));
 	options.OnRejected = (context, _) =>
 	{
 		context.HttpContext.Response.Headers.RetryAfter = "5";
 		return ValueTask.CompletedTask;
 	};
 
-	static RateLimitPartition<string> PairingRateLimit(HttpContext context, int permitsPerMinute) =>
+	static RateLimitPartition<string> IpRateLimit(HttpContext context, int permitsPerMinute) =>
 		RateLimitPartition.GetFixedWindowLimiter(
 			context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
 			_ => new FixedWindowRateLimiterOptions

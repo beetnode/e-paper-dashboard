@@ -45,6 +45,7 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
 
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("Login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         if (!_deploymentStrategy.IsUserManagementEnabled) return Forbid();

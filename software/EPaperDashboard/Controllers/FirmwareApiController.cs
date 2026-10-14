@@ -42,7 +42,7 @@ public class FirmwareApiController(FirmwareUpdateService firmwareUpdateService) 
     /// Returns the latest firmware information after the check.
     /// </summary>
     [HttpPost("refresh")]
-    [Authorize]
+    [Authorize(Policy = "SuperUserOnly")]
     public async Task<IActionResult> RefreshFirmwareCheck()
     {
         var release = await firmwareUpdateService.RefreshAsync(HttpContext.RequestAborted);

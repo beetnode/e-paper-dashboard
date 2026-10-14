@@ -236,4 +236,11 @@ public class AuthApiControllerTests
 
         result.Should().BeOfType<OkObjectResult>();
     }
+
+    [Fact]
+    public void Login_IsRateLimited() =>
+        typeof(AuthApiController).GetMethod(nameof(AuthApiController.Login))!
+            .GetCustomAttributes(typeof(Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute), true)
+            .Cast<Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute>()
+            .Should().ContainSingle().Which.PolicyName.Should().Be("Login");
 }

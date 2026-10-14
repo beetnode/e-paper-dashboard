@@ -215,7 +215,7 @@ component; each replica must be prepared by the administrator. Replicas must hav
 directories and private renderer sockets. User preferences are shared through PostgreSQL; queue limits are per replica, not cluster-wide.
 
 The service administrator retains global component installation/removal and diagnostic controls under **Settings → System**. Removing a shared
-component affects all users on that replica; an enabled user's next render can prepare it again. Use deployment configuration to take
+component affects all users on that replica until the administrator installs it again. Use deployment configuration to take
 a renderer offline for maintenance. Users only enable/disable their own capability and cannot remove shared files.
 
 Fresh processes, browser contexts, temporary directories, stripped environments, and ownership checks provide application-level
@@ -224,7 +224,7 @@ hard per-user resource boundary, or enforced per-job network-egress policy. Host
 sandboxing.
 
 Only the single-user Home Assistant add-on retains an in-app-container compatibility worker with browser sandboxing disabled.
-Standalone and host deployments require the isolated sidecar and browser sandboxing; they never fall back to compatibility mode.
+Standalone deployments require the isolated sidecar and browser sandboxing; they never fall back to compatibility mode.
 
 Stop the stack and remove its isolated test data and generated component artifacts with:
 

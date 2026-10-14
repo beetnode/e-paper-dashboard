@@ -98,6 +98,22 @@ public class PostgresRepositoryIntegrationTests
             sessions.FindById(session.Id).Value.IsCompleted.Should().BeTrue();
             sessions.DeleteExpired(DateTimeOffset.UtcNow.AddHours(1));
             sessions.FindById(session.Id).HasValue.Should().BeFalse();
+
+            var otherUser = UserId.New();
+            var otherDevice = new Device { UserId = otherUser, DashboardId = dashboard.Id, DeviceIdentifier = $"other-{suffix}", ApiKey = $"other-key-{suffix}" };
+            devices.Insert(otherDevice);
+            var claimed = new PairingSession { Code = suffix[6..12].ToUpperInvariant(), UserId = user.Id, ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5) };
+            var otherSession = new PairingSession { Code = suffix[12..18].ToUpperInvariant(), UserId = otherUser, ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5) };
+            sessions.Insert(claimed);
+            sessions.Insert(otherSession);
+            devices.DeleteByUserId(user.Id);
+            sessions.DeleteByUserId(user.Id);
+            devices.FindByUserId(user.Id).Should().BeEmpty();
+            devices.FindById(otherDevice.Id).HasValue.Should().BeTrue();
+            sessions.FindById(claimed.Id).HasValue.Should().BeFalse();
+            sessions.FindById(otherSession.Id).HasValue.Should().BeTrue();
+            devices.Delete(otherDevice.Id);
+            sessions.DeleteExpired(DateTimeOffset.UtcNow.AddHours(1));
         }
         finally
         {

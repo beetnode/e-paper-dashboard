@@ -2,6 +2,7 @@ using CSharpFunctionalExtensions;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services;
+using EPaperDashboard.UnitTests.TestSupport;
 using EPaperDashboard.Utilities;
 using FluentAssertions;
 using Moq;
@@ -101,6 +102,37 @@ public class UserServiceTests
         result.Should().BeTrue();
         dashboards.Verify(r => r.DeleteByUserId(user.Id), Times.Once);
         users.Verify(r => r.Delete(user.Id), Times.Once);
+    }
+
+    [Fact]
+    public void TryDeleteUser_RegularUser_RemovesTheirDevicesAndPairingSessions()
+    {
+        var users = new Mock<IUserRepository>();
+        var devices = new Mock<IDeviceRepository>();
+        var pairingSessions = new Mock<IPairingSessionRepository>();
+        var sut = new UserService(users.Object, new Mock<IDashboardRepository>().Object,
+            devices: devices.Object, pairingSessions: pairingSessions.Object, unitOfWork: ImmediateUnitOfWork.Instance);
+        var user = new User { Id = UserId.New(), IsSuperUser = false };
+        users.Setup(r => r.FindById(user.Id)).Returns(user);
+
+        sut.TryDeleteUser(user.Id).Should().BeTrue();
+
+        devices.Verify(r => r.DeleteByUserId(user.Id), Times.Once);
+        pairingSessions.Verify(r => r.DeleteByUserId(user.Id), Times.Once);
+    }
+
+    [Fact]
+    public void TryDeleteUser_RunsUnderTheUsersLock()
+    {
+        var users = new Mock<IUserRepository>();
+        var unitOfWork = new Mock<IUnitOfWork>();
+        unitOfWork.Setup(u => u.ExecuteExclusive("users", It.IsAny<Func<bool>>())).Returns(false);
+        var sut = new UserService(users.Object, new Mock<IDashboardRepository>().Object, unitOfWork: unitOfWork.Object);
+
+        sut.TryDeleteUser(UserId.New()).Should().BeFalse();
+
+        unitOfWork.Verify(u => u.ExecuteExclusive("users", It.IsAny<Func<bool>>()), Times.Once);
+        users.Verify(r => r.FindById(It.IsAny<UserId>()), Times.Never);
     }
 
     [Fact]

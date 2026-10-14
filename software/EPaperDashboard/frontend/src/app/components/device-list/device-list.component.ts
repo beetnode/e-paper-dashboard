@@ -302,9 +302,11 @@ import { Dashboard } from '../../models/types';
               <span class="app-status-chip app-status-chip-info">Latest v{{ firmwareInfo()!.version }}</span>
             }
           </div>
-          <button type="button" class="btn btn-sm btn-outline-secondary" (click)="refreshFirmware()" [disabled]="isFirmwareLoading()">
-            <i class="fa-solid fa-rotate me-1" [class.fa-spin]="isFirmwareLoading()" aria-hidden="true"></i>{{ isFirmwareLoading() ? 'Checking…' : 'Check for updates' }}
-          </button>
+          @if (canRefreshFirmware()) {
+            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="refreshFirmware()" [disabled]="isFirmwareLoading()">
+              <i class="fa-solid fa-rotate me-1" [class.fa-spin]="isFirmwareLoading()" aria-hidden="true"></i>{{ isFirmwareLoading() ? 'Checking…' : 'Check for updates' }}
+            </button>
+          }
         </div>
         @if (firmwareError()) {
           <p class="small text-danger mb-0"><i class="fa-solid fa-circle-exclamation me-1" aria-hidden="true"></i>{{ firmwareError() }}</p>
@@ -353,6 +355,8 @@ export class DeviceListComponent implements OnDestroy {
   private readonly dialogService = inject(DialogService);
   private readonly toastService = inject(ToastService);
   private readonly clipboardService = inject(ClipboardService);
+
+  protected readonly canRefreshFirmware = computed(() => this.authService.currentUser()?.isSuperUser === true);
 
   readonly devices = signal<Device[]>([]);
   readonly dashboards = signal<Dashboard[]>([]);

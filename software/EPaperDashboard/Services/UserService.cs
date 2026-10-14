@@ -11,7 +11,10 @@ public sealed class UserService(
     IUserRepository userRepository,
     IDashboardRepository dashboardRepository,
     IProviderConnectionRepository? connections = null,
-    IDeploymentStrategy? deployment = null)
+    IDeploymentStrategy? deployment = null,
+    IDeviceRepository? devices = null,
+    IPairingSessionRepository? pairingSessions = null,
+    IUnitOfWork? unitOfWork = null)
 {
     public Maybe<User> GetUserByUsername(string username) =>
         userRepository.FindByUsername(username);
@@ -96,19 +99,27 @@ public sealed class UserService(
     public void UpdateUser(User user) =>
         userRepository.Update(user);
 
+    /// <summary>Deletes a regular account together with everything it owns, including paired devices.</summary>
     public bool TryDeleteUser(UserId id) =>
-        userRepository.FindById(id)
+        ExecuteUnderUsersLock(() => userRepository.FindById(id)
             .Where(u => !u.IsSuperUser)
             .Match(
                 u =>
                 {
                     dashboardRepository.DeleteByUserId(u.Id);
                     connections?.DeleteByUserId(u.Id);
+                    devices?.DeleteByUserId(u.Id);
+                    pairingSessions?.DeleteByUserId(u.Id);
                     userRepository.Delete(u.Id);
                     return true;
                 },
                 () => false
-            );
+            ));
+
+    private T ExecuteUnderUsersLock<T>(Func<T> operation) =>
+        unitOfWork is null ? operation() : unitOfWork.ExecuteExclusive(UsersLock, operation);
+
+    private const string UsersLock = "users";
 
     public bool IsUserValid(string username, string password) =>
         GetUserByUsername(username)

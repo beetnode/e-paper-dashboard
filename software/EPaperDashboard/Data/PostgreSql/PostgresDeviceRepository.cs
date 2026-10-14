@@ -46,6 +46,9 @@ internal sealed class PostgresDeviceRepository(PostgresDbContext context) : IDev
     public void Delete(DeviceId id) => context.Execute(
         "DELETE FROM izboard_devices WHERE id = @id", PostgresDbContext.Parameter("id", id.Value));
 
+    public void DeleteByUserId(UserId userId) => context.Execute(
+        "DELETE FROM izboard_devices WHERE user_id = @user_id", PostgresDbContext.Parameter("user_id", userId.Value));
+
     private static Npgsql.NpgsqlParameter[] Parameters(Device device) =>
     [
         PostgresDbContext.Parameter("id", device.Id.Value),

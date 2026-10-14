@@ -99,5 +99,26 @@ public sealed class AccountSetupTests : IDisposable
         users.GetAll().Should().ContainSingle().Which.Username.Should().Be("alice");
     }
 
+    [Fact]
+    public void DeleteByUserIdRemovesOnlyThatUsersDevicesAndPairingSessions()
+    {
+        using var context = Open();
+        var devices = new LiteDbDeviceRepository(context);
+        var sessions = new LiteDbPairingSessionRepository(context);
+        var (alice, bob) = (UserId.New(), UserId.New());
+        devices.Insert(new Device { UserId = alice, DeviceIdentifier = "a", ApiKey = "ka" });
+        devices.Insert(new Device { UserId = bob, DeviceIdentifier = "b", ApiKey = "kb" });
+        sessions.Insert(new PairingSession { UserId = alice, Code = "AAAAAA" });
+        sessions.Insert(new PairingSession { UserId = bob, Code = "BBBBBB" });
+
+        devices.DeleteByUserId(alice);
+        sessions.DeleteByUserId(alice);
+
+        devices.FindByUserId(alice).Should().BeEmpty();
+        devices.FindByUserId(bob).Should().ContainSingle();
+        sessions.FindByCode("AAAAAA").HasValue.Should().BeFalse();
+        sessions.FindByCode("BBBBBB").HasValue.Should().BeTrue();
+    }
+
     public void Dispose() { if (Directory.Exists(_directory)) Directory.Delete(_directory, true); }
 }
