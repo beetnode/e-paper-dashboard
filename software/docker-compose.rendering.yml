@@ -9,7 +9,7 @@ services:
       context: .
       dockerfile: EPaperDashboard/Dockerfile
       args:
-        VERSION: "${IZBOARD_VERSION:-0.5.0.999}"
+        VERSION: "${IZBOARD_VERSION:-0.6.0.999}"
         COMPONENT_RELEASE_TAG: deployment-test
     environment:
       CLIENT_URL: http://localhost:8128
@@ -48,7 +48,7 @@ services:
       dockerfile: EPaperDashboard.PlaywrightComponent/Dockerfile
       target: package
       args:
-        VERSION: "${IZBOARD_VERSION:-0.5.0.999}"
+        VERSION: "${IZBOARD_VERSION:-0.6.0.999}"
     entrypoint: ["/bin/bash", "-euc"]
     command:
       - |
