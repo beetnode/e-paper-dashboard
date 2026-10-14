@@ -84,12 +84,13 @@ public class AuthApiControllerTests
     [Fact]
     public async Task Register_UsernameAlreadyExists_ReturnsBadRequest()
     {
-        _userRepository.Setup(r => r.FindByUsername("bob")).Returns(new User { Username = "bob" });
+        _userRepository.Setup(r => r.ExistsByUsernameIgnoreCase("Bob")).Returns(true);
         var sut = CreateSut();
 
-        var result = await sut.Register(new RegisterRequest("bob", "password"));
+        var result = await sut.Register(new RegisterRequest("Bob", "password"));
 
         result.Should().BeOfType<BadRequestObjectResult>();
+        _userRepository.Verify(r => r.TryInsert(It.IsAny<User>()), Times.Never);
     }
 
     [Fact]

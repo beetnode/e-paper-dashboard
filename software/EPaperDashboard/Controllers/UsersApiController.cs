@@ -75,7 +75,7 @@ public class UsersApiController(UserService userService, ILogger<UsersApiControl
     public IActionResult GetAllUsers()
     {
         var users = userService.GetAllUsers();
-        return Ok(users.Select(u => new { u.Id, u.Username, u.Nickname, u.IsSuperUser, u.IsSuspended, u.MustChangePassword, u.CreatedAt }));
+        return Ok(users.Select(u => new { u.Id, u.Username, u.Nickname, u.IsSuperUser, u.IsSuspended, u.MustChangePassword, RenderingAllowed = u.RenderingAllowed != false, u.CreatedAt }));
     }
 
     [HttpPost("add")]
@@ -107,6 +107,13 @@ public class UsersApiController(UserService userService, ILogger<UsersApiControl
         Administer(id, request.Suspended ? "suspended" : "reinstated",
             target => userService.SetSuspended(CurrentUserId, target, request.Suspended),
             request.Suspended ? "User suspended." : "User reinstated.");
+
+    [HttpPut("{id}/rendering")]
+    [Authorize(Policy = "SuperUserOnly")]
+    public IActionResult SetRenderingAccess(string id, [FromBody] SetRenderingAccessRequest request) =>
+        Administer(id, request.Allowed ? "allowed rendering for" : "revoked rendering for",
+            target => userService.SetRenderingAllowed(CurrentUserId, target, request.Allowed),
+            request.Allowed ? "Rendering allowed." : "Rendering turned off for this user.");
 
     [HttpPost("{id}/reset-password")]
     [Authorize(Policy = "SuperUserOnly")]
@@ -161,3 +168,4 @@ public record ChangePasswordRequest(string CurrentPassword, string NewPassword, 
 public record AddUserRequest(string Username, string Password, bool MustChangePassword = true);
 public record SetRoleRequest(bool IsSuperUser);
 public record SetSuspensionRequest(bool Suspended);
+public record SetRenderingAccessRequest(bool Allowed);

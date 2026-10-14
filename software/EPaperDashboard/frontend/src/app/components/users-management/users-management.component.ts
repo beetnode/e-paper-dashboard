@@ -15,6 +15,7 @@ export interface ManagedUser {
   isSuperUser: boolean;
   isSuspended: boolean;
   mustChangePassword: boolean;
+  renderingAllowed: boolean;
   createdAt?: string;
 }
 
@@ -185,6 +186,11 @@ export class UsersManagementComponent implements OnInit {
       return;
     }
     this.runAction(user, this.http.put(`/api/users/${user.id}/suspension`, { suspended }), 'Could not reinstate the user.');
+  }
+
+  setRenderingAllowed(user: ManagedUser, allowed: boolean): void {
+    this.runAction(user, this.http.put(`/api/users/${user.id}/rendering`, { allowed }),
+      allowed ? 'Could not allow rendering.' : 'Could not turn off rendering.');
   }
 
   resetPassword(user: ManagedUser): void {

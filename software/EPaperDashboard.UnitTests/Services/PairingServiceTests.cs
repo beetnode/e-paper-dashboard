@@ -2,6 +2,7 @@ using CSharpFunctionalExtensions;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.UnitTests.TestSupport;
 using FluentAssertions;
 using Microsoft.Extensions.Time.Testing;
@@ -185,6 +186,7 @@ public class PairingServiceTests
 
         var deviceRepo = new Mock<IDeviceRepository>();
         deviceRepo.Setup(r => r.FindByIdentifier("device-1")).Returns(Maybe<Device>.None);
+        deviceRepo.Setup(r => r.FindByUserId(It.IsAny<UserId>())).Returns([]);
         Device? insertedDevice = null;
         deviceRepo.Setup(r => r.Insert(It.IsAny<Device>()))
             .Callback<Device>(device => insertedDevice = device);
@@ -243,5 +245,28 @@ public class PairingServiceTests
         var session = new PairingSession { ExpiresAt = FixedNow.AddSeconds(30.5) };
 
         sut.GetSecondsUntilExpiry(session).Should().Be(31);
+    }
+
+    [Fact]
+    public void ClaimDevice_AtTheDeviceLimit_DoesNotAddAnotherDevice()
+    {
+        const string token = "0123456789abcdef0123456789abcdef";
+        PairingSession? stored = null;
+        var repo = CreateRepo();
+        repo.Setup(r => r.FindByCode("ABC123"))
+            .Returns(() => stored is null ? Maybe<PairingSession>.None : Maybe.From(stored));
+        repo.Setup(r => r.Insert(It.IsAny<PairingSession>())).Callback<PairingSession>(session => stored = session);
+        var owner = UserId.New();
+        var deviceRepo = new Mock<IDeviceRepository>();
+        deviceRepo.Setup(r => r.FindByIdentifier("device-new")).Returns(Maybe<Device>.None);
+        deviceRepo.Setup(r => r.FindByUserId(owner))
+            .Returns(Enumerable.Range(0, UserLimits.MaxDevices).Select(i => new Device { UserId = owner }).ToList());
+        var sut = CreateSut(repo, deviceRepo: deviceRepo);
+        sut.AnnounceDevice("ABC123", token, "device-new", "Hall", 800, 480);
+
+        var result = sut.ClaimDevice("ABC123", owner);
+
+        result.Failure.Should().Be(PairingFailure.LimitReached);
+        deviceRepo.Verify(r => r.Insert(It.IsAny<Device>()), Times.Never);
     }
 }

@@ -1,3 +1,4 @@
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Guards;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services.Plugins;
@@ -32,7 +33,7 @@ public sealed class ProviderConnectionsController(ProviderRegistry registry, Pro
         if (!HasAccount) return Forbid();
         var plugin = registry.Find(request.PluginId);
         if (plugin is null) return BadRequest(new { message = "Unknown provider" });
-        if (connections.List(CurrentUserId).Count(c => !connections.IsDefault(c)) >= 20) return BadRequest(new { message = "You can create up to 20 connections." });
+        if (connections.List(CurrentUserId).Count(c => !connections.IsDefault(c)) >= UserLimits.MaxConnections) return BadRequest(new { message = $"You can create up to {UserLimits.MaxConnections} connections." });
         var credentials = AllowedCredentials(plugin, request.Credentials);
         var error = Validate(plugin, request.Name, credentials);
         if (error is not null) return BadRequest(new { message = error });

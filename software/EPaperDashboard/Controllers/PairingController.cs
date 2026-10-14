@@ -234,7 +234,7 @@ public class PairingController(
             PairingFailure.NotFound => StatusCodes.Status404NotFound,
             PairingFailure.Expired => StatusCodes.Status410Gone,
             PairingFailure.Conflict or PairingFailure.AlreadyClaimed or PairingFailure.DeviceOwnedByAnotherUser
-                => StatusCodes.Status409Conflict,
+                or PairingFailure.LimitReached => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status500InternalServerError
         };
 

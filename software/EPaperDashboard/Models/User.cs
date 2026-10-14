@@ -16,5 +16,7 @@ namespace EPaperDashboard.Models
         public bool IsSuspended { get; set; }
         // Set when an administrator issues a temporary password; cleared once the user picks their own.
         public bool MustChangePassword { get; set; }
+        // Null or true: rendering is allowed. An administrator sets false to revoke it regardless of the user's opt-in.
+        public bool? RenderingAllowed { get; set; }
     }
 }

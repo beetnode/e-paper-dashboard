@@ -60,7 +60,11 @@ The administrator manages accounts and shared server components. Ordinary users 
 administrators by default. Administrators manage accounts under **Users**: they can make another account an administrator
 or remove those rights, suspend and reinstate accounts, issue a temporary password, and delete accounts. At least one
 active administrator always remains. Administrators never see other users' dashboards, devices or connections.
-Suspending an account signs it out and stops its devices from receiving updates.
+Suspending an account signs it out and stops its devices from receiving updates. Administrators can also turn off
+browser rendering for an account, which takes precedence over that user's own setting.
+
+Each account can create up to 50 dashboards, pair up to 20 devices and add up to 20 connections. Existing items above a
+limit are kept; only new ones are refused. Usernames are unique regardless of letter case. The add-on is not limited.
 Existing accounts, administrator permissions, dashboards, and devices are preserved. Existing installations do not reopen setup,
 even if their accounts are later deleted. The old superuser environment variables are no longer read or required.
 Home Assistant add-on deployments continue using ingress authentication and disable local account setup and registration.

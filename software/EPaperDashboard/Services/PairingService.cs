@@ -1,3 +1,4 @@
+using EPaperDashboard.Utilities;
 using CSharpFunctionalExtensions;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
@@ -15,7 +16,8 @@ public enum PairingFailure
     Conflict,
     AlreadyClaimed,
     DeviceOwnedByAnotherUser,
-    InvalidRegistrationToken
+    InvalidRegistrationToken,
+    LimitReached
 }
 
 public sealed record PairingResult<T>(T? Value, PairingFailure Failure, string? Message) where T : class
@@ -191,6 +193,11 @@ public sealed class PairingService(
                             "Device is owned by another user and must be released before it can be claimed");
                     }
 
+                }
+                else if (UserLimits.AppliesTo(userId) && deviceService.GetDevicesForUser(userId).Count >= UserLimits.MaxDevices)
+                {
+                    return PairingResult<Device>.Failed(
+                        PairingFailure.LimitReached, $"You can pair up to {UserLimits.MaxDevices} devices.");
                 }
 
                 var device = CreatePendingDevice(existingDevice, session, userId, now);

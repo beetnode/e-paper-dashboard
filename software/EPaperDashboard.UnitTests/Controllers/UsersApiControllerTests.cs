@@ -214,6 +214,7 @@ public class UsersApiControllerTests
     [InlineData(nameof(UsersApiController.DeleteUser))]
     [InlineData(nameof(UsersApiController.GetAllUsers))]
     [InlineData(nameof(UsersApiController.AddUser))]
+    [InlineData(nameof(UsersApiController.SetRenderingAccess))]
     public void AdminEndpoints_RequireSuperUser(string action) =>
         typeof(UsersApiController).GetMethod(action)!
             .GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), true)
@@ -296,6 +297,18 @@ public class UsersApiControllerTests
         var properties = ((System.Collections.IEnumerable)result.Value!).Cast<object>().Single()
             .GetType().GetProperties().Select(p => p.Name);
         properties.Should().BeEquivalentTo(
-            ["Id", "Username", "Nickname", "IsSuperUser", "IsSuspended", "MustChangePassword", "CreatedAt"]);
+            ["Id", "Username", "Nickname", "IsSuperUser", "IsSuspended", "MustChangePassword", "RenderingAllowed", "CreatedAt"]);
+    }
+
+    [Fact]
+    public void SetRenderingAccess_RevokesRendering()
+    {
+        var target = new User { Id = UserId.New(), Username = "bob" };
+        _userRepository.Setup(r => r.FindById(target.Id)).Returns(target);
+        var sut = CreateSut().WithUser(UserId.New(), isSuperUser: true);
+
+        sut.SetRenderingAccess(target.Id.Value, new SetRenderingAccessRequest(false)).Should().BeOfType<OkObjectResult>();
+
+        target.RenderingAllowed.Should().BeFalse();
     }
 }

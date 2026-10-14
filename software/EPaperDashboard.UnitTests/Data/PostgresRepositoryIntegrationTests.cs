@@ -78,6 +78,7 @@ public class PostgresRepositoryIntegrationTests
             sessions.Insert(session);
 
             users.FindByUsername(user.Username).Value.Id.Should().Be(user.Id);
+            users.ExistsByUsernameIgnoreCase(user.Username.ToUpperInvariant()).Should().BeTrue();
             users.ExistsSuperUser().Should().BeTrue();
             var suspendedAdmin = new User { Username = $"suspended-{suffix}", IsSuperUser = true, IsSuspended = true };
             users.Insert(suspendedAdmin);

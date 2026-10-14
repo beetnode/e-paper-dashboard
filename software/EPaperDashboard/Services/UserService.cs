@@ -56,10 +56,19 @@ public sealed class UserService(
             () => false);
     }
 
-    /// <summary>Rendering requires an explicit opt-in; owners without an account never have access.</summary>
+    /// <summary>
+    /// Rendering requires an explicit opt-in and must not be revoked by an administrator; owners without an account
+    /// never have access.
+    /// </summary>
     public bool IsRenderingEnabled(UserId id) =>
-        HasAccount(id) && (userRepository.GetRenderingEnabled(id)
+        IsRenderingAllowed(id) && (userRepository.GetRenderingEnabled(id)
             ?? FindAccount(id).Map(user => user.RenderingEnabled).GetValueOrDefault() ?? false);
+
+    public bool IsRenderingAllowed(UserId id) =>
+        HasAccount(id) && (IsAddonOwner(id) || FindAccount(id).Map(user => user.RenderingAllowed != false).GetValueOrDefault());
+
+    public bool IsUsernameTaken(string username) =>
+        userRepository.ExistsByUsernameIgnoreCase(username.Trim());
 
     public bool TrySetRenderingEnabled(UserId id, bool enabled)
     {
@@ -160,6 +169,14 @@ public sealed class UserService(
         });
         return (result, result == AdminActionResult.Done ? temporaryPassword : null);
     }
+
+    public AdminActionResult SetRenderingAllowed(UserId actor, UserId target, bool allowed) =>
+        Administer(actor, target, user =>
+        {
+            user.RenderingAllowed = allowed ? null : false;
+            userRepository.Update(user);
+            return AdminActionResult.Done;
+        });
 
     public AdminActionResult DeleteUserAsAdmin(UserId actor, UserId target) =>
         Administer(actor, target, user =>
@@ -267,7 +284,8 @@ public sealed class UserService(
     /// <summary>Creates a regular account. Administrators are only made by setup or by promoting an account.</summary>
     public bool TryCreateUser(string username, string password, bool mustChangePassword = false)
     {
-        if (userRepository.ExistsByUsername(username))
+        // Usernames that differ only in case would let one account pass itself off as another.
+        if (userRepository.ExistsByUsername(username) || userRepository.ExistsByUsernameIgnoreCase(username))
         {
             return false;
         }

@@ -85,8 +85,7 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
         var error = UserService.ValidateCredentials(request.Username, request.Password);
         if (error is not null) return BadRequest(new { message = error });
         request = request with { Username = request.Username.Trim() };
-        var existingUser = _userService.GetUserByUsername(request.Username);
-        if (existingUser.HasValue)
+        if (_userService.IsUsernameTaken(request.Username))
         {
             return BadRequest(new { message = "Username already exists." });
         }

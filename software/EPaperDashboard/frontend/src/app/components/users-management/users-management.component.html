@@ -106,6 +106,9 @@
         @if (user.isSuspended) {
         <span class="app-status-chip app-status-chip-danger">Suspended</span>
         }
+        @if (!user.renderingAllowed) {
+        <span class="app-status-chip app-status-chip-muted">Rendering off</span>
+        }
         @if (user.mustChangePassword) {
         <span class="app-status-chip app-status-chip-warning">Must change password</span>
         }
@@ -124,6 +127,11 @@
           [attr.aria-label]="(user.isSuspended ? 'Reinstate user ' : 'Suspend user ') + user.username"
           [title]="user.isSuspended ? 'Reinstate' : 'Suspend'">
           <i class="fa-solid" [class.fa-user-lock]="!user.isSuspended" [class.fa-user-check]="user.isSuspended" aria-hidden="true"></i>
+        </button>
+        <button type="button" (click)="setRenderingAllowed(user, !user.renderingAllowed)" class="btn btn-ghost app-icon-button" [disabled]="isBusy(user)"
+          [attr.aria-label]="(user.renderingAllowed ? 'Turn off rendering for ' : 'Allow rendering for ') + user.username"
+          [title]="user.renderingAllowed ? 'Turn off rendering' : 'Allow rendering'">
+          <i class="fa-solid" [class.fa-image]="user.renderingAllowed" [class.fa-ban]="!user.renderingAllowed" aria-hidden="true"></i>
         </button>
         <button type="button" (click)="resetPassword(user)" class="btn btn-ghost app-icon-button" [disabled]="isBusy(user)"
           [attr.aria-label]="'Reset password for ' + user.username" title="Reset password">

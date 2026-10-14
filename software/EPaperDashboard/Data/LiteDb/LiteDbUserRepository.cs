@@ -20,6 +20,12 @@ internal sealed class LiteDbUserRepository(LiteDbContext context) : IUserReposit
     public bool ExistsByUsername(string username) =>
         context.Users.Exists(u => u.Username == username);
 
+    public bool ExistsByUsernameIgnoreCase(string username)
+    {
+        var lower = username.ToLowerInvariant();
+        return context.Users.Exists(u => u.Username.ToLower() == lower);
+    }
+
     public bool ExistsSuperUser() =>
         context.Users.Exists(u => u.IsSuperUser);
 

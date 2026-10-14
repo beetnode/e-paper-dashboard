@@ -9,6 +9,7 @@ public interface IUserRepository
     Maybe<User> FindByUsername(string username);
     List<User> GetAll();
     bool ExistsByUsername(string username);
+    bool ExistsByUsernameIgnoreCase(string username);
     bool ExistsSuperUser();
     /// <summary>Whether an unsuspended super user other than <paramref name="except"/> exists.</summary>
     bool ExistsOtherActiveSuperUser(UserId except);

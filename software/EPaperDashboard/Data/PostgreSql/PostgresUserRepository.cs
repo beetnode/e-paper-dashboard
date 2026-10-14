@@ -19,6 +19,10 @@ internal sealed class PostgresUserRepository(PostgresDbContext context) : IUserR
         "SELECT EXISTS (SELECT 1 FROM izboard_users WHERE username = @username)",
         PostgresDbContext.Parameter("username", username));
 
+    public bool ExistsByUsernameIgnoreCase(string username) => context.Exists(
+        "SELECT EXISTS (SELECT 1 FROM izboard_users WHERE lower(username) = lower(@username))",
+        PostgresDbContext.Parameter("username", username));
+
     public bool ExistsSuperUser() => context.Exists(
         "SELECT EXISTS (SELECT 1 FROM izboard_users WHERE is_super_user)");
 

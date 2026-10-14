@@ -165,5 +165,17 @@ public sealed class AccountSetupTests : IDisposable
         users.GetOrCreateSetupCode("THIRD333").Should().Be("THIRD333");
     }
 
+    [Fact]
+    public void ExistsByUsernameIgnoreCaseMatchesAnyCase()
+    {
+        using var context = Open();
+        var users = new LiteDbUserRepository(context);
+        users.Insert(new User { Username = "Alice" });
+
+        users.ExistsByUsernameIgnoreCase("alice").Should().BeTrue();
+        users.ExistsByUsernameIgnoreCase("ALICE").Should().BeTrue();
+        users.ExistsByUsernameIgnoreCase("bob").Should().BeFalse();
+    }
+
     public void Dispose() { if (Directory.Exists(_directory)) Directory.Delete(_directory, true); }
 }

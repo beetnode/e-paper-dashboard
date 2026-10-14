@@ -203,4 +203,27 @@ public class UserAdministrationTests
         inserted!.MustChangePassword.Should().BeTrue();
         inserted.IsSuperUser.Should().BeFalse();
     }
+
+    [Fact]
+    public void SetRenderingAllowed_RevokesAndRestores()
+    {
+        var sut = CreateSut();
+
+        sut.SetRenderingAllowed(_admin.Id, _bob.Id, false).Should().Be(AdminActionResult.Done);
+        _bob.RenderingAllowed.Should().BeFalse();
+
+        sut.SetRenderingAllowed(_admin.Id, _bob.Id, true).Should().Be(AdminActionResult.Done);
+        _bob.RenderingAllowed.Should().BeNull();
+        _users.Verify(r => r.Update(_bob), Times.Exactly(2));
+    }
+
+    [Fact]
+    public void TryCreateUser_RejectsAUsernameThatDiffersOnlyInCase()
+    {
+        _users.Setup(r => r.ExistsByUsernameIgnoreCase("Alice")).Returns(true);
+
+        CreateSut().TryCreateUser("Alice", "password").Should().BeFalse();
+
+        _users.Verify(r => r.TryInsert(It.IsAny<User>()), Times.Never);
+    }
 }
