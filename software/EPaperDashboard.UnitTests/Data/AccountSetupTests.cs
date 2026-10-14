@@ -1,5 +1,6 @@
 using EPaperDashboard.Data.LiteDb;
 using EPaperDashboard.Models;
+using EPaperDashboard.Services;
 using EPaperDashboard.Utilities;
 using FluentAssertions;
 using Moq;
@@ -118,6 +119,37 @@ public sealed class AccountSetupTests : IDisposable
         devices.FindByUserId(bob).Should().ContainSingle();
         sessions.FindByCode("AAAAAA").HasValue.Should().BeFalse();
         sessions.FindByCode("BBBBBB").HasValue.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ConcurrentDemotionsLeaveAnActiveAdministrator()
+    {
+        using var context = Open();
+        var users = new LiteDbUserRepository(context);
+        var service = new UserService(users, new LiteDbDashboardRepository(context), unitOfWork: new LiteDbUnitOfWork(context));
+        var (alice, bob) = (new User { Username = "alice", IsSuperUser = true }, new User { Username = "bob", IsSuperUser = true });
+        users.Insert(alice); users.Insert(bob);
+
+        await Task.WhenAll(Enumerable.Range(0, 12).Select(i => Task.Run(() =>
+            i % 2 == 0 ? service.SetSuperUser(alice.Id, bob.Id, false) : service.SetSuperUser(bob.Id, alice.Id, false))));
+
+        users.GetAll().Count(u => u.IsSuperUser).Should().Be(1);
+    }
+
+    [Fact]
+    public void ExistsOtherActiveSuperUserIgnoresSuspendedAndRegularAccounts()
+    {
+        using var context = Open();
+        var users = new LiteDbUserRepository(context);
+        var admin = new User { Username = "admin", IsSuperUser = true };
+        users.Insert(admin);
+        users.Insert(new User { Username = "regular" });
+        users.Insert(new User { Username = "suspended", IsSuperUser = true, IsSuspended = true });
+
+        users.ExistsOtherActiveSuperUser(admin.Id).Should().BeFalse();
+        var second = new User { Username = "second", IsSuperUser = true };
+        users.Insert(second);
+        users.ExistsOtherActiveSuperUser(admin.Id).Should().BeTrue();
     }
 
     public void Dispose() { if (Directory.Exists(_directory)) Directory.Delete(_directory, true); }

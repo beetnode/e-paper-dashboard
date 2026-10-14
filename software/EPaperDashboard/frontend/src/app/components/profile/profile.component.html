@@ -6,6 +6,13 @@
     </div>
   </div>
 
+  @if (mustChangePassword()) {
+  <div class="alert alert-warning" role="alert">
+    <i class="fa-solid fa-key me-2" aria-hidden="true"></i>
+    An administrator reset your password. Choose a new password to continue using izBoard.
+  </div>
+  }
+
   <div class="app-section-grid">
     <section class="app-section-card" [class.app-section-grid-full]="isUserManagementDisabled()" aria-labelledby="accountDetailsTitle">
       <h2 id="accountDetailsTitle" class="app-section-title">Account details</h2>

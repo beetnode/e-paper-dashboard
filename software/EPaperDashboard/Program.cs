@@ -95,7 +95,7 @@ builder.Services.AddDataProtection()
 	.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysDir));
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddControllers()
+builder.Services.AddControllers(options => options.Filters.Add<PasswordChangeRequiredFilter>())
 	.AddJsonOptions(options =>
 	{
 		options.JsonSerializerOptions.Converters.Add(new TimeOnlyJsonConverter());

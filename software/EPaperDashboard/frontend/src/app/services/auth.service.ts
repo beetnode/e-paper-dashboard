@@ -16,6 +16,7 @@ export class AuthService {
   readonly authReady = this.authReadySignal.asReadonly();
   readonly isAuthenticated = computed(() => this.currentUserSignal() !== null);
   readonly isAuthReady = computed(() => this.authReadySignal());
+  readonly mustChangePassword = computed(() => this.currentUserSignal()?.mustChangePassword === true);
   readonly isUserManagementDisabled = computed(() => this.currentUserSignal()?.userManagementEnabled === false);
   readonly hasDefaultHomeAssistantConnection = computed(() => this.currentUserSignal()?.hasDefaultHomeAssistantConnection === true);
 

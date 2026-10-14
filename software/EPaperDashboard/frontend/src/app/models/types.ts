@@ -3,6 +3,8 @@ export interface User {
   username: string;
   nickname?: string;
   isSuperUser: boolean;
+  /** An administrator issued a temporary password; the user must choose a new one before doing anything else. */
+  mustChangePassword?: boolean;
   /** False when the deployment signs everyone in as one shared user (the Home Assistant add-on). */
   userManagementEnabled?: boolean;
   /** The deployment provides a Home Assistant connection of its own (the add-on's server). */

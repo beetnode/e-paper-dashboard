@@ -23,6 +23,9 @@ internal sealed class LiteDbUserRepository(LiteDbContext context) : IUserReposit
     public bool ExistsSuperUser() =>
         context.Users.Exists(u => u.IsSuperUser);
 
+    public bool ExistsOtherActiveSuperUser(UserId except) =>
+        context.Users.Exists(u => u.IsSuperUser && !u.IsSuspended && u.Id != except);
+
     public bool IsSetupComplete() => context.ServiceState.Exists(s => s["_id"] == "setup") || context.Users.Exists(_ => true);
 
     public bool TryCreateAdministrator(User user)

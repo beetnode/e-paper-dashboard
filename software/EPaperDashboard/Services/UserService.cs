@@ -31,7 +31,8 @@ public sealed class UserService(
     /// </summary>
     public bool HasAccount(UserId id) =>
         IsAddonOwner(id)
-        || (id != UserId.Empty && deployment?.IsUserManagementEnabled != false && userRepository.FindById(id).HasValue);
+        || (id != UserId.Empty && deployment?.IsUserManagementEnabled != false
+            && userRepository.FindById(id).Map(user => !user.IsSuspended).GetValueOrDefault());
 
     /// <summary>Returns the owner's global AI provider, or null when it is not configured or the owner has no account.</summary>
     public AiConfig? GetAiConfig(UserId id) =>
@@ -101,23 +102,114 @@ public sealed class UserService(
     public void UpdateUser(User user) =>
         userRepository.Update(user);
 
-    /// <summary>Deletes a regular account together with everything it owns, including paired devices.</summary>
+    /// <summary>
+    /// Deletes the caller's own account together with everything it owns, including paired devices.
+    /// The last active administrator cannot leave.
+    /// </summary>
     public bool TryDeleteUser(UserId id) =>
         ExecuteUnderUsersLock(() => userRepository.FindById(id)
-            .Where(u => !u.IsSuperUser)
+            .Where(u => !IsLastActiveAdministrator(u))
             .Match(
                 u =>
                 {
-                    dashboardRepository.DeleteByUserId(u.Id);
-                    connections?.DeleteByUserId(u.Id);
-                    devices?.DeleteByUserId(u.Id);
-                    pairingSessions?.DeleteByUserId(u.Id);
-                    userRepository.Delete(u.Id);
-                    sessions?.Invalidate(u.Id);
+                    DeleteAccount(u);
                     return true;
                 },
                 () => false
             ));
+
+    public AdminActionResult SetSuperUser(UserId actor, UserId target, bool isSuperUser) =>
+        Administer(actor, target, user =>
+        {
+            if (!isSuperUser && IsLastActiveAdministrator(user))
+            {
+                return AdminActionResult.LastAdministrator;
+            }
+
+            user.IsSuperUser = isSuperUser;
+            if (!isSuperUser)
+            {
+                user.SecurityStamp = NewSecurityStamp();
+            }
+            userRepository.Update(user);
+            return AdminActionResult.Done;
+        });
+
+    public AdminActionResult SetSuspended(UserId actor, UserId target, bool suspended) =>
+        Administer(actor, target, user =>
+        {
+            if (suspended && IsLastActiveAdministrator(user))
+            {
+                return AdminActionResult.LastAdministrator;
+            }
+
+            user.IsSuspended = suspended;
+            user.SecurityStamp = NewSecurityStamp();
+            userRepository.Update(user);
+            return AdminActionResult.Done;
+        });
+
+    /// <summary>Replaces the target's password with a random one that must be changed at the next sign-in.</summary>
+    public (AdminActionResult Result, string? TemporaryPassword) ResetPassword(UserId actor, UserId target)
+    {
+        string? temporaryPassword = null;
+        var result = Administer(actor, target, user =>
+        {
+            temporaryPassword = NewTemporaryPassword();
+            user.PasswordHash = PasswordHashing.Hash(temporaryPassword);
+            user.MustChangePassword = true;
+            user.SecurityStamp = NewSecurityStamp();
+            userRepository.Update(user);
+            return AdminActionResult.Done;
+        });
+        return (result, result == AdminActionResult.Done ? temporaryPassword : null);
+    }
+
+    public AdminActionResult DeleteUserAsAdmin(UserId actor, UserId target) =>
+        Administer(actor, target, user =>
+        {
+            if (IsLastActiveAdministrator(user))
+            {
+                return AdminActionResult.LastAdministrator;
+            }
+
+            DeleteAccount(user);
+            return AdminActionResult.Done;
+        });
+
+    public const int TemporaryPasswordLength = 20;
+
+    private AdminActionResult Administer(UserId actor, UserId target, Func<User, AdminActionResult> change)
+    {
+        if (actor == target)
+        {
+            return AdminActionResult.SelfNotAllowed;
+        }
+
+        var result = ExecuteUnderUsersLock(() => userRepository.FindById(target).Match(change, () => AdminActionResult.NotFound));
+        sessions?.Invalidate(target);
+        return result;
+    }
+
+    // Callers hold the users lock, so two administrators cannot remove each other at the same time.
+    private bool IsLastActiveAdministrator(User user) =>
+        user.IsSuperUser && !user.IsSuspended && !userRepository.ExistsOtherActiveSuperUser(user.Id);
+
+    private void DeleteAccount(User user)
+    {
+        dashboardRepository.DeleteByUserId(user.Id);
+        connections?.DeleteByUserId(user.Id);
+        devices?.DeleteByUserId(user.Id);
+        pairingSessions?.DeleteByUserId(user.Id);
+        userRepository.Delete(user.Id);
+        sessions?.Invalidate(user.Id);
+    }
+
+    private static string NewTemporaryPassword()
+    {
+        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+        return RandomNumberGenerator.GetString(alphabet, TemporaryPasswordLength);
+    }
 
     private T ExecuteUnderUsersLock<T>(Func<T> operation) =>
         unitOfWork is null ? operation() : unitOfWork.ExecuteExclusive(UsersLock, operation);
@@ -147,7 +239,8 @@ public sealed class UserService(
         }
     }
 
-    public bool TryCreateUser(string username, string password, bool isSuperUser = false)
+    /// <summary>Creates a regular account. Administrators are only made by setup or by promoting an account.</summary>
+    public bool TryCreateUser(string username, string password, bool mustChangePassword = false)
     {
         if (userRepository.ExistsByUsername(username))
         {
@@ -158,10 +251,10 @@ public sealed class UserService(
         {
             Username = username,
             PasswordHash = PasswordHashing.Hash(password),
-            IsSuperUser = isSuperUser,
             RenderingEnabled = false,
             SecurityStamp = NewSecurityStamp(),
-            CreatedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow,
+            MustChangePassword = mustChangePassword
         };
 
         return userRepository.TryInsert(user);
@@ -190,6 +283,7 @@ public sealed class UserService(
                     }
 
                     user.PasswordHash = PasswordHashing.Hash(newPassword);
+                    user.MustChangePassword = false;
                     user.SecurityStamp = NewSecurityStamp();
                     userRepository.Update(user);
                     sessions?.Invalidate(user.Id);

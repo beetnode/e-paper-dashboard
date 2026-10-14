@@ -108,4 +108,25 @@ public class UserSessionValidatorTests
 
         sut.Validate(principal).State.Should().Be(SessionState.Reject);
     }
+
+    [Fact]
+    public void Validate_SuspendedAccount_IsRejected()
+    {
+        var principal = UserClaims.Create(_alice);
+        _users.Setup(r => r.FindById(_alice.Id)).Returns(new User { Id = _alice.Id, Username = "alice", SecurityStamp = "stamp-1", IsSuspended = true });
+
+        CreateSut().Validate(principal).State.Should().Be(SessionState.Reject);
+    }
+
+    [Fact]
+    public void Validate_PendingPasswordChange_RefreshesTheClaims()
+    {
+        var principal = UserClaims.Create(_alice);
+        _users.Setup(r => r.FindById(_alice.Id)).Returns(new User { Id = _alice.Id, Username = "alice", SecurityStamp = "stamp-1", MustChangePassword = true });
+
+        var check = CreateSut().Validate(principal);
+
+        check.State.Should().Be(SessionState.Refresh);
+        check.Principal!.FindFirst(Constants.MustChangePasswordClaim)!.Value.Should().Be("true");
+    }
 }

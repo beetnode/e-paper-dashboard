@@ -13,5 +13,8 @@ namespace EPaperDashboard.Models
         // Rotated whenever existing sessions must stop working; null on accounts that predate it.
         public string? SecurityStamp { get; set; }
         public DateTimeOffset? CreatedAt { get; set; }
+        public bool IsSuspended { get; set; }
+        // Set when an administrator issues a temporary password; cleared once the user picks their own.
+        public bool MustChangePassword { get; set; }
     }
 }

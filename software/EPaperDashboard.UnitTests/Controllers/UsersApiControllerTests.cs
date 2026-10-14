@@ -115,7 +115,7 @@ public class UsersApiControllerTests
     }
 
     [Fact]
-    public void DeleteProfile_SuperUser_ReturnsBadRequestAndDoesNotDelete()
+    public void DeleteProfile_LastSuperUser_ReturnsBadRequestAndDoesNotDelete()
     {
         var userId = UserId.New();
         _userRepository.Setup(r => r.FindById(userId)).Returns(new User { Id = userId, IsSuperUser = true });
@@ -183,15 +183,15 @@ public class UsersApiControllerTests
     }
 
     [Fact]
-    public void DeleteUser_TargetIsSuperUser_ReturnsBadRequest()
+    public void DeleteUser_TargetIsLastSuperUser_ReturnsConflict()
     {
         var targetId = UserId.New();
         _userRepository.Setup(r => r.FindById(targetId)).Returns(new User { Id = targetId, IsSuperUser = true });
-        var sut = CreateSut();
+        var sut = CreateSut().WithUser(UserId.New(), isSuperUser: true);
 
         var result = sut.DeleteUser(targetId.Value);
 
-        result.Should().BeOfType<BadRequestObjectResult>();
+        result.Should().BeOfType<ConflictObjectResult>();
     }
 
     [Fact]
@@ -199,11 +199,103 @@ public class UsersApiControllerTests
     {
         var targetId = UserId.New();
         _userRepository.Setup(r => r.FindById(targetId)).Returns(new User { Id = targetId, IsSuperUser = false });
-        var sut = CreateSut();
+        var sut = CreateSut().WithUser(UserId.New(), isSuperUser: true);
 
         var result = sut.DeleteUser(targetId.Value);
 
         result.Should().BeOfType<OkObjectResult>();
         _userRepository.Verify(r => r.Delete(targetId), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(nameof(UsersApiController.SetRole))]
+    [InlineData(nameof(UsersApiController.SetSuspension))]
+    [InlineData(nameof(UsersApiController.ResetPassword))]
+    [InlineData(nameof(UsersApiController.DeleteUser))]
+    [InlineData(nameof(UsersApiController.GetAllUsers))]
+    [InlineData(nameof(UsersApiController.AddUser))]
+    public void AdminEndpoints_RequireSuperUser(string action) =>
+        typeof(UsersApiController).GetMethod(action)!
+            .GetCustomAttributes(typeof(Microsoft.AspNetCore.Authorization.AuthorizeAttribute), true)
+            .Cast<Microsoft.AspNetCore.Authorization.AuthorizeAttribute>()
+            .Select(a => a.Policy).Should().Contain("SuperUserOnly");
+
+    [Fact]
+    public void ChangePassword_IsAllowedWhileAPasswordChangeIsPending() =>
+        typeof(UsersApiController).GetMethod(nameof(UsersApiController.ChangePassword))!
+            .GetCustomAttributes(typeof(EPaperDashboard.Authorization.AllowedDuringPasswordChangeAttribute), true)
+            .Should().ContainSingle();
+
+    [Fact]
+    public void SetRole_PromotesTarget()
+    {
+        var target = new User { Id = UserId.New(), Username = "bob" };
+        _userRepository.Setup(r => r.FindById(target.Id)).Returns(target);
+        var sut = CreateSut().WithUser(UserId.New(), isSuperUser: true);
+
+        sut.SetRole(target.Id.Value, new SetRoleRequest(true)).Should().BeOfType<OkObjectResult>();
+
+        target.IsSuperUser.Should().BeTrue();
+    }
+
+    [Fact]
+    public void SetRole_OnSelf_ReturnsBadRequest()
+    {
+        var self = UserId.New();
+        _userRepository.Setup(r => r.FindById(self)).Returns(new User { Id = self, IsSuperUser = true });
+        var sut = CreateSut().WithUser(self, isSuperUser: true);
+
+        sut.SetRole(self.Value, new SetRoleRequest(false)).Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public void SetSuspension_UnknownTarget_ReturnsNotFound()
+    {
+        var ghost = UserId.New();
+        _userRepository.Setup(r => r.FindById(ghost)).Returns(CSharpFunctionalExtensions.Maybe<User>.None);
+        var sut = CreateSut().WithUser(UserId.New(), isSuperUser: true);
+
+        sut.SetSuspension(ghost.Value, new SetSuspensionRequest(true)).Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public void SetSuspension_InvalidId_ReturnsBadRequest() =>
+        CreateSut().WithUser(UserId.New(), isSuperUser: true)
+            .SetSuspension("nope", new SetSuspensionRequest(true)).Should().BeOfType<BadRequestObjectResult>();
+
+    [Fact]
+    public void ResetPassword_ReturnsTheTemporaryPasswordOnce()
+    {
+        var target = new User { Id = UserId.New(), Username = "bob" };
+        _userRepository.Setup(r => r.FindById(target.Id)).Returns(target);
+        var sut = CreateSut().WithUser(UserId.New(), isSuperUser: true);
+
+        var result = sut.ResetPassword(target.Id.Value).Should().BeOfType<OkObjectResult>().Subject;
+
+        var temporary = (string)result.Value!.GetType().GetProperty("temporaryPassword")!.GetValue(result.Value)!;
+        PasswordHashing.Verify(target.PasswordHash, temporary).Should().Be(PasswordCheck.Valid);
+    }
+
+    [Fact]
+    public void AddUser_RequiresAPasswordChangeByDefault()
+    {
+        _userRepository.Setup(r => r.TryInsert(It.IsAny<User>())).Returns(true);
+
+        CreateSut().AddUser(new AddUserRequest("bob", "password")).Should().BeOfType<OkObjectResult>();
+
+        _userRepository.Verify(r => r.TryInsert(It.Is<User>(u => u.MustChangePassword && !u.IsSuperUser)), Times.Once);
+    }
+
+    [Fact]
+    public void GetAllUsers_ExposesAccountStatusOnly()
+    {
+        _userRepository.Setup(r => r.GetAll()).Returns([new User { Username = "alice", IsSuspended = true }]);
+
+        var result = CreateSut().GetAllUsers().Should().BeOfType<OkObjectResult>().Subject;
+
+        var properties = ((System.Collections.IEnumerable)result.Value!).Cast<object>().Single()
+            .GetType().GetProperties().Select(p => p.Name);
+        properties.Should().BeEquivalentTo(
+            ["Id", "Username", "Nickname", "IsSuperUser", "IsSuspended", "MustChangePassword", "CreatedAt"]);
     }
 }

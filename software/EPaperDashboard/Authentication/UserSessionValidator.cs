@@ -18,7 +18,7 @@ public sealed record SessionCheck(SessionState State, ClaimsPrincipal? Principal
 
 /// <summary>
 /// Checks a signed-in cookie against the stored account, so deleting an account, rotating its security stamp or
-/// changing its role takes effect without waiting for the user to sign in again. Accounts are cached briefly to keep
+/// suspending it or changing its role takes effect without waiting for the user to sign in again. Accounts are cached briefly to keep
 /// the per-request cost low; other replicas pick up a change within <see cref="CacheDuration"/>.
 /// </summary>
 public sealed class UserSessionValidator(IUserRepository users, TimeProvider time)
@@ -36,7 +36,7 @@ public sealed class UserSessionValidator(IUserRepository users, TimeProvider tim
         }
 
         var account = Load(id);
-        if (account.HasNoValue)
+        if (account.HasNoValue || account.Value.IsSuspended)
         {
             return new SessionCheck(SessionState.Reject);
         }
@@ -50,7 +50,8 @@ public sealed class UserSessionValidator(IUserRepository users, TimeProvider tim
 
         var isSuperUser = principal.FindFirst(Constants.IsSuperUserClaim)?.Value == "true";
         var username = principal.FindFirst(ClaimTypes.Name)?.Value;
-        return isSuperUser != user.IsSuperUser || username != user.Username
+        var mustChangePassword = principal.FindFirst(Constants.MustChangePasswordClaim)?.Value == "true";
+        return isSuperUser != user.IsSuperUser || username != user.Username || mustChangePassword != user.MustChangePassword
             ? new SessionCheck(SessionState.Refresh, UserClaims.Create(user))
             : new SessionCheck(SessionState.Valid);
     }

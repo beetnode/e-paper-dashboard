@@ -106,11 +106,12 @@ public class UserServiceTests
     }
 
     [Fact]
-    public void TryDeleteUser_UserIsSuperUser_ReturnsFalseAndDoesNotDelete()
+    public void TryDeleteUser_LastSuperUser_ReturnsFalseAndDoesNotDelete()
     {
         var (sut, users, dashboards) = CreateSut();
         var user = new User { Id = UserId.New(), IsSuperUser = true };
         users.Setup(r => r.FindById(user.Id)).Returns(user);
+        users.Setup(r => r.ExistsOtherActiveSuperUser(user.Id)).Returns(false);
 
         var result = sut.TryDeleteUser(user.Id);
 

@@ -79,6 +79,12 @@ public class PostgresRepositoryIntegrationTests
 
             users.FindByUsername(user.Username).Value.Id.Should().Be(user.Id);
             users.ExistsSuperUser().Should().BeTrue();
+            var suspendedAdmin = new User { Username = $"suspended-{suffix}", IsSuperUser = true, IsSuspended = true };
+            users.Insert(suspendedAdmin);
+            users.ExistsOtherActiveSuperUser(suspendedAdmin.Id).Should().BeTrue();
+            var otherAdmins = users.GetAll().Where(u => u.IsSuperUser && !u.IsSuspended && u.Id != user.Id).ToList();
+            users.ExistsOtherActiveSuperUser(user.Id).Should().Be(otherAdmins.Count > 0);
+            users.Delete(suspendedAdmin.Id);
             dashboards.FindByUserId(user.Id).Should().ContainSingle();
             dashboards.FindById(dashboard.Id).Value.LayoutConfig!.Widgets[0].Config
                 .GetProperty("text").GetString().Should().Be("hello");

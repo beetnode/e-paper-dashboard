@@ -40,6 +40,7 @@ export class ProfileComponent {
   readonly isChangingPassword = signal(false);
   readonly isDeletingProfile = signal(false);
   readonly isUserManagementDisabled = this.authService.isUserManagementDisabled;
+  readonly mustChangePassword = this.authService.mustChangePassword;
   readonly canChangePassword = computed(() =>
     !!this.currentPassword() &&
     this.newPassword().length >= 6 &&
@@ -99,15 +100,15 @@ export class ProfileComponent {
 
     this.http.post('/api/users/change-password', request).subscribe({
       next: () => {
-        this.toastService.success('Password changed. Sign in again with the new password.');
+        const wasRequired = this.mustChangePassword();
+        this.toastService.success('Password changed. Your other sessions were signed out.');
         this.clearPasswordFields();
         this.isChangingPassword.set(false);
-        // Log out after password change
-        setTimeout(() => {
-          this.authService.logout().subscribe(() => {
-            this.router.navigate(['/login']);
-          });
-        }, 2000);
+        this.authService.getCurrentUser().subscribe(() => {
+          if (wasRequired) {
+            this.router.navigate(['/dashboards']);
+          }
+        });
       },
       error: (err) => {
         this.toastService.httpError(err, 'Could not change the password.');

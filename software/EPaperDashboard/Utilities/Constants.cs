@@ -37,6 +37,7 @@ public static class Constants
     
     public const string IsSuperUserClaim = "IsSuperUser";
     public const string SecurityStampClaim = "SecurityStamp";
+    public const string MustChangePasswordClaim = "MustChangePassword";
     public const string HomeAssistantIngressClaim = "HomeAssistantIngress";
     public const string HomeAssistantAdminUserName = "Home Assistant Admin";
     

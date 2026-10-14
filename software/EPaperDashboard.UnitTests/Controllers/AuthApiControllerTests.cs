@@ -243,4 +243,34 @@ public class AuthApiControllerTests
             .GetCustomAttributes(typeof(Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute), true)
             .Cast<Microsoft.AspNetCore.RateLimiting.EnableRateLimitingAttribute>()
             .Should().ContainSingle().Which.PolicyName.Should().Be("Login");
+
+    [Fact]
+    public async Task Login_SuspendedAccount_ReturnsForbiddenWithoutSigningIn()
+    {
+        var user = new User { Username = "alice", PasswordHash = PasswordHashing.Hash("secret"), IsSuspended = true };
+        _userRepository.Setup(r => r.FindByUsername("alice")).Returns(user);
+
+        var result = await CreateSut().Login(new LoginRequest("alice", "secret"));
+
+        result.Should().BeOfType<ObjectResult>().Which.StatusCode.Should().Be(StatusCodes.Status403Forbidden);
+        _authenticationService.Verify(a => a.SignInAsync(
+            It.IsAny<HttpContext>(), It.IsAny<string>(), It.IsAny<ClaimsPrincipal>(), It.IsAny<AuthenticationProperties>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Login_ReportsAPendingPasswordChange()
+    {
+        var user = new User { Username = "alice", PasswordHash = PasswordHashing.Hash("secret"), MustChangePassword = true };
+        _userRepository.Setup(r => r.FindByUsername("alice")).Returns(user);
+
+        var result = await CreateSut().Login(new LoginRequest("alice", "secret"));
+
+        var body = result.Should().BeOfType<OkObjectResult>().Subject.Value!;
+        body.GetType().GetProperty("mustChangePassword")!.GetValue(body).Should().Be(true);
+    }
+
+    [Fact]
+    public void AuthEndpoints_AreAllowedWhileAPasswordChangeIsPending() =>
+        typeof(AuthApiController).GetCustomAttributes(typeof(EPaperDashboard.Authorization.AllowedDuringPasswordChangeAttribute), true)
+            .Should().ContainSingle();
 }

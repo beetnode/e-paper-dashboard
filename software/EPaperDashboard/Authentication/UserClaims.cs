@@ -16,6 +16,10 @@ public static class UserClaims
             new(ClaimTypes.Name, user.Username),
             new(Constants.IsSuperUserClaim, user.IsSuperUser ? "true" : "false")
         };
+        if (user.MustChangePassword)
+        {
+            claims.Add(new Claim(Constants.MustChangePasswordClaim, "true"));
+        }
         if (!string.IsNullOrEmpty(user.SecurityStamp))
         {
             claims.Add(new Claim(Constants.SecurityStampClaim, user.SecurityStamp));

@@ -10,6 +10,8 @@ public interface IUserRepository
     List<User> GetAll();
     bool ExistsByUsername(string username);
     bool ExistsSuperUser();
+    /// <summary>Whether an unsuspended super user other than <paramref name="except"/> exists.</summary>
+    bool ExistsOtherActiveSuperUser(UserId except);
     bool IsSetupComplete();
     bool TryCreateAdministrator(User user);
     bool? GetRenderingEnabled(UserId id);

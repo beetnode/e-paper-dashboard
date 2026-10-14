@@ -22,6 +22,11 @@ internal sealed class PostgresUserRepository(PostgresDbContext context) : IUserR
     public bool ExistsSuperUser() => context.Exists(
         "SELECT EXISTS (SELECT 1 FROM izboard_users WHERE is_super_user)");
 
+    public bool ExistsOtherActiveSuperUser(UserId except) => context.Exists("""
+        SELECT EXISTS (SELECT 1 FROM izboard_users WHERE is_super_user AND id <> @id
+            AND NOT coalesce((document->>'IsSuspended')::boolean, false))
+        """, PostgresDbContext.Parameter("id", except.Value));
+
     public bool IsSetupComplete() => context.Exists(
         "SELECT EXISTS (SELECT 1 FROM izboard_service_state WHERE id = 'setup') OR EXISTS (SELECT 1 FROM izboard_users)");
 
