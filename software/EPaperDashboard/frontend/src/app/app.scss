@@ -73,6 +73,28 @@ header {
 	font-weight: 600;
 }
 
+.theme-switch {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.theme-switch-icon {
+	font-size: 0.875rem;
+	color: var(--bs-secondary-color);
+	opacity: 0.5;
+	transition: color 0.2s ease, opacity 0.2s ease;
+
+	&.active {
+		opacity: 1;
+		color: var(--bs-warning);
+	}
+
+	&.fa-moon.active {
+		color: var(--bs-primary);
+	}
+}
+
 .theme-switch .form-check-input {
 	margin-top: 0;
 	background-color: var(--bs-secondary-bg);
