@@ -30,8 +30,19 @@ namespace DisplayConst {
   constexpr uint16_t FrameBytes = FrameWidth * FrameHeight / 8;
 }
 
+namespace Retry {
+  constexpr int RequestAttempts = 3;
+  constexpr unsigned long RequestRetryDelayMs = 3000;
+  constexpr uint64_t BackoffBaseSeconds = 60;
+  constexpr uint64_t BackoffMaxSeconds = 30 * 60;
+  constexpr uint32_t WatchdogTimeoutSeconds = 120;
+}
+
 namespace Ota {
   constexpr int MaxRetries = 3;
+  // Boots (including deep-sleep wakes) a new firmware gets to reach the dashboard
+  // before the previous firmware is restored.
+  constexpr int MaxVerifyBoots = 10;
 }
 
 namespace StorageKey {
@@ -47,4 +58,6 @@ namespace StorageKey {
   constexpr const char* UseHttps = "usehttps";
   constexpr const char* OtaFailVersion = "otafailv";
   constexpr const char* OtaFailCount = "otafailc";
+  constexpr const char* OtaPendingVersion = "otapendv";
+  constexpr const char* OtaPendingBoots = "otapendb";
 }

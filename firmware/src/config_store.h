@@ -14,7 +14,13 @@ public:
 
   int getOtaFailCount(const String& version) const;
   void recordOtaFailure(const String& version) const;
+  void undoOtaFailure(const String& version) const;
   void clearOtaFailCount() const;
+
+  String getOtaPendingVersion() const;
+  int incrementOtaPendingBoots() const;
+  void setOtaPending(const String& version) const;
+  void clearOtaPending() const;
 
 private:
   Logger& _logger;

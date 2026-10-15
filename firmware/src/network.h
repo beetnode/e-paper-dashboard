@@ -31,4 +31,5 @@ private:
   WiFiClientSecure _secureClient;
   bool _useSecure = false;
   WiFiClient& activeClient();
+  bool waitForWiFi(const String& ssid, const String& password);
 };

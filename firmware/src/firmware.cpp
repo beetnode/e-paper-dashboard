@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <esp_task_wdt.h>
 #include "version.h"
 #include "constants.h"
 #include "logger.h"
@@ -31,6 +32,8 @@ void setup()
   logger.print("izBoard Firmware v");
   logger.println(FIRMWARE_VERSION);
 
+  otaUpdater.verifyPendingUpdate();
+
   if (hardware.isResetRequested())
   {
     logger.println("Reset requested, clearing configuration...");
@@ -62,7 +65,8 @@ void setup()
     else
     {
       logger.println("WiFi connection failed, retrying after sleep");
-      hardware.startDeepSleep(Timing::FallbackRefreshSeconds);
+      displayManager.powerOff();
+      hardware.sleepAfterFailure();
       return;
     }
   }
@@ -100,6 +104,12 @@ void setup()
           retryable ? "Pairing Paused" : "Pairing Failed",
           pairingError,
           retryable ? "Retrying automatically..." : "Restarting setup...");
+      if (retryable)
+      {
+        displayManager.powerOff();
+        hardware.sleepAfterFailure();
+        return;
+      }
       delay(5000);
       ESP.restart();
       return;
@@ -115,9 +125,22 @@ void setup()
         "Press the button to refresh manually.");
   }
 
+  // Reboots the device if anything below hangs instead of reaching deep sleep.
+  esp_task_wdt_init(Retry::WatchdogTimeoutSeconds, true);
+  esp_task_wdt_add(nullptr);
+
   uint64_t waitSeconds = Timing::FallbackRefreshSeconds;
 
   auto status = deviceApi.fetchDeviceStatus(config);
+  if (!status.success)
+  {
+    logger.println("Dashboard unavailable, retrying after sleep");
+    displayManager.powerOff();
+    hardware.sleepAfterFailure();
+    return;
+  }
+  otaUpdater.confirmUpdate();
+
   if (status.waitSeconds > 0)
   {
     waitSeconds = status.waitSeconds;
@@ -137,19 +160,31 @@ void setup()
       logger.print("New firmware v");
       logger.print(status.latestFirmwareVersion);
       logger.printf(" available (attempt %d/%d). Starting OTA update...\n", failCount + 1, Ota::MaxRetries);
-      if (otaUpdater.perform(config))
-      {
-        return;
-      }
-      logger.println("OTA update failed, continuing with current firmware");
-      configStore.recordOtaFailure(status.latestFirmwareVersion);
+      displayManager.showSuccess(
+          "Updating Firmware",
+          "v" + String(FIRMWARE_VERSION) + " -> v" + status.latestFirmwareVersion,
+          "Do not power off the device.");
+      // Downloading and flashing can take longer than the watchdog timeout.
+      esp_task_wdt_delete(nullptr);
+      auto failure = otaUpdater.perform(config, status.latestFirmwareVersion);
+      esp_task_wdt_add(nullptr);
+      logger.println(failure == OtaFailure::Transient
+          ? "OTA update interrupted, will retry on next wake"
+          : "OTA update failed, continuing with current firmware");
     }
   }
 
-  deviceApi.fetchAndDisplayImage(config, displayManager);
+  if (!deviceApi.fetchAndDisplayImage(config, displayManager))
+  {
+    logger.println("Image unavailable, retrying after sleep");
+    displayManager.powerOff();
+    hardware.sleepAfterFailure();
+    return;
+  }
 
   displayManager.refresh();
   displayManager.powerOff();
+  hardware.resetFailureBackoff();
   hardware.startDeepSleep(waitSeconds);
 }
 

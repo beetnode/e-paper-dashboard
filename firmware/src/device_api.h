@@ -17,7 +17,7 @@ public:
   DeviceApi(Logger& logger, Network& network);
 
   DeviceStatus fetchDeviceStatus(const DeviceConfig& config);
-  void fetchAndDisplayImage(const DeviceConfig& config, DisplayManager& display);
+  bool fetchAndDisplayImage(const DeviceConfig& config, DisplayManager& display);
   PairingAttemptResult announceDevice(const String& pairingCode, const String& registrationToken,
                                       const String& dashboardUrl, int devicePort, bool useHttps,
                                       const String& dashboardBasePath,
@@ -34,6 +34,9 @@ public:
 private:
   Logger& _logger;
   Network& _network;
+  // Sends a GET request, retrying connection failures and non-200 responses.
+  // On success the response body is ready to be read from the network.
+  bool openSuccessfulResponse(const String& path, const DeviceConfig& config, ResponseHeaders& headers);
   bool postPairingRequest(const String& path, const String& body,
                           const String& dashboardUrl, int devicePort, bool useHttps,
                           const String& dashboardBasePath,

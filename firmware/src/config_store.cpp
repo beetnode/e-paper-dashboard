@@ -81,11 +81,60 @@ void ConfigStore::recordOtaFailure(const String& version) const
   _logger.printf("OTA: Recorded failure %d/%d for v%s\n", count + 1, Ota::MaxRetries, version.c_str());
 }
 
+void ConfigStore::undoOtaFailure(const String& version) const
+{
+  Preferences prefs;
+  prefs.begin(StorageKey::Namespace, false);
+  if (prefs.getString(StorageKey::OtaFailVersion, "") == version)
+  {
+    const int count = prefs.getInt(StorageKey::OtaFailCount, 0);
+    prefs.putInt(StorageKey::OtaFailCount, max(count - 1, 0));
+  }
+  prefs.end();
+}
+
 void ConfigStore::clearOtaFailCount() const
 {
   Preferences prefs;
   prefs.begin(StorageKey::Namespace, false);
   prefs.remove(StorageKey::OtaFailVersion);
   prefs.remove(StorageKey::OtaFailCount);
+  prefs.end();
+}
+
+String ConfigStore::getOtaPendingVersion() const
+{
+  Preferences prefs;
+  prefs.begin(StorageKey::Namespace, true);
+  String version = prefs.getString(StorageKey::OtaPendingVersion, "");
+  prefs.end();
+  return version;
+}
+
+int ConfigStore::incrementOtaPendingBoots() const
+{
+  Preferences prefs;
+  prefs.begin(StorageKey::Namespace, false);
+  const int boots = prefs.getInt(StorageKey::OtaPendingBoots, 0) + 1;
+  prefs.putInt(StorageKey::OtaPendingBoots, boots);
+  prefs.end();
+  return boots;
+}
+
+void ConfigStore::setOtaPending(const String& version) const
+{
+  Preferences prefs;
+  prefs.begin(StorageKey::Namespace, false);
+  prefs.putString(StorageKey::OtaPendingVersion, version);
+  prefs.putInt(StorageKey::OtaPendingBoots, 0);
+  prefs.end();
+}
+
+void ConfigStore::clearOtaPending() const
+{
+  Preferences prefs;
+  prefs.begin(StorageKey::Namespace, false);
+  prefs.remove(StorageKey::OtaPendingVersion);
+  prefs.remove(StorageKey::OtaPendingBoots);
   prefs.end();
 }
