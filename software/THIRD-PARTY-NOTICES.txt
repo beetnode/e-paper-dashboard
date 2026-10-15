@@ -7,34 +7,7 @@ expressly granted herein, whether by implication, estoppel or otherwise.
 
 ================================================================================
 
-1. CSharpFunctionalExtensions (version 3.6.0)
-   https://github.com/vkhorikov/CSharpFunctionalExtensions
-
-   MIT License
-
-   Copyright (c) 2016 Vladimir Khorikov
-
-   Permission is hereby granted, free of charge, to any person obtaining a copy
-   of this software and associated documentation files (the "Software"), to deal
-   in the Software without restriction, including without limitation the rights
-   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-   copies of the Software, and to permit persons to whom the Software is
-   furnished to do so, subject to the following conditions:
-
-   The above copyright notice and this permission notice shall be included in all
-   copies or substantial portions of the Software.
-
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-   SOFTWARE.
-
-================================================================================
-
-2. LiteDB (version 5.0.21)
+1. LiteDB (version 5.0.21)
    https://github.com/mbdavid/LiteDB
 
    MIT License
@@ -61,7 +34,7 @@ expressly granted herein, whether by implication, estoppel or otherwise.
 
 ================================================================================
 
-3. Microsoft.Playwright (version 1.52.0) [optional component only]
+2. Microsoft.Playwright (version 1.52.0) [optional component only]
    https://github.com/microsoft/playwright-dotnet
 
    Apache License 2.0
@@ -82,7 +55,7 @@ expressly granted herein, whether by implication, estoppel or otherwise.
 
 ================================================================================
 
-4. Newtonsoft.Json (version 13.0.3)
+3. Newtonsoft.Json (version 13.0.3)
    https://github.com/JamesNK/Newtonsoft.Json
 
    MIT License
@@ -109,7 +82,7 @@ expressly granted herein, whether by implication, estoppel or otherwise.
 
 ================================================================================
 
-5. SixLabors.ImageSharp (version 3.1.12)
+4. SixLabors.ImageSharp (version 3.1.12)
    https://github.com/SixLabors/ImageSharp
 
    Apache License 2.0 with Six Labors Split License
@@ -138,7 +111,7 @@ expressly granted herein, whether by implication, estoppel or otherwise.
 
 ================================================================================
 
-6. Swashbuckle.AspNetCore (version 6.6.2)
+5. Swashbuckle.AspNetCore (version 6.6.2)
    https://github.com/domaindrivendev/Swashbuckle.AspNetCore
 
    MIT License
@@ -165,7 +138,7 @@ expressly granted herein, whether by implication, estoppel or otherwise.
 
 ================================================================================
 
-7. Microsoft.VisualStudio.Azure.Containers.Tools.Targets (version 1.19.5)
+6. Microsoft.VisualStudio.Azure.Containers.Tools.Targets (version 1.19.5)
 
    MIT License
 
@@ -202,7 +175,7 @@ For full license text, see: https://github.com/dotnet/runtime/blob/main/LICENSE.
 
 ================================================================================
 
-8. QRCoder (version 1.6.0)
+7. QRCoder (version 1.6.0)
    https://github.com/codebude/QRCoder
 
    MIT License
@@ -229,7 +202,7 @@ For full license text, see: https://github.com/dotnet/runtime/blob/main/LICENSE.
 
 ================================================================================
 
-9. Font Awesome Free (version 7.1.0)
+8. Font Awesome Free (version 7.1.0)
    https://github.com/FortAwesome/Font-Awesome
 
    Copyright (c) Fonticons, Inc.

@@ -1,7 +1,7 @@
 using EPaperDashboard.Models;
 using System.Net.WebSockets;
 using System.Text.Json;
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 
 namespace EPaperDashboard.Services.Providers.HomeAssistant;
 
@@ -16,7 +16,7 @@ public class HomeAssistantWeatherForecastProvider(
     private readonly HomeAssistantConnectionService _connection = connection;
     private readonly ILogger<HomeAssistantWeatherForecastProvider> _logger = logger;
 
-    public async Task<Result<List<WeatherForecast>, string>> FetchWeatherForecastAsync(ProviderConnection homeAssistant, string weatherEntityId, string forecastType = "daily", CancellationToken cancellationToken = default)
+    public async Task<Result<List<WeatherForecast>>> FetchWeatherForecastAsync(ProviderConnection homeAssistant, string weatherEntityId, string forecastType = "daily", CancellationToken cancellationToken = default)
     {
         var connectionInfo = _connection.GetConnectionInfo(homeAssistant);
         if (connectionInfo.IsFailure)

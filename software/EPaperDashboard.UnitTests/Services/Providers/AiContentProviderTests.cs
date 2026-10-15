@@ -1,5 +1,5 @@
 using System.Text.Json;
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services;
@@ -44,7 +44,7 @@ public class AiContentProviderTests
     {
         var mock = new Mock<IEntityStateProvider>();
         mock.Setup(p => p.FetchAllEntityStatesAsync(It.IsAny<string>()))
-            .ReturnsAsync(Result.Success<List<EntityState>, string>(new List<EntityState>()));
+            .ReturnsAsync(Result.Success<List<EntityState>>(new List<EntityState>()));
         return mock.Object;
     }
 
@@ -52,7 +52,7 @@ public class AiContentProviderTests
     {
         var mock = new Mock<ITodoDataProvider>();
         mock.Setup(p => p.FetchAllTodoItemsAsync(It.IsAny<string>()))
-            .ReturnsAsync(Result.Success<Dictionary<string, List<TodoItem>>, string>(new Dictionary<string, List<TodoItem>>()));
+            .ReturnsAsync(Result.Success<Dictionary<string, List<TodoItem>>>(new Dictionary<string, List<TodoItem>>()));
         return mock.Object;
     }
 
@@ -60,7 +60,7 @@ public class AiContentProviderTests
     {
         var mock = new Mock<ICalendarDataProvider>();
         mock.Setup(p => p.FetchAllCalendarEventsAsync(It.IsAny<string>(), It.IsAny<int>()))
-            .ReturnsAsync(Result.Success<Dictionary<string, List<CalendarEvent>>, string>(new Dictionary<string, List<CalendarEvent>>()));
+            .ReturnsAsync(Result.Success<Dictionary<string, List<CalendarEvent>>>(new Dictionary<string, List<CalendarEvent>>()));
         return mock.Object;
     }
 
@@ -68,7 +68,7 @@ public class AiContentProviderTests
     {
         var mock = new Mock<IWeatherForecastProvider>();
         mock.Setup(p => p.FetchAllWeatherForecastsAsync(It.IsAny<string>(), It.IsAny<string>()))
-            .ReturnsAsync(Result.Success<Dictionary<string, List<WeatherForecast>>, string>(new Dictionary<string, List<WeatherForecast>>()));
+            .ReturnsAsync(Result.Success<Dictionary<string, List<WeatherForecast>>>(new Dictionary<string, List<WeatherForecast>>()));
         return mock.Object;
     }
 
@@ -76,7 +76,7 @@ public class AiContentProviderTests
     {
         var mock = new Mock<IRssFeedDataProvider>();
         mock.Setup(p => p.FetchAllRssFeedEntriesAsync(It.IsAny<string>()))
-            .ReturnsAsync(Result.Success<Dictionary<string, List<RssFeedEntry>>, string>(new Dictionary<string, List<RssFeedEntry>>()));
+            .ReturnsAsync(Result.Success<Dictionary<string, List<RssFeedEntry>>>(new Dictionary<string, List<RssFeedEntry>>()));
         return mock.Object;
     }
 
@@ -125,9 +125,9 @@ public class AiContentProviderTests
         var dashboard = new Dashboard { Id = dashboardId, AiConfig = new AiConfig { ConnectionMode = AiConnectionMode.HomeAssistant } };
         _dashboardRepository.Setup(r => r.FindById(dashboardId)).Returns(dashboard);
         _aiServiceFactory.Setup(f => f.Create(It.IsAny<AiConfig>(), It.IsAny<string>()))
-            .Returns(Result.Success<IAiService, string>(_aiService.Object));
+            .Returns(Result.Success<IAiService>(_aiService.Object));
         _aiService.Setup(s => s.GenerateCompletionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), false))
-            .ReturnsAsync(Result.Success<string, string>("Generated content"));
+            .ReturnsAsync(Result.Success<string>("Generated content"));
         var sut = CreateSut();
 
         var result = await sut.GenerateContentAsync(dashboardId.Value, "Tell me a story", CancellationToken.None);
@@ -143,9 +143,9 @@ public class AiContentProviderTests
         var dashboard = new Dashboard { Id = dashboardId, AiConfig = new AiConfig { ConnectionMode = AiConnectionMode.HomeAssistant } };
         _dashboardRepository.Setup(r => r.FindById(dashboardId)).Returns(dashboard);
         _aiServiceFactory.Setup(f => f.Create(It.IsAny<AiConfig>(), It.IsAny<string>()))
-            .Returns(Result.Success<IAiService, string>(_aiService.Object));
+            .Returns(Result.Success<IAiService>(_aiService.Object));
         _aiService.Setup(s => s.GenerateCompletionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), false))
-            .ReturnsAsync(Result.Success<string, string>("cached text"));
+            .ReturnsAsync(Result.Success<string>("cached text"));
         var sut = CreateSut();
 
         var result = await sut.GenerateAndCacheContentAsync(dashboardId.Value, "widget-1", "prompt", CancellationToken.None);
@@ -163,9 +163,9 @@ public class AiContentProviderTests
         var dashboard = new Dashboard { Id = dashboardId, AiConfig = new AiConfig { ConnectionMode = AiConnectionMode.HomeAssistant } };
         _dashboardRepository.Setup(r => r.FindById(dashboardId)).Returns(dashboard);
         _aiServiceFactory.Setup(f => f.Create(It.IsAny<AiConfig>(), It.IsAny<string>()))
-            .Returns(Result.Success<IAiService, string>(_aiService.Object));
+            .Returns(Result.Success<IAiService>(_aiService.Object));
         _aiService.Setup(s => s.GenerateCompletionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), false))
-            .ReturnsAsync(Result.Failure<string, string>("llm error"));
+            .ReturnsAsync(Result.Failure<string>("llm error"));
         var sut = CreateSut();
 
         var result = await sut.GenerateAndCacheContentAsync(dashboardId.Value, "widget-1", "prompt", CancellationToken.None);
@@ -199,9 +199,9 @@ public class AiContentProviderTests
         };
         _dashboardRepository.Setup(r => r.FindById(dashboardId)).Returns(dashboard);
         _aiServiceFactory.Setup(f => f.Create(It.IsAny<AiConfig>(), It.IsAny<string>()))
-            .Returns(Result.Success<IAiService, string>(_aiService.Object));
+            .Returns(Result.Success<IAiService>(_aiService.Object));
         _aiService.Setup(s => s.GenerateCompletionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), false))
-            .ReturnsAsync(Result.Success<string, string>("private content"));
+            .ReturnsAsync(Result.Success<string>("private content"));
         var sut = CreateSut(entityStateProvider.Object);
 
         var result = await sut.GenerateAndCacheContentAsync(
@@ -273,9 +273,9 @@ public class AiContentProviderTests
         };
         _dashboardRepository.Setup(r => r.FindById(dashboardId)).Returns(dashboard);
         _aiServiceFactory.Setup(f => f.Create(It.IsAny<AiConfig>(), It.IsAny<string>()))
-            .Returns(Result.Success<IAiService, string>(_aiService.Object));
+            .Returns(Result.Success<IAiService>(_aiService.Object));
         _aiService.Setup(s => s.GenerateCompletionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), false))
-            .ReturnsAsync(Result.Success<string, string>("generated summary"));
+            .ReturnsAsync(Result.Success<string>("generated summary"));
         var sut = CreateSut();
 
         await sut.PreGenerateAllAsync(dashboardId.Value, CancellationToken.None);

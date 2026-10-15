@@ -1,4 +1,3 @@
-using CSharpFunctionalExtensions;
 using EPaperDashboard.Authentication;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;

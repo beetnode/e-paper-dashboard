@@ -1,6 +1,6 @@
 using EPaperDashboard.Models;
 using System.Text.Json;
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 
 namespace EPaperDashboard.Services.Providers.HomeAssistant;
 
@@ -17,7 +17,7 @@ public class HomeAssistantEntityHistoryProvider(
     private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
     private readonly ILogger<HomeAssistantEntityHistoryProvider> _logger = logger;
 
-    public async Task<Result<Dictionary<string, List<HistoryState>>, string>> FetchEntityHistoryAsync(ProviderConnection homeAssistant, IEnumerable<string> entityIds, int hours = 24, CancellationToken cancellationToken = default)
+    public async Task<Result<Dictionary<string, List<HistoryState>>>> FetchEntityHistoryAsync(ProviderConnection homeAssistant, IEnumerable<string> entityIds, int hours = 24, CancellationToken cancellationToken = default)
     {
         var connectionInfo = _connection.GetConnectionInfo(homeAssistant);
         if (connectionInfo.IsFailure)
@@ -25,7 +25,7 @@ public class HomeAssistantEntityHistoryProvider(
 
         var requestedIds = new HashSet<string>(entityIds.Where(id => !string.IsNullOrWhiteSpace(id)), StringComparer.OrdinalIgnoreCase);
         if (requestedIds.Count == 0)
-            return Result.Success<Dictionary<string, List<HistoryState>>, string>(new Dictionary<string, List<HistoryState>>());
+            return Result.Success<Dictionary<string, List<HistoryState>>>(new Dictionary<string, List<HistoryState>>());
 
         var (hostUrl, token) = connectionInfo.Value;
 
@@ -81,7 +81,7 @@ public class HomeAssistantEntityHistoryProvider(
                 }
             }
 
-            return Result.Success<Dictionary<string, List<HistoryState>>, string>(result);
+            return Result.Success<Dictionary<string, List<HistoryState>>>(result);
         }
         catch (OperationCanceledException) { throw; }
         catch (HttpRequestException ex)

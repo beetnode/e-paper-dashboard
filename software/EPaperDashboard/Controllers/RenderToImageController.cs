@@ -2,7 +2,6 @@
 using EPaperDashboard.Services.Rendering;
 using SixLabors.ImageSharp.Processing;
 using EPaperDashboard.Utilities;
-using CSharpFunctionalExtensions;
 using EPaperDashboard.Models.Rendering;
 using SixLabors.ImageSharp.Formats.Bmp;
 using SixLabors.ImageSharp.Formats;

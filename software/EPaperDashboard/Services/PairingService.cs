@@ -1,5 +1,4 @@
 using EPaperDashboard.Utilities;
-using CSharpFunctionalExtensions;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 using System.Security.Cryptography;

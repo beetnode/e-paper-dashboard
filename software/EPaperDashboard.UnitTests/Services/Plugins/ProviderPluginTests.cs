@@ -1,4 +1,3 @@
-using CSharpFunctionalExtensions;
 using System.Security.Claims;
 using EPaperDashboard.Controllers;
 using Microsoft.AspNetCore.Http;
@@ -357,12 +356,12 @@ public sealed class ProviderPluginTests : IDisposable
         public PluginWidgetRequest? GetWidgetDataRequest(EPaperDashboard.Models.Rendering.WidgetConfigEntry widget) => new(widget.Config.GetProperty("source").GetString()!, "custom");
         public List<ProviderContext> Fetches { get; } = [];
         public string? ValidateCredentials(IReadOnlyDictionary<string, string> credentials) => null;
-        public Task<Result<List<DataSource>, string>> DiscoverAsync(ProviderContext context, CancellationToken cancellationToken) =>
-            Task.FromResult(Result.Success<List<DataSource>, string>([new() { EntityId = "calendar/primary", FriendlyName = "Primary", Capabilities = ["calendar"] }]));
-        public Task<Result<SourceData, string>> FetchAsync(ProviderContext context, SourceQuery query, CancellationToken cancellationToken)
+        public Task<Result<List<DataSource>>> DiscoverAsync(ProviderContext context, CancellationToken cancellationToken) =>
+            Task.FromResult(Result.Success<List<DataSource>>([new() { EntityId = "calendar/primary", FriendlyName = "Primary", Capabilities = ["calendar"] }]));
+        public Task<Result<SourceData>> FetchAsync(ProviderContext context, SourceQuery query, CancellationToken cancellationToken)
         {
             Fetches.Add(context);
-            return Task.FromResult(Result.Success<SourceData, string>(new() { CalendarEvents = [new() { Summary = context.Connection.Name }], Custom = JsonSerializer.SerializeToElement(new { name = context.Connection.Name }) }));
+            return Task.FromResult(Result.Success<SourceData>(new() { CalendarEvents = [new() { Summary = context.Connection.Name }], Custom = JsonSerializer.SerializeToElement(new { name = context.Connection.Name }) }));
         }
     }
 
@@ -379,15 +378,15 @@ public sealed class ProviderPluginTests : IDisposable
         public bool Fail { get; set; }
         public IReadOnlyCollection<string> AuthorizationCredentialKeys { get; } = ["token"];
         public bool IsAuthorized(IReadOnlyDictionary<string, string> credentials) => credentials.ContainsKey("token");
-        public Result<(string Url, string State), string> StartAuthorization(ProviderConnection connection, HttpContext httpContext)
+        public Result<(string Url, string State)> StartAuthorization(ProviderConnection connection, HttpContext httpContext)
         {
             Started.Add(connection);
             return ("https://signin.test/authorize", "state-" + Started.Count);
         }
-        public Task<UnitResult<string>> CompleteAuthorizationAsync(string? state, string? browserState, string? code, CancellationToken cancellationToken)
+        public Task<Result> CompleteAuthorizationAsync(string? state, string? browserState, string? code, CancellationToken cancellationToken)
         {
             Completions.Add((state, browserState, code));
-            return Task.FromResult(Fail ? UnitResult.Failure("Sign-in failed") : UnitResult.Success<string>());
+            return Task.FromResult(Fail ? Result.Failure("Sign-in failed") : Result.Success());
         }
     }
 }

@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services;
@@ -23,19 +23,19 @@ public class AiDashboardGenerationServiceTests
     {
         var entityStateProvider = new Mock<IEntityStateProvider>();
         entityStateProvider.Setup(p => p.FetchAllEntityStatesAsync(It.IsAny<string>()))
-            .ReturnsAsync(Result.Success<List<EntityState>, string>(new List<EntityState>()));
+            .ReturnsAsync(Result.Success<List<EntityState>>(new List<EntityState>()));
         var todoDataProvider = new Mock<ITodoDataProvider>();
         todoDataProvider.Setup(p => p.FetchAllTodoItemsAsync(It.IsAny<string>()))
-            .ReturnsAsync(Result.Success<Dictionary<string, List<TodoItem>>, string>(new Dictionary<string, List<TodoItem>>()));
+            .ReturnsAsync(Result.Success<Dictionary<string, List<TodoItem>>>(new Dictionary<string, List<TodoItem>>()));
         var calendarDataProvider = new Mock<ICalendarDataProvider>();
         calendarDataProvider.Setup(p => p.FetchAllCalendarEventsAsync(It.IsAny<string>(), It.IsAny<int>()))
-            .ReturnsAsync(Result.Success<Dictionary<string, List<CalendarEvent>>, string>(new Dictionary<string, List<CalendarEvent>>()));
+            .ReturnsAsync(Result.Success<Dictionary<string, List<CalendarEvent>>>(new Dictionary<string, List<CalendarEvent>>()));
         var weatherForecastProvider = new Mock<IWeatherForecastProvider>();
         weatherForecastProvider.Setup(p => p.FetchAllWeatherForecastsAsync(It.IsAny<string>(), It.IsAny<string>()))
-            .ReturnsAsync(Result.Success<Dictionary<string, List<WeatherForecast>>, string>(new Dictionary<string, List<WeatherForecast>>()));
+            .ReturnsAsync(Result.Success<Dictionary<string, List<WeatherForecast>>>(new Dictionary<string, List<WeatherForecast>>()));
         var rssFeedDataProvider = new Mock<IRssFeedDataProvider>();
         rssFeedDataProvider.Setup(p => p.FetchAllRssFeedEntriesAsync(It.IsAny<string>()))
-            .ReturnsAsync(Result.Success<Dictionary<string, List<RssFeedEntry>>, string>(new Dictionary<string, List<RssFeedEntry>>()));
+            .ReturnsAsync(Result.Success<Dictionary<string, List<RssFeedEntry>>>(new Dictionary<string, List<RssFeedEntry>>()));
 
         var dataFetcher = new AiDataFetcher(
             entityStateProvider.Object,
@@ -85,7 +85,7 @@ public class AiDashboardGenerationServiceTests
     {
         _aiServiceFactory
             .Setup(f => f.Create(It.IsAny<AiConfig>(), It.IsAny<string>()))
-            .Returns(Result.Failure<IAiService, string>("no connection configured"));
+            .Returns(Result.Failure<IAiService>("no connection configured"));
         var sut = CreateSut();
         var dashboard = CreateDashboard();
 
@@ -99,10 +99,10 @@ public class AiDashboardGenerationServiceTests
     [Fact]
     public async Task GenerateAsync_CompletionCallFails_ReturnsFailureAndStoresError()
     {
-        _aiServiceFactory.Setup(f => f.Create(It.IsAny<AiConfig>(), It.IsAny<string>())).Returns(Result.Success<IAiService, string>(_aiService.Object));
+        _aiServiceFactory.Setup(f => f.Create(It.IsAny<AiConfig>(), It.IsAny<string>())).Returns(Result.Success<IAiService>(_aiService.Object));
         _aiService
             .Setup(s => s.GenerateCompletionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
-            .ReturnsAsync(Result.Failure<string, string>("LLM unreachable"));
+            .ReturnsAsync(Result.Failure<string>("LLM unreachable"));
         var sut = CreateSut();
         var dashboard = CreateDashboard();
 
@@ -115,10 +115,10 @@ public class AiDashboardGenerationServiceTests
     [Fact]
     public async Task GenerateAsync_AllWidgetsInvalidAfterValidation_ReturnsFailure()
     {
-        _aiServiceFactory.Setup(f => f.Create(It.IsAny<AiConfig>(), It.IsAny<string>())).Returns(Result.Success<IAiService, string>(_aiService.Object));
+        _aiServiceFactory.Setup(f => f.Create(It.IsAny<AiConfig>(), It.IsAny<string>())).Returns(Result.Success<IAiService>(_aiService.Object));
         _aiService
             .Setup(s => s.GenerateCompletionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
-            .ReturnsAsync(Result.Success<string, string>("""{"widgets": [{"type": "markdown", "config": {"content": ""}}]}"""));
+            .ReturnsAsync(Result.Success<string>("""{"widgets": [{"type": "markdown", "config": {"content": ""}}]}"""));
         var sut = CreateSut();
         var dashboard = CreateDashboard();
 
@@ -131,10 +131,10 @@ public class AiDashboardGenerationServiceTests
     [Fact]
     public async Task GenerateAsync_SuccessfulFlow_PlacesWidgetsAndStampsGenerationTime()
     {
-        _aiServiceFactory.Setup(f => f.Create(It.IsAny<AiConfig>(), It.IsAny<string>())).Returns(Result.Success<IAiService, string>(_aiService.Object));
+        _aiServiceFactory.Setup(f => f.Create(It.IsAny<AiConfig>(), It.IsAny<string>())).Returns(Result.Success<IAiService>(_aiService.Object));
         _aiService
             .Setup(s => s.GenerateCompletionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
-            .ReturnsAsync(Result.Success<string, string>("""{"widgets": [{"type": "markdown", "config": {"content": "hello world"}}]}"""));
+            .ReturnsAsync(Result.Success<string>("""{"widgets": [{"type": "markdown", "config": {"content": "hello world"}}]}"""));
         var sut = CreateSut();
         var dashboard = CreateDashboard();
 
@@ -151,11 +151,11 @@ public class AiDashboardGenerationServiceTests
     [Fact]
     public async Task GenerateAsync_MalformedJsonRepairedSuccessfully_ReturnsRepairedWidgets()
     {
-        _aiServiceFactory.Setup(f => f.Create(It.IsAny<AiConfig>(), It.IsAny<string>())).Returns(Result.Success<IAiService, string>(_aiService.Object));
+        _aiServiceFactory.Setup(f => f.Create(It.IsAny<AiConfig>(), It.IsAny<string>())).Returns(Result.Success<IAiService>(_aiService.Object));
         _aiService
             .SetupSequence(s => s.GenerateCompletionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
-            .ReturnsAsync(Result.Success<string, string>("{ broken json"))
-            .ReturnsAsync(Result.Success<string, string>("""{"widgets": [{"type": "markdown", "config": {"content": "fixed"}}]}"""));
+            .ReturnsAsync(Result.Success<string>("{ broken json"))
+            .ReturnsAsync(Result.Success<string>("""{"widgets": [{"type": "markdown", "config": {"content": "fixed"}}]}"""));
         var sut = CreateSut();
         var dashboard = CreateDashboard();
 
@@ -168,10 +168,10 @@ public class AiDashboardGenerationServiceTests
     [Fact]
     public async Task GenerateAsync_PromptOverrideProvided_SetsDashboardAiPrompt()
     {
-        _aiServiceFactory.Setup(f => f.Create(It.IsAny<AiConfig>(), It.IsAny<string>())).Returns(Result.Success<IAiService, string>(_aiService.Object));
+        _aiServiceFactory.Setup(f => f.Create(It.IsAny<AiConfig>(), It.IsAny<string>())).Returns(Result.Success<IAiService>(_aiService.Object));
         _aiService
             .Setup(s => s.GenerateCompletionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
-            .ReturnsAsync(Result.Success<string, string>("""{"widgets": [{"type": "markdown", "config": {"content": "x"}}]}"""));
+            .ReturnsAsync(Result.Success<string>("""{"widgets": [{"type": "markdown", "config": {"content": "x"}}]}"""));
         var sut = CreateSut();
         var dashboard = CreateDashboard();
 

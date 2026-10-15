@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Guards;
 using EPaperDashboard.Models;
 using EPaperDashboard.Models.Rendering;
@@ -21,14 +21,18 @@ internal sealed class PageToImageRenderingService(
         catch (InvalidOperationException) { return new Health(false, false); }
         using var httpClient = httpClientFactory.CreateClient();
         httpClient.Timeout = TimeSpan.FromSeconds(10);
-        var dashboardHealth = await Result.Try(async () =>
+        bool dashboardHealthy;
+        try
         {
             using var response = await httpClient.GetAsync(dashboardUri);
-            return response.IsSuccessStatusCode;
-        });
-        dashboardHealth.TapError(error =>
-            logger.LogWarning("Dashboard health check failed ({ErrorType})", error.GetType().Name));
-        return new Health(componentManager.GetActiveComponent() is not null && await runtime.IsAvailableAsync(), dashboardHealth.GetValueOrDefault());
+            dashboardHealthy = response.IsSuccessStatusCode;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning("Dashboard health check failed ({ErrorType})", exception.GetType().Name);
+            dashboardHealthy = false;
+        }
+        return new Health(componentManager.GetActiveComponent() is not null && await runtime.IsAvailableAsync(), dashboardHealthy);
     }
 
     public Task<Result<IImage>> RenderDashboardAsync(

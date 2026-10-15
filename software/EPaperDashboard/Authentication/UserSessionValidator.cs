@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Security.Claims;
-using CSharpFunctionalExtensions;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 using EPaperDashboard.Utilities;

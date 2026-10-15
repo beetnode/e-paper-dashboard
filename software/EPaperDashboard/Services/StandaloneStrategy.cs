@@ -1,6 +1,5 @@
 using EPaperDashboard.Models;
 using EPaperDashboard.Utilities;
-using CSharpFunctionalExtensions;
 
 namespace EPaperDashboard.Services;
 
@@ -23,7 +22,7 @@ public class StandaloneStrategy : IDeploymentStrategy
 
     public bool RunsRendererInProcess => false;
 
-    public Result<HomeAssistantOAuthClient, string> GetHomeAssistantOAuthClient(HttpContext? context)
+    public Result<HomeAssistantOAuthClient> GetHomeAssistantOAuthClient(HttpContext? context)
     {
         if (_environmentConfiguration.ClientUri is not { } clientUri)
         {
@@ -34,7 +33,7 @@ public class StandaloneStrategy : IDeploymentStrategy
         return new HomeAssistantOAuthClient(appUrl, appUrl);
     }
 
-    public UnitResult<string> ValidateConfiguration()
+    public Result ValidateConfiguration()
     {
         var missingConfigs = new List<string>();
 
@@ -50,10 +49,10 @@ public class StandaloneStrategy : IDeploymentStrategy
                 Invalid or missing configuration: {string.Join(", ", missingConfigs)}.
                 Please set them as environment variables or in /data/options.json file.
                 """;
-            return UnitResult.Failure(message);
+            return Result.Failure(message);
         }
 
-        return UnitResult.Success<string>();
+        return Result.Success();
     }
 
     public bool IsIngressRequest(HttpContext context) => false;

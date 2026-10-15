@@ -1,6 +1,6 @@
 using System.Text;
 using System.Text.Json;
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services.Ai;
 
@@ -45,15 +45,15 @@ public sealed class AiContentProvider(
         - Prefer short paragraphs and lists over long prose.
         """;
 
-    public async Task<Result<string, string>> GenerateContentAsync(
+    public async Task<Result<string>> GenerateContentAsync(
         string dashboardId, string prompt, CancellationToken cancellationToken)
     {
         if (!DashboardId.TryParse(dashboardId, out var id))
-            return Result.Failure<string, string>("Invalid dashboard ID");
+            return Result.Failure<string>("Invalid dashboard ID");
 
         var dashboard = dashboardService.GetDashboardById(id);
         if (dashboard is null)
-            return Result.Failure<string, string>("Dashboard not found");
+            return Result.Failure<string>("Dashboard not found");
 
         return await CallAiAsync(
             dashboard,
@@ -63,15 +63,15 @@ public sealed class AiContentProvider(
             cancellationToken);
     }
 
-    public async Task<Result<string, string>> GenerateAndCacheContentAsync(
+    public async Task<Result<string>> GenerateAndCacheContentAsync(
         string dashboardId, string widgetId, string prompt, CancellationToken cancellationToken)
     {
         if (!DashboardId.TryParse(dashboardId, out var id))
-            return Result.Failure<string, string>("Invalid dashboard ID");
+            return Result.Failure<string>("Invalid dashboard ID");
 
         var dashboard = dashboardService.GetDashboardById(id);
         if (dashboard is null)
-            return Result.Failure<string, string>("Dashboard not found");
+            return Result.Failure<string>("Dashboard not found");
 
         var result = await CallAiAsync(
             dashboard,
@@ -163,7 +163,7 @@ public sealed class AiContentProvider(
         return dashboard.AiContentCache?.GetValueOrDefault(widgetId);
     }
 
-    private async Task<Result<string, string>> CallAiAsync(
+    private async Task<Result<string>> CallAiAsync(
         Dashboard dashboard,
         string dashboardId,
         string prompt,
@@ -174,12 +174,12 @@ public sealed class AiContentProvider(
         if (effectiveConfig == null || effectiveConfig.ConnectionMode == AiConnectionMode.None)
         {
             logger.LogWarning("AI not configured for dashboard {DashboardId}, skipping ai-content generation", dashboardId);
-            return Result.Failure<string, string>("AI is not configured");
+            return Result.Failure<string>("AI is not configured");
         }
 
         var aiServiceResult = aiServiceFactory.Create(effectiveConfig, dashboardId);
         if (aiServiceResult.IsFailure)
-            return Result.Failure<string, string>(aiServiceResult.Error);
+            return Result.Failure<string>(aiServiceResult.Error);
 
         var aiData = includeDashboardData
             ? await dataFetcher.FetchAsync(dashboardId, cancellationToken)

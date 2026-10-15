@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 
 namespace EPaperDashboard.Services.Providers;
 
@@ -8,11 +8,11 @@ namespace EPaperDashboard.Services.Providers;
 /// </summary>
 public interface IEntityStateProvider
 {
-    Task<Result<List<EntityState>, string>> FetchEntityStatesAsync(string dashboardId, string[] entityIds, CancellationToken cancellationToken = default);
+    Task<Result<List<EntityState>>> FetchEntityStatesAsync(string dashboardId, string[] entityIds, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Fetches states for all entities relevant to dashboard widgets
     /// (sensors, binary sensors, persons, etc.). Excludes internal/automation domains.
     /// </summary>
-    Task<Result<List<EntityState>, string>> FetchAllEntityStatesAsync(string dashboardId, CancellationToken cancellationToken = default);
+    Task<Result<List<EntityState>>> FetchAllEntityStatesAsync(string dashboardId, CancellationToken cancellationToken = default);
 }

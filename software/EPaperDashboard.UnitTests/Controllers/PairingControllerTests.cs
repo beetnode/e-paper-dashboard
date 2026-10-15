@@ -1,4 +1,3 @@
-using CSharpFunctionalExtensions;
 using EPaperDashboard.Controllers;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;

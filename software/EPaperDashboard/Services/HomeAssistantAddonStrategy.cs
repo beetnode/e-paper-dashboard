@@ -1,6 +1,5 @@
 using EPaperDashboard.Models;
 using EPaperDashboard.Utilities;
-using CSharpFunctionalExtensions;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -43,11 +42,11 @@ public class HomeAssistantAddonStrategy : IDeploymentStrategy
     // Supervisor add-ons run as a single container, so there is no rendering sidecar.
     public bool RunsRendererInProcess => true;
 
-    public UnitResult<string> ValidateConfiguration()
+    public Result ValidateConfiguration()
     {
         if (string.IsNullOrWhiteSpace(_supervisorToken))
         {
-            return UnitResult.Failure("SUPERVISOR_TOKEN not found. The add-on mode runs only under the Home Assistant Supervisor.");
+            return Result.Failure("SUPERVISOR_TOKEN not found. The add-on mode runs only under the Home Assistant Supervisor.");
         }
 
         // Ingress is browser-only. The display needs a reachable device API URL
@@ -55,15 +54,15 @@ public class HomeAssistantAddonStrategy : IDeploymentStrategy
         var clientUrlError = ClientUrlValidator.GetValidationError(_environmentConfiguration.ClientUri);
         if (clientUrlError is not null)
         {
-            return UnitResult.Failure(clientUrlError);
+            return Result.Failure(clientUrlError);
         }
 
-        return UnitResult.Success<string>();
+        return Result.Success();
     }
 
     public bool IsIngressRequest(HttpContext context) => TryGetIngressPath(context, out _);
 
-    public Result<HomeAssistantOAuthClient, string> GetHomeAssistantOAuthClient(HttpContext? context)
+    public Result<HomeAssistantOAuthClient> GetHomeAssistantOAuthClient(HttpContext? context)
     {
         if (context is null || !TryGetIngressPath(context, out var ingressPath) || BrowserOrigin(context) is not { } origin)
         {

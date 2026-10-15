@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Models.Rendering;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -260,16 +260,16 @@ public sealed class SsrDataProvider(
         SetSuccess(data, DataSourceKeys.Generated(widgetId), string.IsNullOrEmpty(content) ? 0 : 1, false);
     }
 
-    private async Task<(Result<T, string> Result, bool FromCache)> FetchCachedAsync<T>(
+    private async Task<(Result<T> Result, bool FromCache)> FetchCachedAsync<T>(
         string cacheKey,
         TimeSpan duration,
-        Func<Task<Result<T, string>>> fetch,
+        Func<Task<Result<T>>> fetch,
         bool bypassCache,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (!bypassCache && cache.TryGetValue<T>(cacheKey, out var cached) && cached is not null)
-            return (Result.Success<T, string>(cached), true);
+            return (Result.Success<T>(cached), true);
 
         var result = await fetch().WaitAsync(cancellationToken);
         if (result.IsSuccess) cache.Set(cacheKey, result.Value, duration);

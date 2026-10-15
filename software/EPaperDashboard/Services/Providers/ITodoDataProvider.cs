@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 
 namespace EPaperDashboard.Services.Providers;
 
@@ -7,10 +7,10 @@ namespace EPaperDashboard.Services.Providers;
 /// </summary>
 public interface ITodoDataProvider
 {
-    Task<Result<List<TodoItem>, string>> FetchTodoItemsAsync(string dashboardId, string entityId, CancellationToken cancellationToken = default);
+    Task<Result<List<TodoItem>>> FetchTodoItemsAsync(string dashboardId, string entityId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Discovers all available todo entities and fetches items for each.
     /// </summary>
-    Task<Result<Dictionary<string, List<TodoItem>>, string>> FetchAllTodoItemsAsync(string dashboardId, CancellationToken cancellationToken = default);
+    Task<Result<Dictionary<string, List<TodoItem>>>> FetchAllTodoItemsAsync(string dashboardId, CancellationToken cancellationToken = default);
 }

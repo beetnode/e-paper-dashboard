@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text.Json;
-using CSharpFunctionalExtensions;
 using EPaperDashboard.Models;
 using EPaperDashboard.Utilities;
 using Microsoft.AspNetCore.DataProtection;
@@ -24,7 +23,7 @@ public class HomeAssistantAuthService(
     private static readonly TimeSpan StateLifetime = TimeSpan.FromMinutes(5);
     private readonly IDataProtector _stateProtector = dataProtection.CreateProtector("izboard.home-assistant.sign-in.v1");
 
-    public Result<(string Url, string State), string> StartConnectionAuth(ProviderConnection connection, string host, HttpContext? httpContext)
+    public Result<(string Url, string State)> StartConnectionAuth(ProviderConnection connection, string host, HttpContext? httpContext)
     {
         if (!Uri.TryCreate(host, UriKind.Absolute, out var hostUri))
             return "Enter the Home Assistant server URL first.";
@@ -42,7 +41,7 @@ public class HomeAssistantAuthService(
     }
 
     /// <summary>Exchanges the authorization code and creates a long-lived token for the connection named in the protected state.</summary>
-    public async Task<Result<ConnectionAuthorization, string>> CompleteConnectionAuthAsync(string? code, string? state, CancellationToken cancellationToken)
+    public async Task<Result<ConnectionAuthorization>> CompleteConnectionAuthAsync(string? code, string? state, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(state))
             return "Home Assistant sign-in was cancelled or expired.";

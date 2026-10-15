@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Models;
 
 namespace EPaperDashboard.Data.Repositories;

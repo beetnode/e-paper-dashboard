@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services.Providers.HomeAssistant;
 namespace EPaperDashboard.Services.Plugins.HomeAssistant;
@@ -25,22 +25,22 @@ public sealed class HomeAssistantPlugin(
     public bool IsAuthorized(IReadOnlyDictionary<string, string> credentials) =>
         credentials.TryGetValue(TokenKey, out var token) && !string.IsNullOrWhiteSpace(token);
 
-    public Result<(string Url, string State), string> StartAuthorization(ProviderConnection connection, HttpContext httpContext) =>
+    public Result<(string Url, string State)> StartAuthorization(ProviderConnection connection, HttpContext httpContext) =>
         auth.StartConnectionAuth(connection, connections.Credentials(connection).GetValueOrDefault("host") ?? "", httpContext);
 
-    public async Task<UnitResult<string>> CompleteAuthorizationAsync(string? state, string? browserState, string? code, CancellationToken cancellationToken)
+    public async Task<Result> CompleteAuthorizationAsync(string? state, string? browserState, string? code, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(state) || state != browserState)
-            return UnitResult.Failure("Home Assistant sign-in expired or the browser does not match. Start again from Connections.");
+            return Result.Failure("Home Assistant sign-in expired or the browser does not match. Start again from Connections.");
         var result = await auth.CompleteConnectionAuthAsync(code, state, cancellationToken);
-        if (result.IsFailure) return UnitResult.Failure(result.Error);
+        if (result.IsFailure) return Result.Failure(result.Error);
         var connection = connections.Find(result.Value.ConnectionId, result.Value.Owner);
-        if (connection is null || connection.PluginId != Manifest.Id) return UnitResult.Failure("Connection no longer exists.");
+        if (connection is null || connection.PluginId != Manifest.Id) return Result.Failure("Connection no longer exists.");
         var credentials = connections.Credentials(connection);
         credentials[TokenKey] = result.Value.Token;
         return connections.Update(connection, credentials)
-            ? UnitResult.Success<string>()
-            : UnitResult.Failure("Connection changed. Start sign-in again.");
+            ? Result.Success()
+            : Result.Failure("Connection changed. Start sign-in again.");
     }
 
     public string? ValidateCredentials(IReadOnlyDictionary<string, string> credentials) =>
@@ -49,7 +49,7 @@ public sealed class HomeAssistantPlugin(
             ? "Enter an absolute HTTP or HTTPS Home Assistant server URL."
             : null;
 
-    public async Task<Result<List<DataSource>, string>> DiscoverAsync(ProviderContext context, CancellationToken cancellationToken)
+    public async Task<Result<List<DataSource>>> DiscoverAsync(ProviderContext context, CancellationToken cancellationToken)
     {
         var result = await homeAssistant.FetchEntities(context.Connection, cancellationToken);
         if (result.IsFailure) return result.Error;
@@ -84,7 +84,7 @@ public sealed class HomeAssistantPlugin(
         return capabilities.ToArray();
     }
 
-    public async Task<Result<Dictionary<string, SourceData>, string>> FetchManyAsync(ProviderContext context, string capability, string[] sourceIds, int hours, CancellationToken cancellationToken)
+    public async Task<Result<Dictionary<string, SourceData>>> FetchManyAsync(ProviderContext context, string capability, string[] sourceIds, int hours, CancellationToken cancellationToken)
     {
         if (capability == SourceCapabilities.State)
         {
@@ -101,29 +101,29 @@ public sealed class HomeAssistantPlugin(
         return "Unsupported batch capability";
     }
 
-    public async Task<Result<SourceData, string>> FetchAsync(ProviderContext context, SourceQuery query, CancellationToken cancellationToken)
+    public async Task<Result<SourceData>> FetchAsync(ProviderContext context, SourceQuery query, CancellationToken cancellationToken)
     {
         var homeAssistant = context.Connection;
         switch (query.Capability)
         {
             case SourceCapabilities.State:
                 var state = await states.FetchEntityStatesAsync(homeAssistant, [query.SourceId], cancellationToken);
-                return state.IsFailure ? Result.Failure<SourceData, string>(state.Error) : new SourceData { State = state.Value.FirstOrDefault() };
+                return state.IsFailure ? Result.Failure<SourceData>(state.Error) : new SourceData { State = state.Value.FirstOrDefault() };
             case SourceCapabilities.Calendar:
                 var calendar = await calendars.FetchCalendarEventsAsync(homeAssistant, query.SourceId, query.Hours, cancellationToken);
-                return calendar.IsFailure ? Result.Failure<SourceData, string>(calendar.Error) : new SourceData { CalendarEvents = calendar.Value };
+                return calendar.IsFailure ? Result.Failure<SourceData>(calendar.Error) : new SourceData { CalendarEvents = calendar.Value };
             case SourceCapabilities.Todo:
                 var todo = await tasks.FetchTodoItemsAsync(homeAssistant, query.SourceId, cancellationToken);
-                return todo.IsFailure ? Result.Failure<SourceData, string>(todo.Error) : new SourceData { TodoItems = todo.Value };
+                return todo.IsFailure ? Result.Failure<SourceData>(todo.Error) : new SourceData { TodoItems = todo.Value };
             case SourceCapabilities.Forecast:
                 var forecast = await weather.FetchWeatherForecastAsync(homeAssistant, query.SourceId, query.ForecastType, cancellationToken);
-                return forecast.IsFailure ? Result.Failure<SourceData, string>(forecast.Error) : new SourceData { Forecast = forecast.Value };
+                return forecast.IsFailure ? Result.Failure<SourceData>(forecast.Error) : new SourceData { Forecast = forecast.Value };
             case SourceCapabilities.History:
                 var points = await history.FetchEntityHistoryAsync(homeAssistant, [query.SourceId], query.Hours, cancellationToken);
-                return points.IsFailure ? Result.Failure<SourceData, string>(points.Error) : new SourceData { History = points.Value.GetValueOrDefault(query.SourceId) ?? [] };
+                return points.IsFailure ? Result.Failure<SourceData>(points.Error) : new SourceData { History = points.Value.GetValueOrDefault(query.SourceId) ?? [] };
             case SourceCapabilities.Feed:
                 var feed = await feeds.FetchRssFeedEntriesAsync(homeAssistant, query.SourceId, cancellationToken);
-                return feed.IsFailure ? Result.Failure<SourceData, string>(feed.Error) : new SourceData { Feed = feed.Value };
+                return feed.IsFailure ? Result.Failure<SourceData>(feed.Error) : new SourceData { Feed = feed.Value };
             default: return "Unsupported data capability";
         }
     }

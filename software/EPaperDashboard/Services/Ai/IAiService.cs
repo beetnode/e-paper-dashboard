@@ -1,10 +1,10 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 
 namespace EPaperDashboard.Services.Ai;
 
 public interface IAiService
 {
-    Task<Result<string, string>> GenerateCompletionAsync(
+    Task<Result<string>> GenerateCompletionAsync(
         string systemPrompt,
         string userPrompt,
         CancellationToken cancellationToken = default,

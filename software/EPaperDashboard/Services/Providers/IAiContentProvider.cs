@@ -1,13 +1,13 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 
 namespace EPaperDashboard.Services.Providers;
 
 public interface IAiContentProvider
 {
-    Task<Result<string, string>> GenerateContentAsync(
+    Task<Result<string>> GenerateContentAsync(
         string dashboardId, string prompt, CancellationToken cancellationToken = default);
 
-    Task<Result<string, string>> GenerateAndCacheContentAsync(
+    Task<Result<string>> GenerateAndCacheContentAsync(
         string dashboardId, string widgetId, string prompt, CancellationToken cancellationToken = default);
 
     Task PreGenerateAllAsync(string dashboardId, CancellationToken cancellationToken = default);
