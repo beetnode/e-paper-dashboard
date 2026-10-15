@@ -91,7 +91,7 @@ Behind TLS the sign-in cookie is marked secure automatically. Hosted instances s
 
 ### Home Assistant Add-on
 
-Install via the [izBoard Home Assistant Add-on repository](https://github.com/beetnode/hass-add-ons/tree/master/e-paper-dashboard). Configure `CLIENT_URL` as a device-reachable endpoint, normally `http://homeassistant.local:8129`. Remote URLs work through a direct port, VPN, or reverse proxy; ingress URLs do not.
+Install via the [izBoard Home Assistant Add-on repository](https://github.com/beetnode/hass-add-ons/tree/master/izboard). Configure `CLIENT_URL` as a device-reachable endpoint, normally `http://homeassistant.local:8129`. Remote URLs work through a direct port, VPN, or reverse proxy; ingress URLs do not.
 
 The add-on image `izdevdigital/izboard-addon` is built from the `addon` target of `EPaperDashboard/Dockerfile` alongside the standalone image. It differs only in running as root (Supervisor mounts `/data` root-owned) and carrying Home Assistant labels.
 
