@@ -708,6 +708,19 @@
   visibility: hidden;
 }
 
+// Added since the last render: the image does not show it yet, so keep its label visible.
+.dashboard-canvas.backend-preview-active .widget-container.render-pending .widget-shell-label {
+  visibility: visible;
+}
+
+// Paints the last image as the layout is now while the next render is pending.
+.render-patch {
+  position: absolute;
+  z-index: 0;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
 /* ── Selection overlay ───────────────────────────────────────────────────── */
 /* Absolutely positioned on the canvas – never inside a grid cell, so it      */
 /* can never affect widget layout or overlap adjacent widgets.                 */

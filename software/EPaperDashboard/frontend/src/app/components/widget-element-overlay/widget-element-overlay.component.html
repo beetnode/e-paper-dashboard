@@ -3,14 +3,19 @@
     [class.horizontal]="guide.orientation === 'horizontal'" [ngStyle]="guideStyle(guide)"></div>
 }
 
+@let moved = movedElements;
+@for (element of moved; track element.id) {
+  <span class="element-vacated" [ngStyle]="vacatedStyle(element)"></span>
+}
+
 @for (element of geometry.elements; track element.id) {
   <div class="editable-element" [class.selected]="selectedId === element.id"
     [ngStyle]="elementStyle(element)" [title]="'Select and move ' + elementLabel(element)"
     tabindex="0" role="button" [attr.aria-label]="'Move ' + elementLabel(element)"
     (keydown)="onElementKeyDown($event, element)"
     (pointerdown)="onElementPointerDown($event, element)">
-    @if (isInteracting(element) && previewImageUrl) {
-      <span class="element-image-ghost" [ngStyle]="ghostStyle(element)"></span>
+    @if (showsImage(element, moved.length > 0)) {
+      <span class="element-image-ghost" [class.settled]="!isInteracting(element)" [ngStyle]="ghostStyle(element)"></span>
     }
     <span class="element-label">{{ elementLabel(element) }}</span>
     @if (selectedId === element.id && element.resizable) {

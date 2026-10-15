@@ -54,6 +54,17 @@
   background-repeat: no-repeat;
   opacity: 0.72;
   pointer-events: none;
+
+  &.settled {
+    opacity: 1;
+  }
+}
+
+.element-vacated {
+  position: absolute;
+  z-index: -2;
+  display: block;
+  pointer-events: none;
 }
 
 .element-handle {
