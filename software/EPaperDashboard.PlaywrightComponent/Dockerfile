@@ -57,3 +57,15 @@ RUN dotnet /component/worker/EPaperDashboard.PlaywrightComponent.dll \
 
 FROM scratch AS export
 COPY --from=component /component/ /
+
+# The app installs the component from a single image layer and accepts only regular files and
+# directories, so links are replaced by copies of their targets.
+FROM component AS flat
+RUN cp -rL --preserve=mode,timestamps /component /flat && \
+    if [ -n "$(find /flat ! -type f ! -type d -print -quit)" ]; then \
+      echo "The flattened component contains unsupported file types" >&2; exit 1; \
+    fi
+
+# Multi-architecture distribution image; must stay the last stage so it remains the default target.
+FROM scratch AS image
+COPY --from=flat /flat/ /

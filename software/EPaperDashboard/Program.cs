@@ -252,7 +252,6 @@ builder.Services.AddHttpClient(Constants.FirmwareHttpClientName, client =>
 builder.Services.AddHttpClient(Constants.PlaywrightComponentHttpClientName, client =>
 {
 	client.DefaultRequestHeaders.Add("User-Agent", $"{Constants.AppName}/{Constants.AppVersion}");
-	client.DefaultRequestHeaders.Add("Accept", "application/vnd.github+json");
 	client.Timeout = TimeSpan.FromMinutes(30);
 });
 

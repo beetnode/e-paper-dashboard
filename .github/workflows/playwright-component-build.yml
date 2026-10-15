@@ -7,48 +7,71 @@ on:
         description: Component and compatible application version
         required: true
         type: string
-  workflow_dispatch:
-    inputs:
-      version:
-        description: Component and compatible application version
+      image_tag:
+        description: Tag of the published component image
         required: true
         type: string
+      platforms:
+        description: Comma-separated list of target platforms for buildx
+        required: false
+        type: string
+        default: linux/amd64,linux/arm64
+    outputs:
+      image:
+        description: Component image reference the application installs, pinned by digest when pushed
+        value: ${{ jobs.build.outputs.image }}
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: linux/amd64
-            runtime: linux-x64
-          - platform: linux/arm64
-            runtime: linux-arm64
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      image: ${{ steps.reference.outputs.image }}
+    env:
+      IMAGE: izdevdigital/izboard-rendering
+      PUSH: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
-      - name: Build component payload
+      - name: Log in to Docker Hub
+        if: env.PUSH == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Extract image metadata
+        id: metadata
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: type=raw,value=${{ inputs.image_tag }}
+      # The application downloads the single gzip layer of its platform through the registry API.
+      - name: Build and push component image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: ./software
           file: ./software/EPaperDashboard.PlaywrightComponent/Dockerfile
-          target: export
-          platforms: ${{ matrix.platform }}
+          target: image
+          platforms: ${{ inputs.platforms }}
           build-args: VERSION=${{ inputs.version }}
-          outputs: type=local,dest=./component
-          cache-from: type=gha,scope=playwright-${{ matrix.runtime }}
-          cache-to: type=gha,mode=max,scope=playwright-${{ matrix.runtime }}
-      - name: Create archive and checksum
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          outputs: type=image,push=${{ env.PUSH }},oci-mediatypes=true,compression=gzip,force-compression=true
+          cache-from: type=gha,scope=rendering-component
+          cache-to: type=gha,mode=max,scope=rendering-component
+      - name: Resolve component image reference
+        id: reference
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          TAG: ${{ inputs.image_tag }}
         run: |
-          archive="rendering-component-${{ matrix.runtime }}.tar.gz"
-          tar --dereference --hard-dereference -C component -czf "$archive" .
-          sha256sum "$archive" > "$archive.sha256"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: rendering-component-${{ matrix.runtime }}
-          path: |
-            rendering-component-${{ matrix.runtime }}.tar.gz
-            rendering-component-${{ matrix.runtime }}.tar.gz.sha256
-          if-no-files-found: error
+          if [ "$PUSH" = "true" ]; then
+            [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Missing image digest" >&2; exit 1; }
+            echo "image=$IMAGE@$DIGEST" >> "$GITHUB_OUTPUT"
+          else
+            # Unpushed builds (pull requests) cannot pin a digest; the tag is only used if such an image is run.
+            echo "image=$IMAGE:$TAG" >> "$GITHUB_OUTPUT"
+          fi

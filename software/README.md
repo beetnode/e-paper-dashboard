@@ -104,9 +104,8 @@ The add-on image `izdevdigital/izboard-addon` is built from the `addon` target o
 | `APP_MODE` | No | Deployment mode: `standalone` (default) or `addon` |
 | `DATABASE_PROVIDER` | No | `litedb` (default) or `postgresql`. Independent of `APP_MODE`. |
 | `DATABASE_CONNECTION_STRING` | PostgreSQL only | Npgsql connection string for an existing PostgreSQL database. |
-| `RENDERING_COMPONENT_REPOSITORY` | No | GitHub repository that publishes the optional rendering component (default: `beetnode/izBoard`) |
-| `RENDERING_COMPONENT_RELEASE_TAG` | No | Override the component release tag; normally set by the official image |
-| `RENDERING_COMPONENT_BASE_URL` | No | Direct component artifact source for manual deployment testing; bypasses GitHub release lookup |
+| `RENDERING_COMPONENT_IMAGE` | No | Image the optional rendering component is installed from, e.g. `izdevdigital/izboard-rendering@sha256:…`; normally set by the official image |
+| `RENDERING_COMPONENT_BASE_URL` | No | Direct component archive source for manual deployment testing or mirrors; bypasses the image registry |
 | `RENDERING_COMPONENT_SOCKET` | No | Standalone app's private renderer Unix socket (default: `/run/izboard-rendering/renderer.sock`) |
 | `RENDERING_LOG_WORKER_ERRORS` | No | Set to `1` on the renderer to log raw browser errors for troubleshooting. They can contain dashboard URLs and page text. Default: `0` |
 | `RENDERING_MAX_CONCURRENT_RENDERS` | No | Concurrent worker limit, 1–16 (default: 2); increase only after measuring memory use |
@@ -195,21 +194,23 @@ Other users only opt in with **Enable for my account**; until the administrator 
 shown as not available and they cannot start the download themselves.
 Apply the [e-paper theme](../home-assistant/README.md) to the captured view so it uses only the display colors.
 In add-on mode, open the same page through Home Assistant ingress; the control applies to the whole add-on.
-izBoard downloads the version-matched component for the current CPU architecture from the project's GitHub release, verifies its
-SHA-256 checksum, performs a browser readiness test, and activates it immediately. The component is stored in the persistent `/data` volume, so it survives image
+izBoard downloads the version-matched component for the current CPU architecture from the multi-architecture
+`izdevdigital/izboard-rendering` image on Docker Hub, using the registry API directly (no Docker daemon is involved). Each image
+holds the component as a single layer; izBoard verifies the index, the platform manifest, and the layer by their SHA-256 digests,
+performs a browser readiness test, and activates it immediately. Installation needs outbound HTTPS access to `registry-1.docker.io`,
+`auth.docker.io`, and Docker Hub's blob CDN. The component is stored in the persistent `/data` volume, so it survives image
 updates when `/data` is mounted as documented above. If izBoard is updated while the component is installed, izBoard automatically
 updates the component to the exact application build as well. Custom layouts remain available while an offline update waits for
 the matching component; Home Assistant screenshots are unavailable until it is ready. Removing the component waits for running
 renders and deletes all of its files from `/data`. Activation atomically switches between version directories, and interrupted
 installation/removal cleanup is completed on startup.
 
-CI builds and publishes component archives, but does not run renderer deployment/browser tests. Each application release
-(`v<major.minor.patch>`) carries the component built from the same commit, attached before its application images are published.
-A published release's component is never overwritten, so released installations do not depend on mutable releases. Development (`latest`) images
-install from the `rendering-latest` release, which every master build replaces; an older development image reports a version
-mismatch once a newer build has replaced it.
+CI builds and publishes the component image (`linux/amd64` + `linux/arm64`), but does not run renderer deployment/browser tests.
+It is built from the same commit before the application images, which pin its exact digest in `RENDERING_COMPONENT_IMAGE`, so
+every application build, including development (`latest`) builds, installs exactly the component it was built with. Releases are
+also tagged `izdevdigital/izboard-rendering:<major.minor.patch>`, and development builds `latest`.
 Developers manually verify deployments by setting `RENDERING_COMPONENT_BASE_URL` to a directory served over HTTP that contains the
-architecture-specific `.tar.gz` archive and its `.sha256` file.
+architecture-specific `rendering-component-linux-<x64|arm64>.tar.gz` archive and its `.sha256` file.
 
 ### Local component deployment test
 
@@ -289,4 +290,16 @@ docker buildx build \
   -t izdevdigital/e-paper-dashboard:latest \
   -f EPaperDashboard/Dockerfile \
   --push .
+```
+
+Build and push the matching rendering component image, then pass its digest to the application build as
+`--build-arg COMPONENT_IMAGE=izdevdigital/izboard-rendering@sha256:<digest>`:
+
+```shell
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  --build-arg VERSION=<version> \
+  -t izdevdigital/izboard-rendering:<version> \
+  -f EPaperDashboard.PlaywrightComponent/Dockerfile \
+  --output type=image,push=true,oci-mediatypes=true,compression=gzip,force-compression=true .
 ```

@@ -82,7 +82,7 @@ jobs:
     uses: ./.github/workflows/docker-build.yml
     secrets: inherit
     permissions:
-      contents: write
+      contents: read
       
   # Run FreeCAD STL export if changed or manually selected (or always on master push)
   packaging:
@@ -153,14 +153,6 @@ jobs:
           name: freecad-stl-files
           path: ./artifacts/stl/
 
-      - name: Download rendering component artifacts
-        if: needs.software.result == 'success'
-        uses: actions/download-artifact@v4
-        with:
-          pattern: rendering-component-*
-          path: ./artifacts/rendering/
-          merge-multiple: true
-
       - name: Create versioned artifact zips
         run: |
           mkdir -p artifacts
@@ -199,6 +191,9 @@ jobs:
             # Latest development build
             docker pull izdevdigital/e-paper-dashboard:latest
             ```
+
+            The optional rendering component is installed from the app (**Settings → Rendering**) using the
+            multi-architecture image `izdevdigital/izboard-rendering:latest`.
             
             [View on Docker Hub](https://hub.docker.com/r/izdevdigital/e-paper-dashboard)
             
@@ -208,9 +203,5 @@ jobs:
           files: |
             firmware-${{ steps.version.outputs.version }}.zip
             stl-${{ steps.version.outputs.version }}.zip
-            artifacts/rendering/rendering-component-linux-x64.tar.gz
-            artifacts/rendering/rendering-component-linux-x64.tar.gz.sha256
-            artifacts/rendering/rendering-component-linux-arm64.tar.gz
-            artifacts/rendering/rendering-component-linux-arm64.tar.gz.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
