@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 
@@ -6,12 +6,12 @@ namespace EPaperDashboard.Data.PostgreSql;
 
 internal sealed class PostgresUserRepository(PostgresDbContext context) : IUserRepository
 {
-    public Maybe<User> FindById(UserId id) => Maybe.From(
-        context.FindOne<User>("SELECT document FROM izboard_users WHERE id = @id", PostgresDbContext.Parameter("id", id.Value)));
+    public User? FindById(UserId id) =>
+        context.FindOne<User>("SELECT document FROM izboard_users WHERE id = @id", PostgresDbContext.Parameter("id", id.Value));
 
-    public Maybe<User> FindByUsername(string username) => Maybe.From(
+    public User? FindByUsername(string username) =>
         context.FindOne<User>("SELECT document FROM izboard_users WHERE username = @username",
-            PostgresDbContext.Parameter("username", username)));
+            PostgresDbContext.Parameter("username", username));
 
     public List<User> GetAll() => context.FindMany<User>("SELECT document FROM izboard_users");
 

@@ -1,4 +1,3 @@
-using CSharpFunctionalExtensions;
 using EPaperDashboard.Authentication;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
@@ -27,7 +26,7 @@ public class UserServiceTests
         var user = new User { Username = "alice", PasswordHash = PasswordHashing.Hash("secret") };
         users.Setup(r => r.FindByUsername("alice")).Returns(user);
 
-        sut.VerifyCredentials("alice", "secret").Should().Be(Maybe.From(user));
+        sut.VerifyCredentials("alice", "secret").Should().Be((user));
         users.Verify(r => r.Update(It.IsAny<User>()), Times.Never);
     }
 
@@ -38,16 +37,16 @@ public class UserServiceTests
         var user = new User { Username = "alice", PasswordHash = PasswordHashing.Hash("secret") };
         users.Setup(r => r.FindByUsername("alice")).Returns(user);
 
-        sut.VerifyCredentials("alice", "wrong").HasValue.Should().BeFalse();
+        sut.VerifyCredentials("alice", "wrong").Should().BeNull();
     }
 
     [Fact]
     public void VerifyCredentials_UnknownUsername_ReturnsNone()
     {
         var (sut, users, _) = CreateSut();
-        users.Setup(r => r.FindByUsername("ghost")).Returns(Maybe<User>.None);
+        users.Setup(r => r.FindByUsername("ghost")).Returns((User?)null);
 
-        sut.VerifyCredentials("ghost", "anything").HasValue.Should().BeFalse();
+        sut.VerifyCredentials("ghost", "anything").Should().BeNull();
     }
 
     [Fact]
@@ -57,7 +56,7 @@ public class UserServiceTests
         var user = new User { Username = "alice", PasswordHash = PasswordHashing.LegacySha256("secret") };
         users.Setup(r => r.FindByUsername("alice")).Returns(user);
 
-        sut.VerifyCredentials("alice", "secret").HasValue.Should().BeTrue();
+        sut.VerifyCredentials("alice", "secret").Should().NotBeNull();
 
         PasswordHashing.Verify(user.PasswordHash, "secret").Should().Be(PasswordCheck.Valid);
         users.Verify(r => r.Update(user), Times.Once);
@@ -71,7 +70,7 @@ public class UserServiceTests
         var user = new User { Username = "alice", PasswordHash = legacy };
         users.Setup(r => r.FindByUsername("alice")).Returns(user);
 
-        sut.VerifyCredentials("alice", "wrong").HasValue.Should().BeFalse();
+        sut.VerifyCredentials("alice", "wrong").Should().BeNull();
 
         user.PasswordHash.Should().Be(legacy);
         users.Verify(r => r.Update(It.IsAny<User>()), Times.Never);
@@ -272,7 +271,7 @@ public class UserServiceTests
         sessions.Validate(session);
 
         sut.TryDeleteUser(user.Id).Should().BeTrue();
-        users.Setup(r => r.FindById(user.Id)).Returns(Maybe<User>.None);
+        users.Setup(r => r.FindById(user.Id)).Returns((User?)null);
 
         sessions.Validate(session).State.Should().Be(SessionState.Reject);
     }
@@ -321,7 +320,7 @@ public class UserServiceTests
     {
         var (sut, users, _) = CreateSut();
         var id = UserId.New();
-        users.Setup(r => r.FindById(id)).Returns(Maybe<User>.None);
+        users.Setup(r => r.FindById(id)).Returns((User?)null);
 
         sut.HasAccount(id).Should().BeFalse();
         sut.GetAiConfig(id).Should().BeNull();

@@ -45,19 +45,19 @@ public class DevicesController(DeviceService deviceService, DashboardService das
         }
 
         var device = _deviceService.GetDeviceById(id);
-        if (device.HasNoValue)
+        if (device is null)
         {
             return NotFound("Device not found");
         }
 
-        if (device.Value.UserId != CurrentUserId)
+        if (device.UserId != CurrentUserId)
         {
             return Forbid();
         }
 
         if (request.Name != null)
         {
-            device.Value.Name = request.Name;
+            device.Name = request.Name;
         }
 
         if (request.DashboardId != null)
@@ -65,30 +65,30 @@ public class DevicesController(DeviceService deviceService, DashboardService das
             if (string.IsNullOrEmpty(request.DashboardId))
             {
                 // Unassign dashboard
-                device.Value.DashboardId = DashboardId.Empty;
+                device.DashboardId = DashboardId.Empty;
             }
             else if (DashboardId.TryParse(request.DashboardId, out var dashboardId))
             {
                 // Verify the user owns the dashboard
                 var dashboard = _dashboardService.GetDashboardById(dashboardId);
-                if (dashboard.HasNoValue)
+                if (dashboard is null)
                 {
                     return NotFound("Dashboard not found");
                 }
-                if (dashboard.Value.UserId != CurrentUserId)
+                if (dashboard.UserId != CurrentUserId)
                 {
                     return Forbid();
                 }
-                if (device.Value.ScreenWidth.HasValue && device.Value.ScreenHeight.HasValue)
+                if (device.ScreenWidth.HasValue && device.ScreenHeight.HasValue)
                 {
-                    if (device.Value.ScreenWidth != dashboard.Value.ScreenWidth
-                        || device.Value.ScreenHeight != dashboard.Value.ScreenHeight)
+                    if (device.ScreenWidth != dashboard.ScreenWidth
+                        || device.ScreenHeight != dashboard.ScreenHeight)
                     {
-                        return BadRequest($"Dashboard size ({dashboard.Value.ScreenWidth}×{dashboard.Value.ScreenHeight}) " +
-                            $"does not match device screen size ({device.Value.ScreenWidth}×{device.Value.ScreenHeight}).");
+                        return BadRequest($"Dashboard size ({dashboard.ScreenWidth}×{dashboard.ScreenHeight}) " +
+                            $"does not match device screen size ({device.ScreenWidth}×{device.ScreenHeight}).");
                     }
                 }
-                device.Value.DashboardId = dashboardId;
+                device.DashboardId = dashboardId;
             }
             else
             {
@@ -96,8 +96,8 @@ public class DevicesController(DeviceService deviceService, DashboardService das
             }
         }
 
-        _deviceService.UpdateDevice(device.Value);
-        return Ok(DeviceResponseDto.FromDevice(device.Value));
+        _deviceService.UpdateDevice(device);
+        return Ok(DeviceResponseDto.FromDevice(device));
     }
 
     [HttpDelete("{deviceId}")]
@@ -109,12 +109,12 @@ public class DevicesController(DeviceService deviceService, DashboardService das
         }
 
         var device = _deviceService.GetDeviceById(id);
-        if (device.HasNoValue)
+        if (device is null)
         {
             return NotFound("Device not found");
         }
 
-        if (device.Value.UserId != CurrentUserId)
+        if (device.UserId != CurrentUserId)
         {
             return Forbid();
         }

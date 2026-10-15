@@ -1,4 +1,3 @@
-using CSharpFunctionalExtensions;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services;
@@ -71,15 +70,15 @@ public class PairingServiceTests
     }
 
     [Fact]
-    public void RegisterDevice_UnknownCode_ReturnsMaybeNone()
+    public void RegisterDevice_UnknownCode_ReturnsNull()
     {
         var repo = CreateRepo();
-        repo.Setup(r => r.FindByCode("BADCOD")).Returns(Maybe<PairingSession>.None);
+        repo.Setup(r => r.FindByCode("BADCOD")).Returns((PairingSession?)null);
         var sut = CreateSut(repo);
 
         var result = sut.RegisterDevice("BADCOD", "device-1");
 
-        result.HasValue.Should().BeFalse();
+        result.Should().BeNull();
     }
 
     [Fact]
@@ -92,11 +91,11 @@ public class PairingServiceTests
 
         var result = sut.RegisterDevice("ABC123", "device-1");
 
-        result.HasValue.Should().BeTrue();
-        result.Value.Status.Should().Be(PairingStatus.Completed);
-        result.Value.IsCompleted.Should().BeTrue();
-        result.Value.DeviceIdentifier.Should().Be("device-1");
-        result.Value.ApiKey.Should().NotBeNullOrEmpty();
+        result.Should().NotBeNull();
+        result!.Status.Should().Be(PairingStatus.Completed);
+        result.IsCompleted.Should().BeTrue();
+        result.DeviceIdentifier.Should().Be("device-1");
+        result.ApiKey.Should().NotBeNullOrEmpty();
         repo.Verify(r => r.Update(session), Times.Once);
     }
 
@@ -111,8 +110,8 @@ public class PairingServiceTests
         // portrait device reports width < height
         var result = sut.RegisterDevice("ABC123", "device-1", screenWidth: 480, screenHeight: 800);
 
-        result.Value.ScreenWidth.Should().Be(800);
-        result.Value.ScreenHeight.Should().Be(480);
+        result!.ScreenWidth.Should().Be(800);
+        result.ScreenHeight.Should().Be(480);
     }
 
     [Fact]
@@ -125,8 +124,8 @@ public class PairingServiceTests
 
         var result = sut.RegisterDevice("ABC123", "device-1");
 
-        result.Value.ScreenWidth.Should().BeNull();
-        result.Value.ScreenHeight.Should().BeNull();
+        result!.ScreenWidth.Should().BeNull();
+        result.ScreenHeight.Should().BeNull();
     }
 
     [Fact]
@@ -155,7 +154,7 @@ public class PairingServiceTests
     public void AnnounceDevice_CreatesPendingSessionWithHashedToken()
     {
         var repo = CreateRepo();
-        repo.Setup(r => r.FindByCode("ABC123")).Returns(Maybe<PairingSession>.None);
+        repo.Setup(r => r.FindByCode("ABC123")).Returns((PairingSession?)null);
         PairingSession? inserted = null;
         repo.Setup(r => r.Insert(It.IsAny<PairingSession>()))
             .Callback<PairingSession>(session => inserted = session);
@@ -180,12 +179,12 @@ public class PairingServiceTests
         PairingSession? stored = null;
         var repo = CreateRepo();
         repo.Setup(r => r.FindByCode("ABC123"))
-            .Returns(() => stored is null ? Maybe<PairingSession>.None : Maybe.From(stored));
+            .Returns(() => stored is null ? (PairingSession?)null : (stored));
         repo.Setup(r => r.Insert(It.IsAny<PairingSession>()))
             .Callback<PairingSession>(session => stored = session);
 
         var deviceRepo = new Mock<IDeviceRepository>();
-        deviceRepo.Setup(r => r.FindByIdentifier("device-1")).Returns(Maybe<Device>.None);
+        deviceRepo.Setup(r => r.FindByIdentifier("device-1")).Returns((Device?)null);
         deviceRepo.Setup(r => r.FindByUserId(It.IsAny<UserId>())).Returns([]);
         Device? insertedDevice = null;
         deviceRepo.Setup(r => r.Insert(It.IsAny<Device>()))
@@ -221,7 +220,7 @@ public class PairingServiceTests
         PairingSession? stored = null;
         var repo = CreateRepo();
         repo.Setup(r => r.FindByCode("ABC123"))
-            .Returns(() => stored is null ? Maybe<PairingSession>.None : Maybe.From(stored));
+            .Returns(() => stored is null ? (PairingSession?)null : (stored));
         repo.Setup(r => r.Insert(It.IsAny<PairingSession>()))
             .Callback<PairingSession>(session => stored = session);
         var existing = new Device { UserId = UserId.New(), DeviceIdentifier = "device-1" };
@@ -254,11 +253,11 @@ public class PairingServiceTests
         PairingSession? stored = null;
         var repo = CreateRepo();
         repo.Setup(r => r.FindByCode("ABC123"))
-            .Returns(() => stored is null ? Maybe<PairingSession>.None : Maybe.From(stored));
+            .Returns(() => stored is null ? (PairingSession?)null : (stored));
         repo.Setup(r => r.Insert(It.IsAny<PairingSession>())).Callback<PairingSession>(session => stored = session);
         var owner = UserId.New();
         var deviceRepo = new Mock<IDeviceRepository>();
-        deviceRepo.Setup(r => r.FindByIdentifier("device-new")).Returns(Maybe<Device>.None);
+        deviceRepo.Setup(r => r.FindByIdentifier("device-new")).Returns((Device?)null);
         deviceRepo.Setup(r => r.FindByUserId(owner))
             .Returns(Enumerable.Range(0, UserLimits.MaxDevices).Select(i => new Device { UserId = owner }).ToList());
         var sut = CreateSut(repo, deviceRepo: deviceRepo);

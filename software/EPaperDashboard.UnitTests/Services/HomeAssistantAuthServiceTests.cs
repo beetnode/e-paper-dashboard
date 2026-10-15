@@ -1,5 +1,4 @@
 using System.Net;
-using CSharpFunctionalExtensions;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services;
 using EPaperDashboard.Utilities;
@@ -54,7 +53,7 @@ public class HomeAssistantAuthServiceTests
     public void StartConnectionAuth_UnknownClientUri_Fails()
     {
         _deployment.Setup(d => d.GetHomeAssistantOAuthClient(It.IsAny<HttpContext?>()))
-            .Returns(Result.Failure<HomeAssistantOAuthClient, string>("CLIENT_URL is not configured."));
+            .Returns(Result.Failure<HomeAssistantOAuthClient>("CLIENT_URL is not configured."));
 
         CreateSut().StartConnectionAuth(_connection, "https://ha.example.test", null).IsFailure.Should().BeTrue();
     }

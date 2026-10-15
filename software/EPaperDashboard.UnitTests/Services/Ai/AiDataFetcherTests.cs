@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Services;
 using EPaperDashboard.Services.Ai;
 using EPaperDashboard.Services.Providers;
@@ -21,19 +21,19 @@ public class AiDataFetcherTests
     {
         _entityStateProvider
             .Setup(p => p.FetchAllEntityStatesAsync(It.IsAny<string>()))
-            .ReturnsAsync(Result.Success<List<EntityState>, string>([]));
+            .ReturnsAsync(Result.Success<List<EntityState>>([]));
         _todoDataProvider
             .Setup(p => p.FetchAllTodoItemsAsync(It.IsAny<string>()))
-            .ReturnsAsync(Result.Success<Dictionary<string, List<TodoItem>>, string>([]));
+            .ReturnsAsync(Result.Success<Dictionary<string, List<TodoItem>>>([]));
         _calendarDataProvider
             .Setup(p => p.FetchAllCalendarEventsAsync(It.IsAny<string>(), It.IsAny<int>()))
-            .ReturnsAsync(Result.Success<Dictionary<string, List<CalendarEvent>>, string>([]));
+            .ReturnsAsync(Result.Success<Dictionary<string, List<CalendarEvent>>>([]));
         _weatherForecastProvider
             .Setup(p => p.FetchAllWeatherForecastsAsync(It.IsAny<string>(), It.IsAny<string>()))
-            .ReturnsAsync(Result.Success<Dictionary<string, List<WeatherForecast>>, string>([]));
+            .ReturnsAsync(Result.Success<Dictionary<string, List<WeatherForecast>>>([]));
         _rssFeedDataProvider
             .Setup(p => p.FetchAllRssFeedEntriesAsync(It.IsAny<string>()))
-            .ReturnsAsync(Result.Success<Dictionary<string, List<RssFeedEntry>>, string>([]));
+            .ReturnsAsync(Result.Success<Dictionary<string, List<RssFeedEntry>>>([]));
 
         return new AiDataFetcher(
             _entityStateProvider.Object,
@@ -50,7 +50,7 @@ public class AiDataFetcherTests
         var sut = CreateSut();
         _entityStateProvider
             .Setup(p => p.FetchAllEntityStatesAsync("dash1"))
-            .ReturnsAsync(Result.Success<List<EntityState>, string>([new EntityState { EntityId = "sensor.x" }]));
+            .ReturnsAsync(Result.Success<List<EntityState>>([new EntityState { EntityId = "sensor.x" }]));
 
         var result = await sut.FetchAsync("dash1");
 
@@ -63,10 +63,10 @@ public class AiDataFetcherTests
         var sut = CreateSut();
         _entityStateProvider
             .Setup(p => p.FetchAllEntityStatesAsync(It.IsAny<string>()))
-            .ReturnsAsync(Result.Failure<List<EntityState>, string>("boom"));
+            .ReturnsAsync(Result.Failure<List<EntityState>>("boom"));
         _todoDataProvider
             .Setup(p => p.FetchAllTodoItemsAsync(It.IsAny<string>()))
-            .ReturnsAsync(Result.Success<Dictionary<string, List<TodoItem>>, string>(
+            .ReturnsAsync(Result.Success<Dictionary<string, List<TodoItem>>>(
                 new Dictionary<string, List<TodoItem>> { ["todo.list"] = [] }));
 
         var result = await sut.FetchAsync("dash1");
@@ -95,15 +95,15 @@ public class AiDataFetcherTests
     {
         var sut = CreateSut();
         _entityStateProvider.Setup(p => p.FetchAllEntityStatesAsync(It.IsAny<string>()))
-            .ReturnsAsync(Result.Failure<List<EntityState>, string>("x"));
+            .ReturnsAsync(Result.Failure<List<EntityState>>("x"));
         _todoDataProvider.Setup(p => p.FetchAllTodoItemsAsync(It.IsAny<string>()))
-            .ReturnsAsync(Result.Failure<Dictionary<string, List<TodoItem>>, string>("x"));
+            .ReturnsAsync(Result.Failure<Dictionary<string, List<TodoItem>>>("x"));
         _calendarDataProvider.Setup(p => p.FetchAllCalendarEventsAsync(It.IsAny<string>(), It.IsAny<int>()))
-            .ReturnsAsync(Result.Failure<Dictionary<string, List<CalendarEvent>>, string>("x"));
+            .ReturnsAsync(Result.Failure<Dictionary<string, List<CalendarEvent>>>("x"));
         _weatherForecastProvider.Setup(p => p.FetchAllWeatherForecastsAsync(It.IsAny<string>(), It.IsAny<string>()))
-            .ReturnsAsync(Result.Failure<Dictionary<string, List<WeatherForecast>>, string>("x"));
+            .ReturnsAsync(Result.Failure<Dictionary<string, List<WeatherForecast>>>("x"));
         _rssFeedDataProvider.Setup(p => p.FetchAllRssFeedEntriesAsync(It.IsAny<string>()))
-            .ReturnsAsync(Result.Failure<Dictionary<string, List<RssFeedEntry>>, string>("x"));
+            .ReturnsAsync(Result.Failure<Dictionary<string, List<RssFeedEntry>>>("x"));
 
         var result = await sut.FetchAsync("dash1");
 

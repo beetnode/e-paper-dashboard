@@ -56,8 +56,8 @@ public sealed class LegacyHomeAssistantSettingsMigration(
     {
         // Read again under the lock: another instance may have migrated it already.
         var found = dashboards.FindById(id);
-        if (found.HasNoValue || !HasLegacySettings(found.Value)) return false;
-        var dashboard = found.Value;
+        if (found is null || !HasLegacySettings(found)) return false;
+        var dashboard = found;
 
         var hasDefaultConnection = connections.DefaultConnection(dashboard.UserId) is not null;
         var rendersWithSettings = dashboard.RenderingMode == RenderingMode.HomeAssistant && string.IsNullOrEmpty(dashboard.HomeAssistantConnectionId);

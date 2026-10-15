@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Data;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
@@ -20,7 +20,7 @@ public class UserAdminCommandTests
     public UserAdminCommandTests()
     {
         _users.Setup(r => r.FindByUsername("alice")).Returns(_alice);
-        _users.Setup(r => r.FindByUsername("ghost")).Returns(Maybe<User>.None);
+        _users.Setup(r => r.FindByUsername("ghost")).Returns((User?)null);
     }
 
     private int Run(params string[] args) => UserAdminCommand.Execute(args,

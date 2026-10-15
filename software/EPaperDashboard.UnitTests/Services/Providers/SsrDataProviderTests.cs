@@ -1,5 +1,5 @@
 using System.Text.Json;
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Models.Rendering;
 using EPaperDashboard.Services;
 using EPaperDashboard.Services.Providers;
@@ -25,7 +25,7 @@ public class SsrDataProviderTests
     {
         _entityStateProvider
             .Setup(p => p.FetchEntityStatesAsync(It.IsAny<string>(), It.IsAny<string[]>()))
-            .ReturnsAsync(Result.Success<List<EntityState>, string>(new List<EntityState>()));
+            .ReturnsAsync(Result.Success<List<EntityState>>(new List<EntityState>()));
 
         return new SsrDataProvider(
             _entityStateProvider.Object,
@@ -52,9 +52,9 @@ public class SsrDataProviderTests
         var second = EPaperDashboard.Services.Plugins.SourceReference.Create(Guid.NewGuid().ToString("N"), "weather.home");
         var sut = CreateSut();
         _entityStateProvider.Setup(p => p.FetchEntityStatesAsync("dash1", It.Is<string[]>(ids => ids.Length == 1 && ids[0] == first), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Failure<List<EntityState>, string>("Offline"));
+            .ReturnsAsync(Result.Failure<List<EntityState>>("Offline"));
         _entityStateProvider.Setup(p => p.FetchEntityStatesAsync("dash1", It.Is<string[]>(ids => ids.Length == 1 && ids[0] == second), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Success<List<EntityState>, string>([new() { EntityId = second, State = "sunny" }]));
+            .ReturnsAsync(Result.Success<List<EntityState>>([new() { EntityId = second, State = "sunny" }]));
         var data = await sut.FetchSsrDataAsync("dash1", LayoutWith(Widget("weather", new { entityId = first }, "a"), Widget("weather", new { entityId = second }, "b")));
         data.EntityStates.Should().ContainKey(second);
         data.SourceStatuses[DataSourceKeys.Entity(first)].State.Should().Be("error");
@@ -88,7 +88,7 @@ public class SsrDataProviderTests
     {
         _todoDataProvider
             .Setup(p => p.FetchTodoItemsAsync("dash1", "todo.list"))
-            .ReturnsAsync(Result.Success<List<TodoItem>, string>([new TodoItem { Summary = "Buy milk" }]));
+            .ReturnsAsync(Result.Success<List<TodoItem>>([new TodoItem { Summary = "Buy milk" }]));
         var sut = CreateSut();
         var layout = LayoutWith(Widget("todo", new { entityId = "todo.list" }));
 
@@ -103,7 +103,7 @@ public class SsrDataProviderTests
     {
         _calendarDataProvider
             .Setup(p => p.FetchCalendarEventsAsync("dash1", "calendar.a", 168))
-            .ReturnsAsync(Result.Success<List<CalendarEvent>, string>([new CalendarEvent { Summary = "Meeting" }]));
+            .ReturnsAsync(Result.Success<List<CalendarEvent>>([new CalendarEvent { Summary = "Meeting" }]));
         var sut = CreateSut();
         var layout = LayoutWith(Widget("calendar", new { entityId = "calendar.a" }));
 
@@ -118,7 +118,7 @@ public class SsrDataProviderTests
         var forecastList = new List<WeatherForecast> { new() { Condition = "sunny" } };
         _weatherForecastProvider
             .Setup(p => p.FetchWeatherForecastAsync("dash1", "weather.home", "daily"))
-            .ReturnsAsync(Result.Success<List<WeatherForecast>, string>(forecastList));
+            .ReturnsAsync(Result.Success<List<WeatherForecast>>(forecastList));
         var sut = CreateSut();
         var layout = LayoutWith(Widget("weather-forecast", new { entityId = "weather.home" }));
 
@@ -134,7 +134,7 @@ public class SsrDataProviderTests
     {
         _weatherForecastProvider
             .Setup(p => p.FetchWeatherForecastAsync("dash1", "weather.home", "hourly"))
-            .ReturnsAsync(Result.Success<List<WeatherForecast>, string>([]));
+            .ReturnsAsync(Result.Success<List<WeatherForecast>>([]));
         var sut = CreateSut();
         var layout = LayoutWith(Widget("weather-forecast", new { entityId = "weather.home", forecastMode = "hourly" }));
 
@@ -150,10 +150,10 @@ public class SsrDataProviderTests
         var hourly = new List<WeatherForecast> { new() { Condition = "hourly" } };
         _weatherForecastProvider
             .Setup(p => p.FetchWeatherForecastAsync("dash1", "weather.home", "daily"))
-            .ReturnsAsync(Result.Success<List<WeatherForecast>, string>(daily));
+            .ReturnsAsync(Result.Success<List<WeatherForecast>>(daily));
         _weatherForecastProvider
             .Setup(p => p.FetchWeatherForecastAsync("dash1", "weather.home", "hourly"))
-            .ReturnsAsync(Result.Success<List<WeatherForecast>, string>(hourly));
+            .ReturnsAsync(Result.Success<List<WeatherForecast>>(hourly));
         var sut = CreateSut();
         var layout = LayoutWith(
             Widget("weather-forecast", new { entityId = "weather.home", forecastMode = "daily" }, "daily"),
@@ -172,7 +172,7 @@ public class SsrDataProviderTests
     {
         _todoDataProvider
             .Setup(p => p.FetchTodoItemsAsync("dash1", "todo.list"))
-            .ReturnsAsync(Result.Success<List<TodoItem>, string>([]));
+            .ReturnsAsync(Result.Success<List<TodoItem>>([]));
         var sut = CreateSut();
         var layout = LayoutWith(
             Widget("todo", new { entityId = "todo.list" }, "todo-1"),
@@ -188,7 +188,7 @@ public class SsrDataProviderTests
     {
         var sut = CreateSut();
         _rssFeedDataProvider.Setup(p => p.FetchRssFeedEntriesAsync("dash1", "sensor.feed", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Success<List<RssFeedEntry>, string>([new() { Title = "Headline", Link = "https://example.com/item" }]));
+            .ReturnsAsync(Result.Success<List<RssFeedEntry>>([new() { Title = "Headline", Link = "https://example.com/item" }]));
         var layout = LayoutWith(Widget("rss-feed", new { entityId = "sensor.feed" }));
 
         var result = await sut.FetchSsrDataAsync("dash1", layout);
@@ -211,7 +211,7 @@ public class SsrDataProviderTests
     {
         _entityHistoryProvider
             .Setup(p => p.FetchEntityHistoryAsync("dash1", It.IsAny<IEnumerable<string>>(), expectedHours))
-            .ReturnsAsync(Result.Success<Dictionary<string, List<HistoryState>>, string>(
+            .ReturnsAsync(Result.Success<Dictionary<string, List<HistoryState>>>(
                 new Dictionary<string, List<HistoryState>> { ["sensor.temp"] = [] }));
         var sut = CreateSut();
         var layout = LayoutWith(Widget("graph", new
@@ -230,7 +230,7 @@ public class SsrDataProviderTests
     {
         _entityHistoryProvider
             .Setup(p => p.FetchEntityHistoryAsync("dash1", It.IsAny<IEnumerable<string>>(), 720))
-            .ReturnsAsync(Result.Success<Dictionary<string, List<HistoryState>>, string>(
+            .ReturnsAsync(Result.Success<Dictionary<string, List<HistoryState>>>(
                 new Dictionary<string, List<HistoryState>> { ["sensor.temp"] = [] }));
         var sut = CreateSut();
         var layout = LayoutWith(
@@ -302,7 +302,7 @@ public class SsrDataProviderTests
     {
         _todoDataProvider
             .Setup(p => p.FetchTodoItemsAsync("dash1", "todo.list", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Success<List<TodoItem>, string>([new TodoItem { Summary = "Cached" }]));
+            .ReturnsAsync(Result.Success<List<TodoItem>>([new TodoItem { Summary = "Cached" }]));
         var sut = CreateSut();
         var layout = LayoutWith(Widget("todo", new { entityId = "todo.list" }));
 
@@ -321,7 +321,7 @@ public class SsrDataProviderTests
     {
         _calendarDataProvider
             .Setup(p => p.FetchCalendarEventsAsync("dash1", "calendar.a", 168, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Failure<List<CalendarEvent>, string>("calendar unavailable"));
+            .ReturnsAsync(Result.Failure<List<CalendarEvent>>("calendar unavailable"));
         var sut = CreateSut();
 
         var result = await sut.FetchSsrDataAsync(

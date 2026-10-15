@@ -1,4 +1,3 @@
-using CSharpFunctionalExtensions;
 using EPaperDashboard.Authentication;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
@@ -17,10 +16,10 @@ public sealed class UserService(
     IUnitOfWork? unitOfWork = null,
     UserSessionValidator? sessions = null)
 {
-    public Maybe<User> GetUserByUsername(string username) =>
+    public User? GetUserByUsername(string username) =>
         userRepository.FindByUsername(username);
 
-    public Maybe<User> GetUserById(UserId id) =>
+    public User? GetUserById(UserId id) =>
         userRepository.FindById(id);
 
     /// <summary>
@@ -32,11 +31,11 @@ public sealed class UserService(
     public bool HasAccount(UserId id) =>
         IsAddonOwner(id)
         || (id != UserId.Empty && deployment?.IsUserManagementEnabled != false
-            && userRepository.FindById(id).Map(user => !user.IsSuspended).GetValueOrDefault());
+            && userRepository.FindById(id) is { IsSuspended: false });
 
     /// <summary>Returns the owner's global AI provider, or null when it is not configured or the owner has no account.</summary>
     public AiConfig? GetAiConfig(UserId id) =>
-        IsAddonOwner(id) ? userRepository.GetAiConfig(id) : FindAccount(id).Map(user => user.AiConfig).GetValueOrDefault();
+        IsAddonOwner(id) ? userRepository.GetAiConfig(id) : FindAccount(id)?.AiConfig;
 
     public bool TryUpdateAiConfig(UserId id, AiConfig config)
     {
@@ -46,14 +45,15 @@ public sealed class UserService(
             return true;
         }
 
-        return FindAccount(id).Match(
-            user =>
-            {
-                user.AiConfig = config;
-                userRepository.Update(user);
-                return true;
-            },
-            () => false);
+        var user = FindAccount(id);
+        if (user is null)
+        {
+            return false;
+        }
+
+        user.AiConfig = config;
+        userRepository.Update(user);
+        return true;
     }
 
     /// <summary>
@@ -62,10 +62,10 @@ public sealed class UserService(
     /// </summary>
     public bool IsRenderingEnabled(UserId id) =>
         IsRenderingAllowed(id) && (userRepository.GetRenderingEnabled(id)
-            ?? FindAccount(id).Map(user => user.RenderingEnabled).GetValueOrDefault() ?? false);
+            ?? FindAccount(id)?.RenderingEnabled ?? false);
 
     public bool IsRenderingAllowed(UserId id) =>
-        HasAccount(id) && (IsAddonOwner(id) || FindAccount(id).Map(user => user.RenderingAllowed != false).GetValueOrDefault());
+        HasAccount(id) && (IsAddonOwner(id) || FindAccount(id) is { RenderingAllowed: not false });
 
     public bool IsUsernameTaken(string username) =>
         userRepository.ExistsByUsernameIgnoreCase(username.Trim());
@@ -83,8 +83,8 @@ public sealed class UserService(
 
     private static bool IsAddonOwner(UserId id) => id == Constants.HomeAssistantVirtualUserId;
 
-    private Maybe<User> FindAccount(UserId id) =>
-        HasAccount(id) ? userRepository.FindById(id) : Maybe<User>.None;
+    private User? FindAccount(UserId id) =>
+        HasAccount(id) ? userRepository.FindById(id) : null;
 
     public bool IsSetupComplete() => userRepository.IsSetupComplete();
 
@@ -116,16 +116,17 @@ public sealed class UserService(
     /// The last active administrator cannot leave.
     /// </summary>
     public bool TryDeleteUser(UserId id) =>
-        ExecuteUnderUsersLock(() => userRepository.FindById(id)
-            .Where(u => !IsLastActiveAdministrator(u))
-            .Match(
-                u =>
-                {
-                    DeleteAccount(u);
-                    return true;
-                },
-                () => false
-            ));
+        ExecuteUnderUsersLock(() =>
+        {
+            var user = userRepository.FindById(id);
+            if (user is null || IsLastActiveAdministrator(user))
+            {
+                return false;
+            }
+
+            DeleteAccount(user);
+            return true;
+        });
 
     public AdminActionResult SetSuperUser(UserId actor, UserId target, bool isSuperUser) =>
         Administer(actor, target, user =>
@@ -194,22 +195,34 @@ public sealed class UserService(
 
     // The operator console has no acting account, so the self and last-administrator checks do not apply.
     public bool TryPromoteFromConsole(string username) =>
-        ExecuteUnderUsersLock(() => userRepository.FindByUsername(username).Match(user =>
+        ExecuteUnderUsersLock(() =>
         {
+            var user = userRepository.FindByUsername(username);
+            if (user is null)
+            {
+                return false;
+            }
+
             user.IsSuperUser = true;
             user.IsSuspended = false;
             userRepository.Update(user);
             sessions?.Invalidate(user.Id);
             return true;
-        }, () => false));
+        });
 
     public string? TryResetPasswordFromConsole(string username) =>
-        ExecuteUnderUsersLock(() => userRepository.FindByUsername(username).Match(user =>
+        ExecuteUnderUsersLock(() =>
         {
+            var user = userRepository.FindByUsername(username);
+            if (user is null)
+            {
+                return null;
+            }
+
             var temporaryPassword = IssueTemporaryPassword(user);
             sessions?.Invalidate(user.Id);
             return temporaryPassword;
-        }, () => (string?)null));
+        });
 
     private string IssueTemporaryPassword(User user)
     {
@@ -228,7 +241,7 @@ public sealed class UserService(
             return AdminActionResult.SelfNotAllowed;
         }
 
-        var result = ExecuteUnderUsersLock(() => userRepository.FindById(target).Match(change, () => AdminActionResult.NotFound));
+        var result = ExecuteUnderUsersLock(() => userRepository.FindById(target) is { } user ? change(user) : AdminActionResult.NotFound);
         sessions?.Invalidate(target);
         return result;
     }
@@ -259,25 +272,25 @@ public sealed class UserService(
     private const string UsersLock = "users";
 
     /// <summary>Returns the account when the password matches, upgrading a legacy password hash on the way.</summary>
-    public Maybe<User> VerifyCredentials(string username, string password)
+    public User? VerifyCredentials(string username, string password)
     {
         var user = GetUserByUsername(username);
-        if (user.HasNoValue)
+        if (user is null)
         {
             PasswordHashing.SimulateVerification(password);
-            return Maybe<User>.None;
+            return null;
         }
 
-        switch (PasswordHashing.Verify(user.Value.PasswordHash, password))
+        switch (PasswordHashing.Verify(user.PasswordHash, password))
         {
             case PasswordCheck.ValidNeedsRehash:
-                user.Value.PasswordHash = PasswordHashing.Hash(password);
-                userRepository.Update(user.Value);
+                user.PasswordHash = PasswordHashing.Hash(password);
+                userRepository.Update(user);
                 return user;
             case PasswordCheck.Valid:
                 return user;
             default:
-                return Maybe<User>.None;
+                return null;
         }
     }
 
@@ -303,37 +316,36 @@ public sealed class UserService(
         return userRepository.TryInsert(user);
     }
 
-    public bool TryChangeNickname(UserId userId, string? newNickname) =>
-        GetUserById(userId)
-        .Match(
-            user =>
-            {
-                user.Nickname = string.IsNullOrWhiteSpace(newNickname) ? null : newNickname;
-                userRepository.Update(user);
-                return true;
-            },
-            () => false);
+    public bool TryChangeNickname(UserId userId, string? newNickname)
+    {
+        var user = GetUserById(userId);
+        if (user is null)
+        {
+            return false;
+        }
 
-    public bool TryChangePassword(UserId userId, string oldPassword, string newPassword) =>
-        userRepository.FindById(userId)
-            .Where(user => PasswordHashing.Verify(user.PasswordHash, oldPassword) != PasswordCheck.Failed)
-            .Match(
-                user =>
-                {
-                    if (PasswordHashing.Verify(user.PasswordHash, newPassword) != PasswordCheck.Failed)
-                    {
-                        return false;
-                    }
+        user.Nickname = string.IsNullOrWhiteSpace(newNickname) ? null : newNickname;
+        userRepository.Update(user);
+        return true;
+    }
 
-                    user.PasswordHash = PasswordHashing.Hash(newPassword);
-                    user.MustChangePassword = false;
-                    user.SecurityStamp = NewSecurityStamp();
-                    userRepository.Update(user);
-                    sessions?.Invalidate(user.Id);
-                    return true;
-                },
-                () => false
-            );
+    public bool TryChangePassword(UserId userId, string oldPassword, string newPassword)
+    {
+        var user = userRepository.FindById(userId);
+        if (user is null
+            || PasswordHashing.Verify(user.PasswordHash, oldPassword) == PasswordCheck.Failed
+            || PasswordHashing.Verify(user.PasswordHash, newPassword) != PasswordCheck.Failed)
+        {
+            return false;
+        }
+
+        user.PasswordHash = PasswordHashing.Hash(newPassword);
+        user.MustChangePassword = false;
+        user.SecurityStamp = NewSecurityStamp();
+        userRepository.Update(user);
+        sessions?.Invalidate(user.Id);
+        return true;
+    }
 
     private static string NewSecurityStamp() => Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
 }

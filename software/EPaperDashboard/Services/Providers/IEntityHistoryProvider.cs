@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 
 namespace EPaperDashboard.Services.Providers;
 
@@ -7,5 +7,5 @@ namespace EPaperDashboard.Services.Providers;
 /// </summary>
 public interface IEntityHistoryProvider
 {
-    Task<Result<Dictionary<string, List<HistoryState>>, string>> FetchEntityHistoryAsync(string dashboardId, IEnumerable<string> entityIds, int hours = 24, CancellationToken cancellationToken = default);
+    Task<Result<Dictionary<string, List<HistoryState>>>> FetchEntityHistoryAsync(string dashboardId, IEnumerable<string> entityIds, int hours = 24, CancellationToken cancellationToken = default);
 }

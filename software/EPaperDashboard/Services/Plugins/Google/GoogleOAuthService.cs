@@ -1,7 +1,7 @@
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text.Json;
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Models;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.AspNetCore.DataProtection;
@@ -43,7 +43,7 @@ public sealed class GoogleOAuthService(
         return (url, state);
     }
 
-    public async Task<Result<bool, string>> CompleteAsync(string? state, string? cookie, string? code, CancellationToken ct)
+    public async Task<Result<bool>> CompleteAsync(string? state, string? cookie, string? code, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(state) || state.Length > 4096 || string.IsNullOrEmpty(cookie) || state != cookie)
             return "Google sign-in expired or the browser does not match. Start again from Connections.";
@@ -74,24 +74,24 @@ public sealed class GoogleOAuthService(
         return true;
     }
 
-    public async Task<Result<string, string>> AccessTokenAsync(ProviderConnection connection, CancellationToken ct)
+    public async Task<Result<string>> AccessTokenAsync(ProviderConnection connection, CancellationToken ct)
     {
         // The encrypted credential version prevents reuse after a connection is reconfigured.
         var key = "google-token:" + connection.Id + ":" + connection.ProtectedCredentials;
-        if (cache.TryGetValue<string>(key, out var cached) && cached is not null) return Result.Success<string, string>(cached);
+        if (cache.TryGetValue<string>(key, out var cached) && cached is not null) return Result.Success<string>(cached);
         var credentials = connections.Credentials(connection);
         if (!credentials.TryGetValue(RefreshTokenKey, out var refresh) || string.IsNullOrEmpty(refresh))
-            return Result.Failure<string, string>("Connect this Google account from Connections first.");
+            return Result.Failure<string>("Connect this Google account from Connections first.");
         var result = await TokenRequest(credentials, new() { ["grant_type"] = "refresh_token", ["refresh_token"] = refresh }, ct);
-        if (result.IsFailure) return Result.Failure<string, string>(result.Error);
+        if (result.IsFailure) return Result.Failure<string>(result.Error);
         var token = String(result.Value, "access_token");
-        if (string.IsNullOrEmpty(token)) return Result.Failure<string, string>("Google returned no access token. Reconnect the account.");
+        if (string.IsNullOrEmpty(token)) return Result.Failure<string>("Google returned no access token. Reconnect the account.");
         var seconds = result.Value.TryGetProperty("expires_in", out var expires) && expires.TryGetInt32(out var value) ? value : 300;
         cache.Set(key, token, TimeSpan.FromSeconds(Math.Clamp(seconds - 60, 1, 3600)));
-        return Result.Success<string, string>(token);
+        return Result.Success<string>(token);
     }
 
-    private async Task<Result<JsonElement, string>> TokenRequest(Dictionary<string, string> credentials, Dictionary<string, string> form, CancellationToken ct)
+    private async Task<Result<JsonElement>> TokenRequest(Dictionary<string, string> credentials, Dictionary<string, string> form, CancellationToken ct)
     {
         form["client_id"] = credentials["clientId"];
         form["client_secret"] = credentials["clientSecret"];

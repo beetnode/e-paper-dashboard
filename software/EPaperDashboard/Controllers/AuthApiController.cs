@@ -59,19 +59,19 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
         if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrEmpty(request.Password))
             return Unauthorized(new { message = "Invalid username or password." });
         var user = _userService.VerifyCredentials(request.Username, request.Password);
-        if (user.HasNoValue)
+        if (user is null)
         {
             return Unauthorized(new { message = "Invalid username or password." });
         }
-        if (user.Value.IsSuspended)
+        if (user.IsSuspended)
         {
             return StatusCode(StatusCodes.Status403Forbidden,
                 new { code = "account_suspended", message = "This account is suspended. Contact the administrator." });
         }
 
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, UserClaims.Create(user.Value));
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, UserClaims.Create(user));
 
-        return Ok(UserResponse(user.Value.Id.ToString(), user.Value.Username, user.Value.Nickname, user.Value.IsSuperUser, user.Value.MustChangePassword));
+        return Ok(UserResponse(user.Id.ToString(), user.Username, user.Nickname, user.IsSuperUser, user.MustChangePassword));
     }
 
     [HttpPost("register")]
@@ -96,14 +96,14 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
         }
 
         var user = _userService.GetUserByUsername(request.Username);
-        if (user.HasNoValue)
+        if (user is null)
         {
             return BadRequest(new { message = "Failed to retrieve created user." });
         }
 
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, UserClaims.Create(user.Value));
+        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, UserClaims.Create(user));
 
-        return Ok(UserResponse(user.Value.Id.ToString(), user.Value.Username, user.Value.Nickname, user.Value.IsSuperUser, user.Value.MustChangePassword));
+        return Ok(UserResponse(user.Id.ToString(), user.Username, user.Nickname, user.IsSuperUser, user.MustChangePassword));
     }
 
     [HttpPost("logout")]
@@ -134,12 +134,12 @@ public class AuthApiController(UserService userService, IDeploymentStrategy depl
 
         // In standalone mode, get full user details from database
         var user = _userService.GetUserById(CurrentUserId);
-        if (user.HasNoValue)
+        if (user is null)
         {
             return Unauthorized();
         }
 
-        return Ok(UserResponse(user.Value.Id.ToString(), user.Value.Username, user.Value.Nickname, user.Value.IsSuperUser, user.Value.MustChangePassword));
+        return Ok(UserResponse(user.Id.ToString(), user.Username, user.Nickname, user.IsSuperUser, user.MustChangePassword));
     }
 
     // The deployment's capabilities travel with the user, so the UI never has to infer them from a mode name.

@@ -1,11 +1,11 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Models;
 
 namespace EPaperDashboard.Services.Ai;
 
 public interface IAiServiceFactory
 {
-    Result<IAiService, string> Create(AiConfig aiConfig, string? dashboardId = null);
+    Result<IAiService> Create(AiConfig aiConfig, string? dashboardId = null);
 }
 
 public sealed class AiServiceFactory(
@@ -13,17 +13,17 @@ public sealed class AiServiceFactory(
     HomeAssistantConnectionService homeAssistantConnectionService,
     ILoggerFactory loggerFactory) : IAiServiceFactory
 {
-    public Result<IAiService, string> Create(AiConfig aiConfig, string? dashboardId = null)
+    public Result<IAiService> Create(AiConfig aiConfig, string? dashboardId = null)
     {
         return aiConfig.ConnectionMode switch
         {
             AiConnectionMode.Direct => CreateDirectService(aiConfig),
             AiConnectionMode.HomeAssistant => CreateHomeAssistantService(aiConfig, dashboardId),
-            _ => Result.Failure<IAiService, string>("AI is not configured. Set up an AI connection in user settings.")
+            _ => Result.Failure<IAiService>("AI is not configured. Set up an AI connection in user settings.")
         };
     }
 
-    private Result<IAiService, string> CreateDirectService(AiConfig aiConfig)
+    private Result<IAiService> CreateDirectService(AiConfig aiConfig)
     {
         if (string.IsNullOrWhiteSpace(aiConfig.DirectEndpoint))
         {
@@ -42,7 +42,7 @@ public sealed class AiServiceFactory(
             loggerFactory.CreateLogger<DirectAiService>());
     }
 
-    private Result<IAiService, string> CreateHomeAssistantService(AiConfig aiConfig, string? dashboardId)
+    private Result<IAiService> CreateHomeAssistantService(AiConfig aiConfig, string? dashboardId)
     {
         if (string.IsNullOrWhiteSpace(dashboardId))
         {

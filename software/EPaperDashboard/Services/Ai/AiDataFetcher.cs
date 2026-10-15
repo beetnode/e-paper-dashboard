@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Services.Providers;
 
 namespace EPaperDashboard.Services.Ai;
@@ -64,7 +64,7 @@ public sealed class AiDataFetcher(
         return data;
     }
 
-    private async Task<T?> SafeFetchAsync<T>(Func<Task<Result<T, string>>> fetch, CancellationToken cancellationToken) where T : class
+    private async Task<T?> SafeFetchAsync<T>(Func<Task<Result<T>>> fetch, CancellationToken cancellationToken) where T : class
     {
         try
         {

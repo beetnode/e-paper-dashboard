@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Services.Ai;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -107,7 +107,7 @@ public class AiResponseParserTests
         var aiService = new Mock<IAiService>();
         aiService
             .Setup(s => s.GenerateCompletionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
-            .ReturnsAsync(Result.Failure<string, string>("llm down"));
+            .ReturnsAsync(Result.Failure<string>("llm down"));
 
         var result = await sut.RepairAndParseAsync(aiService.Object, "{broken", "parse error", CancellationToken.None);
 
@@ -122,7 +122,7 @@ public class AiResponseParserTests
         var aiService = new Mock<IAiService>();
         aiService
             .Setup(s => s.GenerateCompletionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
-            .ReturnsAsync(Result.Success<string, string>("""{"widgets": [{"type": "markdown"}]}"""));
+            .ReturnsAsync(Result.Success<string>("""{"widgets": [{"type": "markdown"}]}"""));
 
         var result = await sut.RepairAndParseAsync(aiService.Object, "{broken", "parse error", CancellationToken.None);
 

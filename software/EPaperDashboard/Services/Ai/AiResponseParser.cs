@@ -1,12 +1,12 @@
 using System.Text.Json;
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Models;
 
 namespace EPaperDashboard.Services.Ai;
 
 public sealed class AiResponseParser(ILogger<AiResponseParser> logger)
 {
-    public Result<List<WidgetConfig>, string> Parse(string response)
+    public Result<List<WidgetConfig>> Parse(string response)
     {
         try
         {
@@ -74,7 +74,7 @@ public sealed class AiResponseParser(ILogger<AiResponseParser> logger)
         }
     }
 
-    public async Task<Result<List<WidgetConfig>, string>> RepairAndParseAsync(
+    public async Task<Result<List<WidgetConfig>>> RepairAndParseAsync(
         IAiService aiService,
         string brokenResponse,
         string parseError,

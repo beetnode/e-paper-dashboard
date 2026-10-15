@@ -48,9 +48,9 @@ public class UsersApiController(UserService userService, ILogger<UsersApiControl
         {
             // The new security stamp ends every other session; reissue this one so the user stays signed in here.
             var user = userService.GetUserById(CurrentUserId);
-            if (user.HasValue)
+            if (user is not null)
             {
-                await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, UserClaims.Create(user.Value));
+                await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, UserClaims.Create(user));
             }
 
             return Ok(new { message = "Password changed successfully." });

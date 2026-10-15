@@ -2,7 +2,6 @@
 using EPaperDashboard.Services.Rendering;
 using SixLabors.ImageSharp.Processing;
 using EPaperDashboard.Utilities;
-using CSharpFunctionalExtensions;
 using EPaperDashboard.Models.Rendering;
 using SixLabors.ImageSharp.Formats.Bmp;
 using SixLabors.ImageSharp.Formats;
@@ -60,24 +59,24 @@ public sealed class RenderToImageController(
     public async Task<IActionResult> GetHealth([FromHeader(Name = HttpHeaderNames.ApiKeyHeaderName)] string apiKey)
     {
         var dashboard = ResolveDashboardByApiKey(apiKey);
-        if (dashboard.HasNoValue) return NotFound();
-        var uri = homeAssistantTargets.ResolveUri(dashboard.Value);
+        if (dashboard is null) return NotFound();
+        var uri = homeAssistantTargets.ResolveUri(dashboard);
         if (uri.IsFailure) return NotFound();
-        return Ok(await renderingService.GetHealth(dashboard.Value.UserId, dashboard.Value.Id, uri.Value));
+        return Ok(await renderingService.GetHealth(dashboard.UserId, dashboard.Id, uri.Value));
     }
 
-	private Maybe<Dashboard> ResolveDashboardByApiKey(string apiKey)
+	private Dashboard? ResolveDashboardByApiKey(string apiKey)
 	{
 		var device = deviceService.GetDeviceByApiKey(apiKey);
-		if (device.HasValue && device.Value.DashboardId != DashboardId.Empty)
+		if (device is not null && device.DashboardId != DashboardId.Empty)
 		{
-			device.Value.LastSeenAt = DateTimeOffset.UtcNow;
-			deviceService.UpdateDevice(device.Value);
-			return dashboardService.GetDashboardById(device.Value.DashboardId)
-                .Where(d => d.UserId == device.Value.UserId);
+			device.LastSeenAt = DateTimeOffset.UtcNow;
+			deviceService.UpdateDevice(device);
+			var dashboard = dashboardService.GetDashboardById(device.DashboardId);
+			return dashboard?.UserId == device.UserId ? dashboard : null;
 		}
 
-		return Maybe.None;
+		return null;
 	}
 
 	private async Task<IActionResult> RenderImage(
@@ -86,12 +85,12 @@ public sealed class RenderToImageController(
 		Func<Dashboard, IImage, IImage>? transform = null)
 	{
 		var dashboardResult = ResolveDashboardByApiKey(apiKey);
-		if (dashboardResult.HasNoValue)
+		if (dashboardResult is null)
 		{
 			return NotFound("Dashboard not found for this API key");
 		}
 
-		var dashboard = dashboardResult.Value;
+		var dashboard = dashboardResult;
 		var (width, height) = dashboard.GetEffectiveSize();
 		var imageSize = new Size(width, height);
 

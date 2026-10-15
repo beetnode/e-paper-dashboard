@@ -1,7 +1,7 @@
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services.Plugins;
 
@@ -44,7 +44,7 @@ public class HomeAssistantConnectionService(
     /// The connection a dashboard feature uses: the named one, which must belong to the dashboard owner,
     /// or else the owner's default connection (the add-on's own server).
     /// </summary>
-    public Result<ProviderConnection, string> ResolveConnection(Dashboard dashboard, string? connectionId)
+    public Result<ProviderConnection> ResolveConnection(Dashboard dashboard, string? connectionId)
     {
         var connection = string.IsNullOrEmpty(connectionId)
             ? connections.DefaultConnection(dashboard.UserId)
@@ -56,15 +56,15 @@ public class HomeAssistantConnectionService(
     }
 
     /// <inheritdoc cref="ResolveConnection(Dashboard, string?)"/>
-    public Result<ProviderConnection, string> ResolveConnection(string dashboardId, string? connectionId)
+    public Result<ProviderConnection> ResolveConnection(string dashboardId, string? connectionId)
     {
         if (!DashboardId.TryParse(dashboardId, out var id)) return "Invalid dashboard ID format";
         var dashboard = _dashboardService.GetDashboardById(id);
-        return dashboard.HasNoValue ? "Dashboard not found" : ResolveConnection(dashboard.Value, connectionId);
+        return dashboard is null ? "Dashboard not found" : ResolveConnection(dashboard, connectionId);
     }
 
     /// <summary>Resolves the server and token of a connection. Callers must have checked that it belongs to the requesting user.</summary>
-    public Result<HomeAssistantEndpoint, string> GetConnectionInfo(ProviderConnection homeAssistant)
+    public Result<HomeAssistantEndpoint> GetConnectionInfo(ProviderConnection homeAssistant)
     {
         if (homeAssistant.PluginId != "home-assistant") return "Connection not found";
         if (connections.IsDefault(homeAssistant))

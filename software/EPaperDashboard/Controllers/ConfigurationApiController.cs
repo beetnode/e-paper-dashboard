@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Authorization;
 using EPaperDashboard.Utilities;
 using EPaperDashboard.Services;
 using EPaperDashboard.Models;
-using CSharpFunctionalExtensions;
 using System.Text;
 using EPaperDashboard.Guards;
 
@@ -24,18 +23,16 @@ public class ConfigurationApiController(DashboardService dashboardService, Devic
     public IActionResult GetNextUpdateWait([FromHeader(Name = HttpHeaderNames.ApiKeyHeaderName)] string apiKey)
     {
         var now = DateTime.Now;
-        return ResolveDashboardByApiKey(apiKey)
-            .Bind(d => GetNextUpdateTime(now, d.UpdateTimes))
-            .Match(
-                nextUpdate => Content(((long)(nextUpdate - now).TotalSeconds).ToString(), "text/plain", Encoding.UTF8),
-                () => (IActionResult)NotFound("No upcoming update times found.")
-            );
+        var dashboard = ResolveDashboardByApiKey(apiKey);
+        return GetNextUpdateTime(now, dashboard?.UpdateTimes) is { } nextUpdate
+            ? Content(((long)(nextUpdate - now).TotalSeconds).ToString(), "text/plain", Encoding.UTF8)
+            : NotFound("No upcoming update times found.");
 
-        Maybe<DateTime> GetNextUpdateTime(DateTime now, List<TimeOnly>? updateTimes)
+        DateTime? GetNextUpdateTime(DateTime now, List<TimeOnly>? updateTimes)
         {
             if (updateTimes is null || !updateTimes.Any())
             {
-                return Maybe.None;
+                return null;
             }
 
             var today = now.Date;
@@ -47,18 +44,19 @@ public class ConfigurationApiController(DashboardService dashboardService, Devic
                 .Select(t => today.Add(t.ToTimeSpan()))
                 .Append(tomorrow.Add(times.First().ToTimeSpan()))
                 .Where(dt => dt > gracefulCutoff)
-                .TryFirst();
+                .Select(dt => (DateTime?)dt)
+                .FirstOrDefault();
         }
     }
 
-    private Maybe<Dashboard> ResolveDashboardByApiKey(string apiKey)
+    private Dashboard? ResolveDashboardByApiKey(string apiKey)
     {
         var device = _deviceService.GetDeviceByApiKey(apiKey);
-        if (device.HasValue && device.Value.DashboardId != DashboardId.Empty)
+        if (device is not null && device.DashboardId != DashboardId.Empty)
         {
-            return _dashboardService.GetDashboardById(device.Value.DashboardId);
+            return _dashboardService.GetDashboardById(device.DashboardId);
         }
 
-        return Maybe.None;
+        return null;
     }
 }

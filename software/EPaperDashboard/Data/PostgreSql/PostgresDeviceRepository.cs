@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 
@@ -6,17 +6,17 @@ namespace EPaperDashboard.Data.PostgreSql;
 
 internal sealed class PostgresDeviceRepository(PostgresDbContext context) : IDeviceRepository
 {
-    public Maybe<Device> FindById(DeviceId id) => Maybe.From(
+    public Device? FindById(DeviceId id) =>
         context.FindOne<Device>("SELECT document FROM izboard_devices WHERE id = @id",
-            PostgresDbContext.Parameter("id", id.Value)));
+            PostgresDbContext.Parameter("id", id.Value));
 
-    public Maybe<Device> FindByIdentifier(string deviceIdentifier) => Maybe.From(
+    public Device? FindByIdentifier(string deviceIdentifier) =>
         context.FindOne<Device>("SELECT document FROM izboard_devices WHERE device_identifier = @identifier",
-            PostgresDbContext.Parameter("identifier", deviceIdentifier)));
+            PostgresDbContext.Parameter("identifier", deviceIdentifier));
 
-    public Maybe<Device> FindByApiKey(string apiKey) => Maybe.From(
+    public Device? FindByApiKey(string apiKey) =>
         context.FindOne<Device>("SELECT document FROM izboard_devices WHERE api_key = @api_key",
-            PostgresDbContext.Parameter("api_key", apiKey)));
+            PostgresDbContext.Parameter("api_key", apiKey));
 
     public List<Device> FindByDashboardId(DashboardId dashboardId) => context.FindMany<Device>(
         "SELECT document FROM izboard_devices WHERE dashboard_id = @dashboard_id",

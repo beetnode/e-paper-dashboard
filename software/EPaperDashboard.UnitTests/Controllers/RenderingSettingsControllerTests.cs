@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using System.Text.Json;
-using CSharpFunctionalExtensions;
 using EPaperDashboard.Controllers;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;

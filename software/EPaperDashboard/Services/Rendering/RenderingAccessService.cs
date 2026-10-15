@@ -34,7 +34,7 @@ public sealed class RenderingAccessService(
         if (dashboardId is { } id)
         {
             var dashboard = dashboards.FindById(id);
-            if (dashboard.HasNoValue || dashboard.Value.UserId != owner)
+            if (dashboard is null || dashboard.UserId != owner)
                 throw new RenderingRequestException("Dashboard is not accessible to this rendering account.");
         }
     }

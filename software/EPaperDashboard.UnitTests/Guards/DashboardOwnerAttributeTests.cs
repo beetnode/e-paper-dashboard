@@ -68,7 +68,7 @@ public class DashboardOwnerAttributeTests
             configure: (users, dashboards) =>
             {
                 users.Setup(r => r.FindById(userId)).Returns(new User { Id = userId });
-                dashboards.Setup(r => r.FindById(dashboardId)).Returns(CSharpFunctionalExtensions.Maybe<Dashboard>.None);
+                dashboards.Setup(r => r.FindById(dashboardId)).Returns((Dashboard?)null);
             });
 
         Sut.OnAuthorization(context);

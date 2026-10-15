@@ -428,14 +428,14 @@ app.Use(async (context, next) =>
 		{
 			var deviceService = context.RequestServices.GetRequiredService<DeviceService>();
 			var device = deviceService.GetDeviceByIdentifier(deviceIdHeader.ToString());
-			if (device.HasValue)
+			if (device is not null)
 			{
 				var fwStr = deviceFwVersion.ToString();
 				var lastSeenTracker = context.RequestServices.GetRequiredService<DeviceLastSeenTracker>();
-				if (lastSeenTracker.ShouldUpdate(device.Value, fwStr))
+				if (lastSeenTracker.ShouldUpdate(device, fwStr))
 				{
-					lastSeenTracker.Apply(device.Value, fwStr);
-					deviceService.UpdateDevice(device.Value);
+					lastSeenTracker.Apply(device, fwStr);
+					deviceService.UpdateDevice(device);
 				}
 			}
 		}

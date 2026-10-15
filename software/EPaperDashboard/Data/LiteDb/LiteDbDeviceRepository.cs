@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 using LiteDB;
@@ -7,13 +7,13 @@ namespace EPaperDashboard.Data.LiteDb;
 
 internal sealed class LiteDbDeviceRepository(LiteDbContext context) : IDeviceRepository
 {
-    public Maybe<Device> FindById(DeviceId id) =>
+    public Device? FindById(DeviceId id) =>
         context.Devices.FindById(new ObjectId(id.Value));
 
-    public Maybe<Device> FindByIdentifier(string deviceIdentifier) =>
+    public Device? FindByIdentifier(string deviceIdentifier) =>
         context.Devices.FindOne(d => d.DeviceIdentifier == deviceIdentifier);
 
-    public Maybe<Device> FindByApiKey(string apiKey) =>
+    public Device? FindByApiKey(string apiKey) =>
         context.Devices.FindOne(d => d.ApiKey == apiKey);
 
     public List<Device> FindByDashboardId(DashboardId dashboardId) =>

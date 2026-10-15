@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services;
@@ -11,15 +11,15 @@ namespace EPaperDashboard.UnitTests.Services;
 public class DeviceServiceTests
 {
     [Fact]
-    public void GetDeviceByApiKey_UnknownKey_ReturnsMaybeNone()
+    public void GetDeviceByApiKey_UnknownKey_ReturnsNull()
     {
         var repo = new Mock<IDeviceRepository>();
-        repo.Setup(r => r.FindByApiKey("nope")).Returns(Maybe<Device>.None);
+        repo.Setup(r => r.FindByApiKey("nope")).Returns((Device?)null);
         var sut = new DeviceService(repo.Object);
 
         var result = sut.GetDeviceByApiKey("nope");
 
-        result.HasValue.Should().BeFalse();
+        result.Should().BeNull();
     }
 
     [Fact]
@@ -32,15 +32,15 @@ public class DeviceServiceTests
 
         var result = sut.GetDeviceByApiKey("key123");
 
-        result.HasValue.Should().BeTrue();
-        result.Value.Should().BeSameAs(device);
+        result.Should().NotBeNull();
+        result.Should().BeSameAs(device);
     }
 
     [Fact]
     public void GetDeviceByIdentifier_CallsRepositoryWithGivenIdentifier()
     {
         var repo = new Mock<IDeviceRepository>();
-        repo.Setup(r => r.FindByIdentifier("dev-1")).Returns(Maybe<Device>.None);
+        repo.Setup(r => r.FindByIdentifier("dev-1")).Returns((Device?)null);
         var sut = new DeviceService(repo.Object);
 
         sut.GetDeviceByIdentifier("dev-1");
@@ -81,7 +81,7 @@ public class DeviceServiceTests
         var users = new Mock<IUserRepository>();
         users.Setup(r => r.FindById(owner.Id)).Returns(owner);
 
-        new DeviceService(repo.Object, users.Object).GetDeviceByApiKey("key").HasValue.Should().BeFalse();
+        new DeviceService(repo.Object, users.Object).GetDeviceByApiKey("key").Should().BeNull();
     }
 
     [Fact]
@@ -90,8 +90,8 @@ public class DeviceServiceTests
         var repo = new Mock<IDeviceRepository>();
         repo.Setup(r => r.FindByApiKey("key")).Returns(new Device { UserId = UserId.New() });
         var users = new Mock<IUserRepository>();
-        users.Setup(r => r.FindById(It.IsAny<UserId>())).Returns(Maybe<User>.None);
+        users.Setup(r => r.FindById(It.IsAny<UserId>())).Returns((User?)null);
 
-        new DeviceService(repo.Object, users.Object).GetDeviceByApiKey("key").HasValue.Should().BeTrue();
+        new DeviceService(repo.Object, users.Object).GetDeviceByApiKey("key").Should().NotBeNull();
     }
 }
