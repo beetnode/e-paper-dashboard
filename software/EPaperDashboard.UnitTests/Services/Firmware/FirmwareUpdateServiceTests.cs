@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using EPaperDashboard.Services.Firmware;
 using EPaperDashboard.Utilities;
 using FluentAssertions;
@@ -126,5 +127,44 @@ public sealed class FirmwareUpdateServiceTests : IDisposable
 
         sut.IsOtaReady.Should().BeFalse();
         (await sut.GetFirmwareBinaryPathAsync()).Should().BeNull();
+    }
+
+    [Fact]
+    public void GetFirmwareMd5_NoReadyBinary_IsNull()
+    {
+        var sut = CreateSut();
+
+        sut.GetFirmwareMd5().Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetFirmwareMd5_MatchesCachedFileContent()
+    {
+        SetupRelease("0.5.0");
+        SetupDownload([1, 2, 3]);
+        var sut = CreateSut();
+        await sut.RefreshAsync();
+
+        var path = await sut.GetFirmwareBinaryPathAsync();
+
+        sut.GetFirmwareMd5().Should().Be(Convert.ToHexStringLower(MD5.HashData(File.ReadAllBytes(path!))))
+            .And.Be("5289df737df57326fcdd22597afb1fac");
+    }
+
+    [Fact]
+    public async Task GetFirmwareMd5_NewBinaryCached_ReturnsNewHash()
+    {
+        SetupRelease("0.4.1");
+        SetupDownload([4]);
+        var sut = CreateSut();
+        await sut.RefreshAsync();
+        var oldMd5 = sut.GetFirmwareMd5();
+
+        SetupRelease("0.5.0");
+        SetupDownload([5]);
+        await sut.RefreshAsync();
+
+        sut.GetFirmwareMd5().Should().NotBe(oldMd5)
+            .And.Be(Convert.ToHexStringLower(MD5.HashData([5])));
     }
 }

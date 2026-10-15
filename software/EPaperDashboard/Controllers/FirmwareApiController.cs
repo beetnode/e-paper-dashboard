@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using EPaperDashboard.Services.Firmware;
 using EPaperDashboard.Guards;
+using EPaperDashboard.Utilities;
 
 namespace EPaperDashboard.Controllers;
 
@@ -80,6 +81,10 @@ public class FirmwareApiController(FirmwareUpdateService firmwareUpdateService) 
 
         var release = firmwareUpdateService.GetLatestRelease();
         var fileName = $"firmware-{release?.Version ?? "unknown"}.bin";
+
+        var md5 = firmwareUpdateService.GetFirmwareMd5();
+        if (md5 is not null)
+            Response.Headers[HttpHeaderNames.FirmwareMd5HeaderName] = md5;
 
         return PhysicalFile(path, "application/octet-stream", fileName);
     }
