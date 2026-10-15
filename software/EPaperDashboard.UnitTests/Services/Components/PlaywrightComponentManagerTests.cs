@@ -90,14 +90,29 @@ public sealed class PlaywrightComponentManagerTests : IDisposable
             .WithMessage("*rendering component base URL*");
     }
 
-    [Theory]
-    [InlineData("0.6.0", "v0.6.0")]
-    [InlineData("0.6.0.900", "v0.6.0")]
-    [InlineData("0.6.0+abcdef", "v0.6.0")]
-    [InlineData("not-a-version", "vnot-a-version")]
-    public void GetDefaultReleaseTag_ReturnsApplicationRelease(string version, string expected)
+    [Fact]
+    public void Constructor_WhenComponentImageIsInvalid_Throws()
     {
-        PlaywrightComponentManager.GetDefaultReleaseTag(version).Should().Be(expected);
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["RENDERING_COMPONENT_IMAGE"] = "Not A Reference"
+            })
+            .Build();
+
+        var action = () => CreateManager(configuration);
+
+        action.Should().Throw<InvalidOperationException>()
+            .WithMessage("*rendering component image*");
+    }
+
+    [Theory]
+    [InlineData("0.6.0", "izdevdigital/izboard-rendering:0.6.0")]
+    [InlineData("0.6.0.900", "izdevdigital/izboard-rendering:0.6.0")]
+    [InlineData("0.6.0+abcdef", "izdevdigital/izboard-rendering:0.6.0")]
+    public void GetDefaultImage_ReturnsApplicationReleaseImage(string version, string expected)
+    {
+        PlaywrightComponentManager.GetDefaultImage(version).Should().Be(expected);
     }
 
     [Theory]

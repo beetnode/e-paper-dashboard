@@ -20,7 +20,7 @@ jobs:
       is_release: true
     secrets: inherit
     permissions:
-      contents: write
+      contents: read
       
   build-packaging:
     uses: ./.github/workflows/freecad-export.yml
@@ -88,6 +88,8 @@ jobs:
         [View on Docker Hub](https://hub.docker.com/r/izdevdigital/e-paper-dashboard)
         
         Home Assistant add-on image: `izdevdigital/izboard-addon:${{ steps.tag.outputs.version }}`
+
+        Optional rendering component (installed from **Settings → Rendering**): `izdevdigital/izboard-rendering:${{ steps.tag.outputs.version }}`
         
         ---
         
@@ -100,7 +102,6 @@ jobs:
         name: Release ${{ steps.tag.outputs.version }}
         draft: false
         prerelease: ${{ contains(steps.tag.outputs.version, '-') }}
-        # The release was created by docker-build.yml with the rendering component; mark it latest now.
         make_latest: ${{ !contains(steps.tag.outputs.version, '-') }}
         generate_release_notes: true
         body_path: release_body.md
@@ -122,7 +123,7 @@ jobs:
         echo "- ✅ Firmware (ESP32) — attached as firmware.zip and standalone firmware.bin for OTA" >> $GITHUB_STEP_SUMMARY
         echo "- ✅ Docker Image: \`izdevdigital/e-paper-dashboard:${{ steps.tag.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
         echo "- ✅ Add-on Image: \`izdevdigital/izboard-addon:${{ steps.tag.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-        echo "- ✅ Optional rendering components (amd64 + arm64)" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Rendering component image: \`izdevdigital/izboard-rendering:${{ steps.tag.outputs.version }}\` (amd64 + arm64)" >> $GITHUB_STEP_SUMMARY
         echo "- ✅ 3D Models (STL) — attached as release/stl.zip" >> $GITHUB_STEP_SUMMARY
         echo "- ✅ Complete Package (ZIP)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY

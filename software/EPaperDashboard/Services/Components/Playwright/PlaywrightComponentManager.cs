@@ -1,7 +1,6 @@
 using System.Formats.Tar;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Text.Json;
 using EPaperDashboard.Utilities;
 using EPaperDashboard.RenderingComponent;
@@ -11,18 +10,14 @@ namespace EPaperDashboard.Services.Components.Playwright;
 public sealed class PlaywrightComponentManager : BackgroundService
 {
     private const int ManifestSchemaVersion = 2;
-    private const long MaximumComponentBytes = 1_500_000_000;
     private const long MaximumExtractedBytes = 3_000_000_000;
-    private const string DefaultRepository = "beetnode/izBoard";
+    private const string DefaultImageRepository = "izdevdigital/izboard-rendering";
     private static readonly TimeSpan UpdateRetryInterval = TimeSpan.FromMinutes(15);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<PlaywrightComponentManager> _logger;
     private readonly string _componentRoot;
-    private readonly string _repository;
-    private readonly string _releaseTag;
-    private readonly Uri? _componentBaseUri;
+    private readonly IRenderingComponentSource _source;
     private readonly object _statusLock = new();
     private readonly PlaywrightComponentRuntime _runtime;
     private readonly CancellationTokenSource _shutdown = new();
@@ -37,19 +32,17 @@ public sealed class PlaywrightComponentManager : BackgroundService
         ILogger<PlaywrightComponentManager> logger,
         PlaywrightComponentRuntime? runtime = null)
     {
-        _httpClientFactory = httpClientFactory;
         _logger = logger;
         _runtime = runtime ?? new PlaywrightComponentRuntime();
         _componentRoot = Path.Combine(environmentConfiguration.ConfigDir, "components", "playwright");
-        _repository = configuration["RENDERING_COMPONENT_REPOSITORY"]
-            ?? configuration["PLAYWRIGHT_COMPONENT_REPOSITORY"]
-            ?? DefaultRepository;
-        var releaseTag = configuration["RENDERING_COMPONENT_RELEASE_TAG"]
-            ?? configuration["PLAYWRIGHT_COMPONENT_RELEASE_TAG"];
-        _releaseTag = string.IsNullOrWhiteSpace(releaseTag) ? GetDefaultReleaseTag(Constants.AppVersion) : releaseTag;
-        _componentBaseUri = ParseComponentBaseUri(
+        var baseUri = UrlComponentSource.ParseBaseUri(
             configuration["RENDERING_COMPONENT_BASE_URL"]
             ?? configuration["PLAYWRIGHT_COMPONENT_BASE_URL"]);
+        var image = configuration["RENDERING_COMPONENT_IMAGE"];
+        _source = baseUri is not null
+            ? new UrlComponentSource(httpClientFactory, baseUri)
+            : new RegistryComponentSource(httpClientFactory, ComponentImageReference.Parse(
+                string.IsNullOrWhiteSpace(image) ? GetDefaultImage(Constants.AppVersion) : image));
         CleanupInterruptedInstallations();
         _status = ReadInstalledStatus();
     }
@@ -180,12 +173,8 @@ public sealed class PlaywrightComponentManager : BackgroundService
             await File.WriteAllTextAsync(Path.Combine(_componentRoot, "requested"), Constants.AppVersion, token);
             Directory.CreateDirectory(operationDirectory);
             var runtimeIdentifier = GetRuntimeIdentifier();
-            var assetName = $"rendering-component-{runtimeIdentifier}.tar.gz";
-            var (archiveUrl, checksumUrl) = await ResolveAssetUrlsAsync(assetName, token);
-
-            var expectedChecksum = await DownloadChecksumAsync(checksumUrl, token);
-            await DownloadArchiveAsync(archiveUrl, archivePath, token);
-            await VerifyChecksumAsync(archivePath, expectedChecksum, token);
+            _logger.LogInformation("Installing the rendering component from {Source}", _source.Description);
+            await _source.DownloadAsync(runtimeIdentifier, archivePath, UpdateProgress, token);
 
             Directory.CreateDirectory(extractPath);
             await ExtractArchiveAsync(archivePath, extractPath, token);
@@ -230,103 +219,6 @@ public sealed class PlaywrightComponentManager : BackgroundService
                 }
             }
         }
-    }
-
-    private async Task<(string ArchiveUrl, string ChecksumUrl)> ResolveAssetUrlsAsync(string assetName, CancellationToken token)
-    {
-        if (_componentBaseUri is not null)
-        {
-            _logger.LogInformation("Installing the rendering component from {BaseUri}", _componentBaseUri);
-            return (
-                new Uri(_componentBaseUri, Uri.EscapeDataString(assetName)).AbsoluteUri,
-                new Uri(_componentBaseUri, Uri.EscapeDataString($"{assetName}.sha256")).AbsoluteUri);
-        }
-
-        var release = await GetReleaseAsync(token);
-        return (
-            FindAssetUrl(release, assetName),
-            FindAssetUrl(release, $"{assetName}.sha256"));
-    }
-
-    private async Task<JsonElement> GetReleaseAsync(CancellationToken token)
-    {
-        var client = _httpClientFactory.CreateClient(Constants.PlaywrightComponentHttpClientName);
-        var url = $"https://api.github.com/repos/{_repository}/releases/tags/{Uri.EscapeDataString(_releaseTag)}";
-        using var response = await client.GetAsync(url, token);
-        if (!response.IsSuccessStatusCode)
-            throw new InvalidOperationException($"GitHub release '{_releaseTag}' is unavailable ({(int)response.StatusCode}).");
-
-        await using var stream = await response.Content.ReadAsStreamAsync(token);
-        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: token);
-        return document.RootElement.Clone();
-    }
-
-    private static string FindAssetUrl(JsonElement release, string assetName)
-    {
-        if (release.TryGetProperty("assets", out var assets))
-        {
-            foreach (var asset in assets.EnumerateArray())
-            {
-                if (asset.TryGetProperty("name", out var name)
-                    && string.Equals(name.GetString(), assetName, StringComparison.Ordinal)
-                    && asset.TryGetProperty("browser_download_url", out var url)
-                    && !string.IsNullOrWhiteSpace(url.GetString()))
-                    return url.GetString()!;
-            }
-        }
-
-        throw new InvalidOperationException($"Release '{release.GetProperty("tag_name").GetString()}' does not contain {assetName}.");
-    }
-
-    private async Task<string> DownloadChecksumAsync(string url, CancellationToken token)
-    {
-        var client = _httpClientFactory.CreateClient(Constants.PlaywrightComponentHttpClientName);
-        var checksumText = await client.GetStringAsync(url, token);
-        var checksum = checksumText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-        if (checksum is null || checksum.Length != 64 || !checksum.All(Uri.IsHexDigit))
-            throw new InvalidOperationException("The component checksum is invalid.");
-        return checksum.ToUpperInvariant();
-    }
-
-    private async Task DownloadArchiveAsync(string url, string destination, CancellationToken token)
-    {
-        var client = _httpClientFactory.CreateClient(Constants.PlaywrightComponentHttpClientName);
-        using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, token);
-        response.EnsureSuccessStatusCode();
-
-        var totalBytes = response.Content.Headers.ContentLength;
-        if (totalBytes is > MaximumComponentBytes)
-            throw new InvalidOperationException("The component archive exceeds the allowed size.");
-
-        UpdateProgress(0, totalBytes);
-        await using var input = await response.Content.ReadAsStreamAsync(token);
-        await using var output = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81_920, true);
-        var buffer = new byte[81_920];
-        long downloaded = 0;
-
-        while (true)
-        {
-            var read = await input.ReadAsync(buffer, token);
-            if (read == 0)
-                break;
-
-            downloaded += read;
-            if (downloaded > MaximumComponentBytes)
-                throw new InvalidOperationException("The component archive exceeds the allowed size.");
-
-            await output.WriteAsync(buffer.AsMemory(0, read), token);
-            UpdateProgress(downloaded, totalBytes);
-        }
-    }
-
-    private static async Task VerifyChecksumAsync(string path, string expectedChecksum, CancellationToken token)
-    {
-        await using var stream = File.OpenRead(path);
-        var actualChecksum = Convert.ToHexString(await SHA256.HashDataAsync(stream, token));
-        if (!CryptographicOperations.FixedTimeEquals(
-                Convert.FromHexString(actualChecksum),
-                Convert.FromHexString(expectedChecksum)))
-            throw new InvalidOperationException("The downloaded component failed checksum verification.");
     }
 
     private static async Task ExtractArchiveAsync(string archivePath, string destination, CancellationToken token)
@@ -527,8 +419,8 @@ public sealed class PlaywrightComponentManager : BackgroundService
         string? error = null) =>
         new(state, Constants.AppVersion, GetRuntimeIdentifier(), IsRuntimeSupported(), installedVersion, Error: error);
 
-    // Releases attach the component to the application release built from the same commit.
-    internal static string GetDefaultReleaseTag(string appVersion) => $"v{GetCompatibilityVersion(appVersion)}";
+    // Release images are tagged with the application release version; builds normally pin an exact digest instead.
+    internal static string GetDefaultImage(string appVersion) => $"{DefaultImageRepository}:{GetCompatibilityVersion(appVersion)}";
 
     internal static string NormalizeVersion(string version)
     {
@@ -559,19 +451,6 @@ public sealed class PlaywrightComponentManager : BackgroundService
                 ? "osx"
                 : OperatingSystem.IsWindows() ? "windows" : "unsupported";
         return $"{os}-{architecture}";
-    }
-
-    private static Uri? ParseComponentBaseUri(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return null;
-
-        if (!Uri.TryCreate($"{value.TrimEnd('/')}/", UriKind.Absolute, out var uri)
-            || (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
-                && !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)))
-            throw new InvalidOperationException("The rendering component base URL must be an absolute HTTP or HTTPS URL.");
-
-        return uri;
     }
 
     private static bool IsRuntimeSupported() =>

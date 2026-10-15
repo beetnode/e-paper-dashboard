@@ -45,11 +45,12 @@ RUN cp /src/LICENSE /app/publish/ && \
   cp /src/THIRD-PARTY-NOTICES.txt /app/publish/
 
 FROM base AS runtime
-ARG COMPONENT_RELEASE_TAG
+# Rendering component image built with this application, pinned by digest in CI builds
+ARG COMPONENT_IMAGE
 WORKDIR /app
 EXPOSE 8128 8129
 COPY --from=publish /app/publish .
-ENV RENDERING_COMPONENT_RELEASE_TAG=$COMPONENT_RELEASE_TAG
+ENV RENDERING_COMPONENT_IMAGE=$COMPONENT_IMAGE
 RUN mkdir -p /data/DataProtection-Keys /data/components /run/izboard-rendering && \
   chown -R app:app /data /run/izboard-rendering && chmod -R 770 /data /run/izboard-rendering
 CMD ["dotnet", "EPaperDashboard.dll"]

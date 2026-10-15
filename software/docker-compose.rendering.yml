@@ -10,7 +10,6 @@ services:
       dockerfile: EPaperDashboard/Dockerfile
       args:
         VERSION: "${IZBOARD_VERSION:-0.6.0.999}"
-        COMPONENT_RELEASE_TAG: deployment-test
     environment:
       CLIENT_URL: http://localhost:8128
       RENDERING_COMPONENT_BASE_URL: http://rendering-component-artifacts/
