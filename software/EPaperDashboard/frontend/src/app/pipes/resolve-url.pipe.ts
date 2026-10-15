@@ -2,6 +2,26 @@ import { Pipe, PipeTransform, inject } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
 
 /**
+ * Resolves an absolute API URL against the document's `<base href>`; see {@link ResolveUrlPipe}.
+ * Use it for URLs the browser loads directly (e.g. `new Image()`), which skip the HTTP interceptor.
+ */
+export function resolveApiUrl(document: Document, url: string | undefined | null): string {
+  if (!url || !url.startsWith('/api/')) {
+    return url ?? '';
+  }
+
+  const baseElement = document.querySelector('base');
+  const baseHref = baseElement?.getAttribute('href') || '/';
+
+  if (baseHref === '/') {
+    return url;
+  }
+
+  // baseHref ends with '/', url starts with '/' → drop the leading slash
+  return baseHref + url.substring(1);
+}
+
+/**
  * Resolves an absolute API URL (e.g. `/api/dashboards/…/images/…`) against the
  * document's `<base href>`.
  *
@@ -21,18 +41,6 @@ export class ResolveUrlPipe implements PipeTransform {
   private readonly document = inject(DOCUMENT);
 
   transform(url: string | undefined | null): string {
-    if (!url || !url.startsWith('/api/')) {
-      return url ?? '';
-    }
-
-    const baseElement = this.document.querySelector('base');
-    const baseHref = baseElement?.getAttribute('href') || '/';
-
-    if (baseHref === '/') {
-      return url;
-    }
-
-    // baseHref ends with '/', url starts with '/' → drop the leading slash
-    return baseHref + url.substring(1);
+    return resolveApiUrl(this.document, url);
   }
 }
