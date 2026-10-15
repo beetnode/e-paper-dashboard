@@ -55,13 +55,6 @@ jobs:
         name: freecad-stl-files
         path: ./release/stl/
 
-    - name: Download rendering component artifacts
-      uses: actions/download-artifact@v4
-      with:
-        pattern: rendering-component-*
-        path: ./release/rendering/
-        merge-multiple: true
-
     - name: Create versioned artifact zips
       run: |
         mkdir -p release
@@ -107,16 +100,14 @@ jobs:
         name: Release ${{ steps.tag.outputs.version }}
         draft: false
         prerelease: ${{ contains(steps.tag.outputs.version, '-') }}
+        # The release was created by docker-build.yml with the rendering component; mark it latest now.
+        make_latest: ${{ !contains(steps.tag.outputs.version, '-') }}
         generate_release_notes: true
         body_path: release_body.md
         files: |
           firmware-${{ steps.tag.outputs.version }}.zip
           firmware-${{ steps.tag.outputs.version }}.bin
           stl-${{ steps.tag.outputs.version }}.zip
-          release/rendering/rendering-component-linux-x64.tar.gz
-          release/rendering/rendering-component-linux-x64.tar.gz.sha256
-          release/rendering/rendering-component-linux-arm64.tar.gz
-          release/rendering/rendering-component-linux-arm64.tar.gz.sha256
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         

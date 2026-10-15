@@ -5,7 +5,7 @@ import { RouterModule } from '@angular/router';
 import { AiService } from '../../services/ai.service';
 import { ToastService } from '../../services/toast.service';
 import { AiConfig, AiConnectionMode } from '../../models/types';
-import { HasUnsavedChanges } from '../../guards/unsaved-changes.guard';
+import { EditableSettingsSection } from '../settings/editable-settings-section';
 
 @Component({
   selector: 'app-ai-config',
@@ -13,7 +13,7 @@ import { HasUnsavedChanges } from '../../guards/unsaved-changes.guard';
   imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './ai-config.component.html'
 })
-export class AiConfigComponent implements OnInit, HasUnsavedChanges {
+export class AiConfigComponent implements OnInit, EditableSettingsSection {
   private readonly aiService = inject(AiService);
   private readonly toastService = inject(ToastService);
 
@@ -127,5 +127,9 @@ export class AiConfigComponent implements OnInit, HasUnsavedChanges {
 
   hasUnsavedChanges(): boolean {
     return this.isDirty();
+  }
+
+  canSave(): boolean {
+    return this.isConfigValid();
   }
 }

@@ -6,13 +6,6 @@ identifies dependencies distributed in optional first-party components:
 
 ================================================================================
 
-CSharpFunctionalExtensions (version 3.6.0)
-https://github.com/vkhorikov/CSharpFunctionalExtensions
-Copyright (c) 2016-2023 Vladimir Khorikov
-Licensed under the MIT License
-
-================================================================================
-
 LiteDB (version 5.0.21)
 https://github.com/mbdavid/LiteDB
 Copyright (c) 2023 Mauricio David

@@ -1,7 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 
 namespace EPaperDashboard.Services.Ai;
 
@@ -12,7 +12,7 @@ public sealed class DirectAiService(
     string model,
     ILogger<DirectAiService> logger) : IAiService
 {
-    public async Task<Result<string, string>> GenerateCompletionAsync(
+    public async Task<Result<string>> GenerateCompletionAsync(
         string systemPrompt,
         string userPrompt,
         CancellationToken cancellationToken = default,
@@ -35,7 +35,7 @@ public sealed class DirectAiService(
         return firstAttempt;
     }
 
-    private async Task<Result<string, string>> TrySendRequestAsync(
+    private async Task<Result<string>> TrySendRequestAsync(
         string systemPrompt,
         string userPrompt,
         bool jsonMode,
@@ -83,7 +83,7 @@ public sealed class DirectAiService(
             {
                 logger.LogError("Direct AI request failed with status {StatusCode}: {Body}",
                     response.StatusCode, responseBody);
-                return Result.Failure<string, string>($"AI request failed with status {response.StatusCode}");
+                return Result.Failure<string>($"AI request failed with status {response.StatusCode}");
             }
 
             using var doc = JsonDocument.Parse(responseBody);
@@ -100,21 +100,21 @@ public sealed class DirectAiService(
                     if (!string.IsNullOrEmpty(result))
                     {
                         logger.LogInformation("Direct AI returned response ({Length} chars)", result.Length);
-                        return Result.Success<string, string>(result);
+                        return Result.Success<string>(result);
                     }
                 }
             }
 
-            return Result.Failure<string, string>("AI returned an empty or unexpected response");
+            return Result.Failure<string>("AI returned an empty or unexpected response");
         }
         catch (OperationCanceledException)
         {
-            return Result.Failure<string, string>("AI request was cancelled");
+            return Result.Failure<string>("AI request was cancelled");
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Direct AI request failed");
-            return Result.Failure<string, string>($"AI request failed: {ex.Message}");
+            return Result.Failure<string>($"AI request failed: {ex.Message}");
         }
     }
 }

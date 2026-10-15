@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services.Providers;
 
@@ -14,11 +14,10 @@ public sealed class PluginDataRouter(
     ILogger<PluginDataRouter> logger) : IEntityStateProvider, ICalendarDataProvider, ITodoDataProvider,
     IWeatherForecastProvider, IEntityHistoryProvider, IRssFeedDataProvider
 {
-    private Result<Dashboard, string> Dashboard(string id)
+    private Result<Dashboard> Dashboard(string id)
     {
         if (!DashboardId.TryParse(id, out var typed)) return "Invalid dashboard ID";
-        var result = dashboards.GetDashboardById(typed);
-        return result.HasValue ? result.Value : "Dashboard not found";
+        return dashboards.GetDashboardById(typed) is { } dashboard ? dashboard : "Dashboard not found";
     }
 
     public string CacheVersion(string dashboardId)
@@ -53,7 +52,7 @@ public sealed class PluginDataRouter(
         return new(sources, errors);
     }
 
-    public async Task<Result<SourceData, string>> FetchAsync(string dashboardId, SourceQuery query, CancellationToken cancellationToken, string? requiredPluginId = null)
+    public async Task<Result<SourceData>> FetchAsync(string dashboardId, SourceQuery query, CancellationToken cancellationToken, string? requiredPluginId = null)
     {
         var dashboard = Dashboard(dashboardId);
         if (dashboard.IsFailure) return dashboard.Error;
@@ -73,7 +72,7 @@ public sealed class PluginDataRouter(
         return await SafeAsync(() => plugin.FetchAsync(new(dashboardId, connection), query, cancellationToken), cancellationToken);
     }
 
-    private async Task<Result<T, string>> SafeAsync<T>(Func<Task<Result<T, string>>> operation, CancellationToken cancellationToken)
+    private async Task<Result<T>> SafeAsync<T>(Func<Task<Result<T>>> operation, CancellationToken cancellationToken)
     {
         try { return await operation(); }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
@@ -81,17 +80,17 @@ public sealed class PluginDataRouter(
         {
             // Do not return exception bodies: provider failures can contain credentials or remote data.
             logger.LogWarning("Provider operation failed ({ExceptionType})", exception.GetType().Name);
-            return Result.Failure<T, string>("Provider is unavailable. Check the connection settings and try again.");
+            return Result.Failure<T>("Provider is unavailable. Check the connection settings and try again.");
         }
     }
 
-    private async Task<Result<T, string>> FetchValue<T>(string dashboardId, SourceQuery query, Func<SourceData, T> select, CancellationToken ct)
+    private async Task<Result<T>> FetchValue<T>(string dashboardId, SourceQuery query, Func<SourceData, T> select, CancellationToken ct)
     {
         var data = await FetchAsync(dashboardId, query, ct);
-        return data.IsFailure ? Result.Failure<T, string>(data.Error) : select(data.Value);
+        return data.IsFailure ? Result.Failure<T>(data.Error) : select(data.Value);
     }
 
-    private async Task<Result<Dictionary<string, T>, string>> FetchAll<T>(string dashboardId, string capability, Func<string, Task<Result<T, string>>> fetch, CancellationToken ct)
+    private async Task<Result<Dictionary<string, T>>> FetchAll<T>(string dashboardId, string capability, Func<string, Task<Result<T>>> fetch, CancellationToken ct)
     {
         var discovery = await DiscoverAsync(dashboardId, ct);
         var result = new Dictionary<string, T>();
@@ -103,7 +102,7 @@ public sealed class PluginDataRouter(
         return result;
     }
 
-    private async Task<Result<Dictionary<string, SourceData>, string>> FetchBatch(string dashboardId, string capability, IEnumerable<string> ids, int hours, CancellationToken ct)
+    private async Task<Result<Dictionary<string, SourceData>>> FetchBatch(string dashboardId, string capability, IEnumerable<string> ids, int hours, CancellationToken ct)
     {
         var dashboard = Dashboard(dashboardId);
         if (dashboard.IsFailure) return dashboard.Error;
@@ -135,34 +134,34 @@ public sealed class PluginDataRouter(
         return values;
     }
 
-    public async Task<Result<List<EntityState>, string>> FetchEntityStatesAsync(string dashboardId, string[] entityIds, CancellationToken cancellationToken = default)
+    public async Task<Result<List<EntityState>>> FetchEntityStatesAsync(string dashboardId, string[] entityIds, CancellationToken cancellationToken = default)
     {
         var result = await FetchBatch(dashboardId, SourceCapabilities.State, entityIds, 168, cancellationToken);
         if (result.IsFailure) return result.Error;
         return result.Value.Where(item => item.Value.State is not null).Select(item => item.Value.State! with { EntityId = item.Key }).ToList();
     }
-    public async Task<Result<List<EntityState>, string>> FetchAllEntityStatesAsync(string dashboardId, CancellationToken cancellationToken = default)
+    public async Task<Result<List<EntityState>>> FetchAllEntityStatesAsync(string dashboardId, CancellationToken cancellationToken = default)
     {
         var sources = await DiscoverAsync(dashboardId, cancellationToken);
         return await FetchEntityStatesAsync(dashboardId, sources.Sources.Where(s => s.Capabilities.Contains(SourceCapabilities.State)).Select(s => s.EntityId).ToArray(), cancellationToken);
     }
-    public Task<Result<List<CalendarEvent>, string>> FetchCalendarEventsAsync(string dashboardId, string entityId, int durationHours = 168, CancellationToken cancellationToken = default) =>
+    public Task<Result<List<CalendarEvent>>> FetchCalendarEventsAsync(string dashboardId, string entityId, int durationHours = 168, CancellationToken cancellationToken = default) =>
         FetchValue(dashboardId, new(SourceCapabilities.Calendar, entityId, durationHours), d => d.CalendarEvents, cancellationToken);
-    public Task<Result<Dictionary<string, List<CalendarEvent>>, string>> FetchAllCalendarEventsAsync(string dashboardId, int durationHours = 168, CancellationToken cancellationToken = default) =>
+    public Task<Result<Dictionary<string, List<CalendarEvent>>>> FetchAllCalendarEventsAsync(string dashboardId, int durationHours = 168, CancellationToken cancellationToken = default) =>
         FetchAll(dashboardId, SourceCapabilities.Calendar, id => FetchCalendarEventsAsync(dashboardId, id, durationHours, cancellationToken), cancellationToken);
-    public Task<Result<List<TodoItem>, string>> FetchTodoItemsAsync(string dashboardId, string entityId, CancellationToken cancellationToken = default) =>
+    public Task<Result<List<TodoItem>>> FetchTodoItemsAsync(string dashboardId, string entityId, CancellationToken cancellationToken = default) =>
         FetchValue(dashboardId, new(SourceCapabilities.Todo, entityId), d => d.TodoItems, cancellationToken);
-    public Task<Result<Dictionary<string, List<TodoItem>>, string>> FetchAllTodoItemsAsync(string dashboardId, CancellationToken cancellationToken = default) =>
+    public Task<Result<Dictionary<string, List<TodoItem>>>> FetchAllTodoItemsAsync(string dashboardId, CancellationToken cancellationToken = default) =>
         FetchAll(dashboardId, SourceCapabilities.Todo, id => FetchTodoItemsAsync(dashboardId, id, cancellationToken), cancellationToken);
-    public Task<Result<List<WeatherForecast>, string>> FetchWeatherForecastAsync(string dashboardId, string entityId, string forecastType = "daily", CancellationToken cancellationToken = default) =>
+    public Task<Result<List<WeatherForecast>>> FetchWeatherForecastAsync(string dashboardId, string entityId, string forecastType = "daily", CancellationToken cancellationToken = default) =>
         FetchValue(dashboardId, new(SourceCapabilities.Forecast, entityId, ForecastType: forecastType), d => d.Forecast, cancellationToken);
-    public Task<Result<Dictionary<string, List<WeatherForecast>>, string>> FetchAllWeatherForecastsAsync(string dashboardId, string forecastType = "daily", CancellationToken cancellationToken = default) =>
+    public Task<Result<Dictionary<string, List<WeatherForecast>>>> FetchAllWeatherForecastsAsync(string dashboardId, string forecastType = "daily", CancellationToken cancellationToken = default) =>
         FetchAll(dashboardId, SourceCapabilities.Forecast, id => FetchWeatherForecastAsync(dashboardId, id, forecastType, cancellationToken), cancellationToken);
-    public Task<Result<List<RssFeedEntry>, string>> FetchRssFeedEntriesAsync(string dashboardId, string entityId, CancellationToken cancellationToken = default) =>
+    public Task<Result<List<RssFeedEntry>>> FetchRssFeedEntriesAsync(string dashboardId, string entityId, CancellationToken cancellationToken = default) =>
         FetchValue(dashboardId, new(SourceCapabilities.Feed, entityId), d => d.Feed, cancellationToken);
-    public Task<Result<Dictionary<string, List<RssFeedEntry>>, string>> FetchAllRssFeedEntriesAsync(string dashboardId, CancellationToken cancellationToken = default) =>
+    public Task<Result<Dictionary<string, List<RssFeedEntry>>>> FetchAllRssFeedEntriesAsync(string dashboardId, CancellationToken cancellationToken = default) =>
         FetchAll(dashboardId, SourceCapabilities.Feed, id => FetchRssFeedEntriesAsync(dashboardId, id, cancellationToken), cancellationToken);
-    public async Task<Result<Dictionary<string, List<HistoryState>>, string>> FetchEntityHistoryAsync(string dashboardId, IEnumerable<string> entityIds, int hours = 24, CancellationToken cancellationToken = default)
+    public async Task<Result<Dictionary<string, List<HistoryState>>>> FetchEntityHistoryAsync(string dashboardId, IEnumerable<string> entityIds, int hours = 24, CancellationToken cancellationToken = default)
     {
         var result = await FetchBatch(dashboardId, SourceCapabilities.History, entityIds, hours, cancellationToken);
         if (result.IsFailure) return result.Error;

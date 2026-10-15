@@ -45,7 +45,7 @@ public class ApiKeyPolicyEvaluatorTests
     public void Evaluate_ApiKeyMatchesNoDevice_ReturnsFalse()
     {
         var deviceRepository = new Mock<IDeviceRepository>();
-        deviceRepository.Setup(r => r.FindByApiKey("bad-key")).Returns(CSharpFunctionalExtensions.Maybe<Device>.None);
+        deviceRepository.Setup(r => r.FindByApiKey("bad-key")).Returns((Device?)null);
         var sut = CreateSut(deviceRepository);
         var context = new DefaultHttpContext();
         context.Request.Headers["X-Api-Key"] = "bad-key";

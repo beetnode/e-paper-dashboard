@@ -55,11 +55,26 @@ public class StandaloneStrategyTests
     }
 
     [Fact]
-    public void GetOAuthClientUri_ReturnsConfiguredClientUri()
+    public void GetHomeAssistantOAuthClient_UsesTheClientUrlAsAppUrlAndClientId()
     {
         var config = CreateValidConfig();
-        var sut = CreateSut(config.Object);
+        config.SetupGet(c => c.ClientUri).Returns(new Uri("https://board.example.test/"));
 
-        sut.GetOAuthClientUri().Should().Be(config.Object.ClientUri);
+        var client = CreateSut(config.Object).GetHomeAssistantOAuthClient(null);
+
+        client.Value.Should().Be(new HomeAssistantOAuthClient("https://board.example.test", "https://board.example.test"));
     }
+
+    [Fact]
+    public void GetHomeAssistantOAuthClient_WithoutClientUrl_Fails()
+    {
+        var config = CreateValidConfig();
+        config.SetupGet(c => c.ClientUri).Returns((Uri?)null);
+
+        CreateSut(config.Object).GetHomeAssistantOAuthClient(null).Error.Should().Contain("CLIENT_URL");
+    }
+
+    [Fact]
+    public void RunsRendererInProcess_IsFalse() =>
+        CreateSut(CreateValidConfig().Object).RunsRendererInProcess.Should().BeFalse();
 }

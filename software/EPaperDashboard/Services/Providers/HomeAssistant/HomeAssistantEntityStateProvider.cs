@@ -1,7 +1,7 @@
 using EPaperDashboard.Models;
 using System.Net.WebSockets;
 using System.Text.Json;
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 
 namespace EPaperDashboard.Services.Providers.HomeAssistant;
 
@@ -27,7 +27,7 @@ public class HomeAssistantEntityStateProvider(
     };
 
 
-    public async Task<Result<List<EntityState>, string>> FetchEntityStatesAsync(ProviderConnection homeAssistant, string[] entityIds, CancellationToken cancellationToken = default)
+    public async Task<Result<List<EntityState>>> FetchEntityStatesAsync(ProviderConnection homeAssistant, string[] entityIds, CancellationToken cancellationToken = default)
     {
         var connectionInfo = _connection.GetConnectionInfo(homeAssistant);
         if (connectionInfo.IsFailure)
@@ -35,7 +35,7 @@ public class HomeAssistantEntityStateProvider(
 
         var requestedIds = new HashSet<string>(entityIds.Where(id => !string.IsNullOrWhiteSpace(id)), StringComparer.OrdinalIgnoreCase);
         if (requestedIds.Count == 0)
-            return Result.Success<List<EntityState>, string>(new List<EntityState>());
+            return Result.Success<List<EntityState>>(new List<EntityState>());
 
         var (hostUrl, token) = connectionInfo.Value;
 

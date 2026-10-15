@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 using LiteDB;
@@ -7,10 +7,10 @@ namespace EPaperDashboard.Data.LiteDb;
 
 internal sealed class LiteDbPairingSessionRepository(LiteDbContext context) : IPairingSessionRepository
 {
-    public Maybe<PairingSession> FindById(PairingSessionId id) =>
+    public PairingSession? FindById(PairingSessionId id) =>
         context.PairingSessions.FindById(new ObjectId(id.Value));
 
-    public Maybe<PairingSession> FindByCode(string code) =>
+    public PairingSession? FindByCode(string code) =>
         context.PairingSessions.FindOne(s => s.Code == code);
 
     public void Insert(PairingSession session)
@@ -25,6 +25,9 @@ internal sealed class LiteDbPairingSessionRepository(LiteDbContext context) : IP
 
     public void DeleteExpired(DateTimeOffset before) =>
         context.PairingSessions.DeleteMany(s => s.ExpiresAt <= before);
+
+    public void DeleteByUserId(UserId userId) =>
+        context.PairingSessions.DeleteMany(s => s.UserId == userId);
 
     public bool HasActiveSessions(DateTimeOffset now) =>
         context.PairingSessions.Exists(s => !s.IsCompleted && s.ExpiresAt > now);

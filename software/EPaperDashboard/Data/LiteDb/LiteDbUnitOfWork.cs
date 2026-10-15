@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using EPaperDashboard.Data.Repositories;
 
 namespace EPaperDashboard.Data.LiteDb;
@@ -20,6 +21,15 @@ internal sealed class LiteDbUnitOfWork(LiteDbContext context) : IUnitOfWork
         }
     }
 
-    // A LiteDB file belongs to one app instance, so a transaction is already exclusive.
-    public T ExecuteExclusive<T>(string lockName, Func<T> operation) => Execute(operation);
+    private readonly ConcurrentDictionary<string, object> _locks = new();
+
+    // A LiteDB file belongs to one app instance, so an in-process lock excludes every other writer. The transaction
+    // alone is not enough: LiteDB lets concurrent transactions read before either writes.
+    public T ExecuteExclusive<T>(string lockName, Func<T> operation)
+    {
+        lock (_locks.GetOrAdd(lockName, _ => new object()))
+        {
+            return Execute(operation);
+        }
+    }
 }

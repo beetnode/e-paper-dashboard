@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 
 namespace EPaperDashboard.Services.Providers;
 
@@ -7,10 +7,10 @@ namespace EPaperDashboard.Services.Providers;
 /// </summary>
 public interface IRssFeedDataProvider
 {
-    Task<Result<List<RssFeedEntry>, string>> FetchRssFeedEntriesAsync(string dashboardId, string entityId, CancellationToken cancellationToken = default);
+    Task<Result<List<RssFeedEntry>>> FetchRssFeedEntriesAsync(string dashboardId, string entityId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Discovers all available RSS feed entities and fetches entries for each.
     /// </summary>
-    Task<Result<Dictionary<string, List<RssFeedEntry>>, string>> FetchAllRssFeedEntriesAsync(string dashboardId, CancellationToken cancellationToken = default);
+    Task<Result<Dictionary<string, List<RssFeedEntry>>>> FetchAllRssFeedEntriesAsync(string dashboardId, CancellationToken cancellationToken = default);
 }

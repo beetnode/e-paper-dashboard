@@ -121,7 +121,7 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
                 @if (!renderingEnabled() || !playwrightStatus()?.ready) {
                   <div class="alert alert-warning small" role="alert">
                     <strong>Rendering is not ready.</strong> Home Assistant dashboards are captured by the rendering component.
-                    <a routerLink="/rendering" target="_blank" rel="noopener" class="alert-link">Enable it in Rendering settings.</a>
+                    <a routerLink="/settings" target="_blank" rel="noopener" class="alert-link">Enable it in Rendering settings.</a>
                   </div>
                 }
                 <div class="row g-3 mb-3">
@@ -187,7 +187,7 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
             @if (previewModeValue === 'ssr') {
               <section class="app-section-card" aria-labelledby="aiSettingsTitle">
                 <h2 id="aiSettingsTitle" class="app-section-title">AI provider</h2>
-                <p class="app-section-description">Used for AI generated widgets. Defaults to the <a routerLink="/ai/config">global AI provider</a>.</p>
+                <p class="app-section-description">Used for AI generated widgets. Defaults to the <a routerLink="/settings">global AI provider</a>.</p>
                 <div [class.mb-3]="aiConfig().connectionMode === 'HomeAssistant'">
                   <label class="form-label fw-semibold" for="aiConnectionMode">Provider</label>
                   <select id="aiConnectionMode" class="form-select"
@@ -207,7 +207,7 @@ import { PlaywrightComponentService, UserRenderingComponentStatus } from '../../
                         [ngModel]="aiConfig().homeAssistantConnectionId || ''"
                         (ngModelChange)="onAiHomeAssistantConnectionChange($event)"
                         [ngModelOptions]="{standalone: true}">
-                        @if (isAddonMode()) {
+                        @if (hasDefaultHomeAssistantConnection()) {
                           <option value="">Home Assistant add-on</option>
                         } @else {
                           <option value="" disabled>Select a connection</option>
@@ -301,7 +301,7 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
   private readonly playwrightComponentService = inject(PlaywrightComponentService);
   private readonly dataProviderService = inject(DataProviderService);
 
-  readonly isAddonMode = this.authService.isAddonMode;
+  readonly hasDefaultHomeAssistantConnection = this.authService.hasDefaultHomeAssistantConnection;
 
   readonly dashboard = signal<Dashboard | null>(null);
   readonly isLoading = signal(false);
@@ -580,9 +580,9 @@ export class DashboardEditComponent implements OnInit, OnDestroy, HasUnsavedChan
     this.aiConfig.update(c => ({ ...c, connectionMode: mode }));
     this.dashboardForm.markAsDirty();
     if (mode === 'HomeAssistant') {
-      // Outside the add-on, a named connection is required; start with a signed-in one.
+      // Without a default connection, a named one is required; start with a signed-in one.
       const currentDashboard = this.dashboard();
-      if (!this.aiConfig().homeAssistantConnectionId && !this.isAddonMode()) {
+      if (!this.aiConfig().homeAssistantConnectionId && !this.hasDefaultHomeAssistantConnection()) {
         const connection = this.homeAssistantConnections().find(c => c.connected);
         if (connection) this.aiConfig.update(c => ({ ...c, homeAssistantConnectionId: connection.id }));
       }

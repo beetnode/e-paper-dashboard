@@ -1,3 +1,4 @@
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Guards;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services.Plugins;
@@ -9,7 +10,7 @@ namespace EPaperDashboard.Controllers;
 [ApiController, Authorize, Route("api/providers")]
 public sealed class ProviderConnectionsController(ProviderRegistry registry, ProviderConnectionStore connections, Services.UserService users) : BaseApiController
 {
-    private bool HasAccount => CurrentUserId != UserId.Empty && (IsHomeAssistantIngress || users.GetUserById(CurrentUserId).HasValue);
+    private bool HasAccount => users.HasAccount(CurrentUserId);
 
     [HttpGet]
     public IActionResult Plugins() => Ok(new
@@ -32,7 +33,7 @@ public sealed class ProviderConnectionsController(ProviderRegistry registry, Pro
         if (!HasAccount) return Forbid();
         var plugin = registry.Find(request.PluginId);
         if (plugin is null) return BadRequest(new { message = "Unknown provider" });
-        if (connections.List(CurrentUserId).Count(c => !connections.IsDefault(c)) >= 20) return BadRequest(new { message = "You can create up to 20 connections." });
+        if (connections.List(CurrentUserId).Count(c => !connections.IsDefault(c)) >= UserLimits.MaxConnections) return BadRequest(new { message = $"You can create up to {UserLimits.MaxConnections} connections." });
         var credentials = AllowedCredentials(plugin, request.Credentials);
         var error = Validate(plugin, request.Name, credentials);
         if (error is not null) return BadRequest(new { message = error });

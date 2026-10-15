@@ -11,34 +11,10 @@ namespace EPaperDashboard.Controllers;
 public abstract class BaseApiController : ControllerBase
 {
     /// <summary>
-    /// Gets the current user's ID from claims.
-    /// In Home Assistant mode, returns a virtual user ID.
-    /// Returns Guid.Empty if not authenticated or claim not found.
+    /// Gets the current user's ID from claims (the add-on's ingress user included).
+    /// Returns UserId.Empty if not authenticated or claim not found.
     /// </summary>
-    protected UserId CurrentUserId
-    {
-        get
-        {
-            var userIdValue = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (string.IsNullOrEmpty(userIdValue))
-            {
-                return UserId.Empty;
-            }
-
-            // In Home Assistant ingress mode, use virtual user ID
-            if (IsHomeAssistantIngress && userIdValue == Constants.HomeAssistantAdminUserId)
-            {
-                return Constants.HomeAssistantVirtualUserId;
-            }
-
-            if (UserId.TryParse(userIdValue, out var id))
-            {
-                return id;
-            }
-
-            return UserId.Empty;
-        }
-    }
+    protected UserId CurrentUserId => User.GetUserId();
 
     /// <summary>
     /// Gets whether the current user is a super user.

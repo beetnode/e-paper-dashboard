@@ -11,7 +11,7 @@ describe('RenderingSettingsComponent', () => {
   beforeEach(() => {
     addon = false;
     TestBed.configureTestingModule({ imports: [RenderingSettingsComponent], providers: [
-      provideHttpClient(), provideHttpClientTesting(), { provide: AuthService, useValue: { isAddonMode: () => addon } }
+      provideHttpClient(), provideHttpClientTesting(), { provide: AuthService, useValue: { isUserManagementDisabled: () => addon } }
     ] });
     http = TestBed.inject(HttpTestingController);
   });
@@ -43,6 +43,19 @@ describe('RenderingSettingsComponent', () => {
     fixture.destroy();
   });
 
+  it('explains when an administrator turned rendering off and prevents enabling it', () => {
+    const fixture = TestBed.createComponent(RenderingSettingsComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/rendering').flush({ enabled: false, allowed: false, canManage: false,
+      component: { state: 'Installed', ready: true, supported: true } });
+    fixture.detectChanges();
+    const element: HTMLElement = fixture.nativeElement;
+    expect(element.textContent).toContain('An administrator turned off rendering for your account.');
+    const enable = Array.from(element.querySelectorAll('button')).find(b => b.textContent?.includes('Enable'))!;
+    expect(enable.disabled).toBe(true);
+    fixture.destroy();
+  });
+
   it('keeps the existing setting when an enable request fails', () => {
     const error = vi.spyOn(TestBed.inject(ToastService), 'error');
     const fixture = TestBed.createComponent(RenderingSettingsComponent);
@@ -54,5 +67,44 @@ describe('RenderingSettingsComponent', () => {
     expect(error).toHaveBeenCalledWith('Unsupported server');
     expect(fixture.componentInstance.busy()).toBe(false);
     fixture.destroy();
+  });
+
+  it('tells a regular user rendering is unavailable instead of preparing the shared component', () => {
+    vi.useFakeTimers();
+    const fixture = TestBed.createComponent(RenderingSettingsComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/rendering').flush({ enabled: true, canManage: false, component: { state: 'NotInstalled', ready: false, supported: true } });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).not.toContain('Prepare rendering');
+    expect(fixture.nativeElement.textContent).toContain('not available on this server');
+    vi.advanceTimersByTime(30000);
+    http.expectNone('/api/rendering');
+    fixture.destroy();
+    vi.useRealTimers();
+  });
+
+  it('lets an administrator prepare the component', () => {
+    const fixture = TestBed.createComponent(RenderingSettingsComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/rendering').flush({ enabled: true, canManage: true, component: { state: 'Failed', ready: false, supported: true } });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Prepare rendering');
+    expect(fixture.nativeElement.textContent).not.toContain('not available on this server');
+    fixture.destroy();
+  });
+
+  it('refreshes the status while the component is being prepared', () => {
+    vi.useFakeTimers();
+    const fixture = TestBed.createComponent(RenderingSettingsComponent);
+    fixture.detectChanges();
+    http.expectOne('/api/rendering').flush({ enabled: true, canManage: false, component: { state: 'Installing', ready: false, supported: true } });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('being prepared');
+    vi.advanceTimersByTime(3000);
+    http.expectOne('/api/rendering').flush({ enabled: true, canManage: false, component: { state: 'Installed', ready: true, supported: true } });
+    vi.advanceTimersByTime(30000);
+    http.expectNone('/api/rendering');
+    fixture.destroy();
+    vi.useRealTimers();
   });
 });

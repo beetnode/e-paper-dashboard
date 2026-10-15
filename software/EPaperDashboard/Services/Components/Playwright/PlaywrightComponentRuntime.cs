@@ -20,16 +20,21 @@ public sealed class PlaywrightComponentRuntime
     private readonly string _componentRoot;
     private readonly bool _allowLocal;
     private int _queuedRequests;
+    private static readonly TimeSpan AvailabilityCacheDuration = TimeSpan.FromSeconds(5);
+    private volatile AvailabilityCheck? _availability;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public PlaywrightComponentRuntime(IConfiguration? configuration = null, IEnvironmentConfiguration? environment = null)
+    public PlaywrightComponentRuntime(
+        IConfiguration? configuration = null,
+        IEnvironmentConfiguration? environment = null,
+        IDeploymentStrategy? deploymentStrategy = null)
     {
         _concurrency = ReadLimit(configuration, "RENDERING_MAX_CONCURRENT_RENDERS", 2, 1, 16);
         _maximumQueuedRequests = ReadLimit(configuration, "RENDERING_MAX_QUEUED_RENDERS", 100, 0, 1000);
         _slots = new SemaphoreSlim(_concurrency, _concurrency);
         _socketPath = configuration?["RENDERING_COMPONENT_SOCKET"] ?? "/run/izboard-rendering/renderer.sock";
         _componentRoot = Path.Combine(environment?.ConfigDir ?? "/data", "components", "playwright");
-        _allowLocal = environment?.IsAddonMode == true;
+        _allowLocal = deploymentStrategy?.RunsRendererInProcess == true;
     }
 
     private static int ReadLimit(IConfiguration? configuration, string key, int fallback, int minimum, int maximum)
@@ -154,9 +159,21 @@ public sealed class PlaywrightComponentRuntime
         }
     }
 
+    // Status pages of many users poll this; a short cache keeps them from probing the sidecar on every request.
     internal async Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
     {
         if (_allowLocal) return true;
+        if (_availability is { } cached && Stopwatch.GetElapsedTime(cached.CheckedAt) < AvailabilityCacheDuration)
+            return cached.Available;
+        var available = await ProbeHostAsync(cancellationToken);
+        _availability = new AvailabilityCheck(available, Stopwatch.GetTimestamp());
+        return available;
+    }
+
+    private sealed record AvailabilityCheck(bool Available, long CheckedAt);
+
+    private async Task<bool> ProbeHostAsync(CancellationToken cancellationToken)
+    {
         try
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

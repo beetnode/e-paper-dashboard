@@ -11,14 +11,13 @@
   <PropertyGroup>
     <!-- Base version (major.minor.patch) - update this when releasing new versions -->
     <!-- The build number will be appended automatically during CI/CD builds -->
-    <Version>0.5.0</Version>
+    <Version>0.6.0</Version>
 
     <AssemblyVersion>$(Version)</AssemblyVersion>
     <FileVersion>$(Version)</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CSharpFunctionalExtensions" Version="3.6.0" />
     <PackageReference Include="FluentMigrator.Runner.Postgres" Version="8.0.1" />
     <PackageReference Include="LiteDB" Version="5.0.21" />
     <PackageReference Include="Npgsql" Version="10.0.1" />

@@ -23,8 +23,8 @@ public class HomeAssistantAuthServiceTests
 
     public HomeAssistantAuthServiceTests()
     {
-        _deployment.SetupGet(d => d.Mode).Returns(DeploymentMode.Standalone);
-        _deployment.Setup(d => d.GetOAuthClientUri(It.IsAny<HttpContext?>())).Returns(new Uri("https://board.example.test/"));
+        _deployment.Setup(d => d.GetHomeAssistantOAuthClient(It.IsAny<HttpContext?>()))
+            .Returns(new HomeAssistantOAuthClient("https://board.example.test", "https://board.example.test"));
     }
 
     private HomeAssistantAuthService CreateSut() => new(NullLogger<HomeAssistantAuthService>.Instance, _clients.Object, _deployment.Object, _time, _protection);
@@ -52,7 +52,8 @@ public class HomeAssistantAuthServiceTests
     [Fact]
     public void StartConnectionAuth_UnknownClientUri_Fails()
     {
-        _deployment.Setup(d => d.GetOAuthClientUri(It.IsAny<HttpContext?>())).Returns((Uri?)null);
+        _deployment.Setup(d => d.GetHomeAssistantOAuthClient(It.IsAny<HttpContext?>()))
+            .Returns(Result.Failure<HomeAssistantOAuthClient>("CLIENT_URL is not configured."));
 
         CreateSut().StartConnectionAuth(_connection, "https://ha.example.test", null).IsFailure.Should().BeTrue();
     }

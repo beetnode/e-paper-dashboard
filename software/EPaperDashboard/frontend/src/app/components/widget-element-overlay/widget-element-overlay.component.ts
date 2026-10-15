@@ -45,6 +45,8 @@ export class WidgetElementOverlayComponent implements OnChanges, OnDestroy {
   @Input() previewImageUrl = '';
   @Input() previewWidth = 0;
   @Input() previewHeight = 0;
+  /** Widget background, painted over element pixels the image still shows at a previous spot. */
+  @Input() maskColor = '';
   @Output() elementChange = new EventEmitter<EditableElementChange>();
 
   readonly handles: readonly ResizeHandle[] = ['n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se'];
@@ -117,6 +119,35 @@ export class WidgetElementOverlayComponent implements OnChanges, OnDestroy {
 
   isInteracting(element: EditableWidgetElementGeometry): boolean {
     return this.interaction?.element.id === element.id;
+  }
+
+  /** True while the element sits somewhere other than where the preview image drew it. */
+  isMoved(element: EditableWidgetElementGeometry): boolean {
+    return this.hasPositionChanged(element.position, this.getPosition(element));
+  }
+
+  /**
+   * Elements whose rendered pixels are hidden until the next render. Once any element has moved,
+   * every element is drawn from the image at its current spot, so hiding a vacated area never
+   * erases a neighbour that overlaps it.
+   */
+  get movedElements(): EditableWidgetElementGeometry[] {
+    return this.previewImageUrl ? this.geometry.elements.filter(element => this.isMoved(element)) : [];
+  }
+
+  showsImage(element: EditableWidgetElementGeometry, anyMoved: boolean): boolean {
+    return !!this.previewImageUrl && (anyMoved || this.isInteracting(element));
+  }
+
+  vacatedStyle(element: EditableWidgetElementGeometry): Record<string, string> {
+    const widget = this.geometry.bounds;
+    return {
+      left: `${element.bounds.x - widget.x}px`,
+      top: `${element.bounds.y - widget.y}px`,
+      width: `${element.bounds.width}px`,
+      height: `${element.bounds.height}px`,
+      backgroundColor: this.maskColor || 'transparent',
+    };
   }
 
   ghostStyle(element: EditableWidgetElementGeometry): Record<string, string> {

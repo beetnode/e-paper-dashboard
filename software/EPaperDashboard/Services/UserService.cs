@@ -1,26 +1,99 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Authentication;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
+using EPaperDashboard.Utilities;
 using System.Security.Cryptography;
-using System.Text;
 
 namespace EPaperDashboard.Services;
 
-public sealed class UserService(IUserRepository userRepository, IDashboardRepository dashboardRepository, IProviderConnectionRepository? connections = null)
+public sealed class UserService(
+    IUserRepository userRepository,
+    IDashboardRepository dashboardRepository,
+    IProviderConnectionRepository? connections = null,
+    IDeploymentStrategy? deployment = null,
+    IDeviceRepository? devices = null,
+    IPairingSessionRepository? pairingSessions = null,
+    IUnitOfWork? unitOfWork = null,
+    UserSessionValidator? sessions = null)
 {
-    public Maybe<User> GetUserByUsername(string username) =>
+    public User? GetUserByUsername(string username) =>
         userRepository.FindByUsername(username);
 
-    public Maybe<User> GetUserById(UserId id) =>
+    public User? GetUserById(UserId id) =>
         userRepository.FindById(id);
+
+    /// <summary>
+    /// Whether the owner is a known account. In add-on mode the only account is the Home Assistant ingress user
+    /// (<see cref="Constants.HomeAssistantVirtualUserId"/>), which has no user record: its settings are kept in
+    /// service state instead. Use the owner settings below rather than reading <see cref="User"/> fields directly,
+    /// so this owner is handled the same way as a regular account.
+    /// </summary>
+    public bool HasAccount(UserId id) =>
+        IsAddonOwner(id)
+        || (id != UserId.Empty && deployment?.IsUserManagementEnabled != false
+            && userRepository.FindById(id) is { IsSuspended: false });
+
+    /// <summary>Returns the owner's global AI provider, or null when it is not configured or the owner has no account.</summary>
+    public AiConfig? GetAiConfig(UserId id) =>
+        IsAddonOwner(id) ? userRepository.GetAiConfig(id) : FindAccount(id)?.AiConfig;
+
+    public bool TryUpdateAiConfig(UserId id, AiConfig config)
+    {
+        if (IsAddonOwner(id))
+        {
+            userRepository.SetAiConfig(id, config);
+            return true;
+        }
+
+        var user = FindAccount(id);
+        if (user is null)
+        {
+            return false;
+        }
+
+        user.AiConfig = config;
+        userRepository.Update(user);
+        return true;
+    }
+
+    /// <summary>
+    /// Rendering requires an explicit opt-in and must not be revoked by an administrator; owners without an account
+    /// never have access.
+    /// </summary>
+    public bool IsRenderingEnabled(UserId id) =>
+        IsRenderingAllowed(id) && (userRepository.GetRenderingEnabled(id)
+            ?? FindAccount(id)?.RenderingEnabled ?? false);
+
+    public bool IsRenderingAllowed(UserId id) =>
+        HasAccount(id) && (IsAddonOwner(id) || FindAccount(id) is { RenderingAllowed: not false });
+
+    public bool IsUsernameTaken(string username) =>
+        userRepository.ExistsByUsernameIgnoreCase(username.Trim());
+
+    public bool TrySetRenderingEnabled(UserId id, bool enabled)
+    {
+        if (!HasAccount(id))
+        {
+            return false;
+        }
+
+        userRepository.SetRenderingEnabled(id, enabled);
+        return true;
+    }
+
+    private static bool IsAddonOwner(UserId id) => id == Constants.HomeAssistantVirtualUserId;
+
+    private User? FindAccount(UserId id) =>
+        HasAccount(id) ? userRepository.FindById(id) : null;
 
     public bool IsSetupComplete() => userRepository.IsSetupComplete();
 
     public bool TryCreateAdministrator(string username, string password) =>
         userRepository.TryCreateAdministrator(new User
         {
-            Username = username.Trim(), PasswordHash = ComputeSha256Hash(password),
-            IsSuperUser = true, RenderingEnabled = false
+            Username = username.Trim(), PasswordHash = PasswordHashing.Hash(password),
+            IsSuperUser = true, RenderingEnabled = false,
+            SecurityStamp = NewSecurityStamp(), CreatedAt = DateTimeOffset.UtcNow
         });
 
     public static string? ValidateCredentials(string? username, string? password) =>
@@ -38,28 +111,194 @@ public sealed class UserService(IUserRepository userRepository, IDashboardReposi
     public void UpdateUser(User user) =>
         userRepository.Update(user);
 
+    /// <summary>
+    /// Deletes the caller's own account together with everything it owns, including paired devices.
+    /// The last active administrator cannot leave.
+    /// </summary>
     public bool TryDeleteUser(UserId id) =>
-        userRepository.FindById(id)
-            .Where(u => !u.IsSuperUser)
-            .Match(
-                u =>
-                {
-                    dashboardRepository.DeleteByUserId(u.Id);
-                    connections?.DeleteByUserId(u.Id);
-                    userRepository.Delete(u.Id);
-                    return true;
-                },
-                () => false
-            );
+        ExecuteUnderUsersLock(() =>
+        {
+            var user = userRepository.FindById(id);
+            if (user is null || IsLastActiveAdministrator(user))
+            {
+                return false;
+            }
 
-    public bool IsUserValid(string username, string password) =>
-        GetUserByUsername(username)
-        .Select(user => string.Equals(user.PasswordHash, ComputeSha256Hash(password), StringComparison.OrdinalIgnoreCase))
-        .GetValueOrDefault();
+            DeleteAccount(user);
+            return true;
+        });
 
-    public bool TryCreateUser(string username, string password, bool isSuperUser = false)
+    public AdminActionResult SetSuperUser(UserId actor, UserId target, bool isSuperUser) =>
+        Administer(actor, target, user =>
+        {
+            if (!isSuperUser && IsLastActiveAdministrator(user))
+            {
+                return AdminActionResult.LastAdministrator;
+            }
+
+            user.IsSuperUser = isSuperUser;
+            if (!isSuperUser)
+            {
+                user.SecurityStamp = NewSecurityStamp();
+            }
+            userRepository.Update(user);
+            return AdminActionResult.Done;
+        });
+
+    public AdminActionResult SetSuspended(UserId actor, UserId target, bool suspended) =>
+        Administer(actor, target, user =>
+        {
+            if (suspended && IsLastActiveAdministrator(user))
+            {
+                return AdminActionResult.LastAdministrator;
+            }
+
+            user.IsSuspended = suspended;
+            user.SecurityStamp = NewSecurityStamp();
+            userRepository.Update(user);
+            return AdminActionResult.Done;
+        });
+
+    /// <summary>Replaces the target's password with a random one that must be changed at the next sign-in.</summary>
+    public (AdminActionResult Result, string? TemporaryPassword) ResetPassword(UserId actor, UserId target)
     {
-        if (userRepository.ExistsByUsername(username))
+        string? temporaryPassword = null;
+        var result = Administer(actor, target, user =>
+        {
+            temporaryPassword = IssueTemporaryPassword(user);
+            return AdminActionResult.Done;
+        });
+        return (result, result == AdminActionResult.Done ? temporaryPassword : null);
+    }
+
+    public AdminActionResult SetRenderingAllowed(UserId actor, UserId target, bool allowed) =>
+        Administer(actor, target, user =>
+        {
+            user.RenderingAllowed = allowed ? null : false;
+            userRepository.Update(user);
+            return AdminActionResult.Done;
+        });
+
+    public AdminActionResult DeleteUserAsAdmin(UserId actor, UserId target) =>
+        Administer(actor, target, user =>
+        {
+            if (IsLastActiveAdministrator(user))
+            {
+                return AdminActionResult.LastAdministrator;
+            }
+
+            DeleteAccount(user);
+            return AdminActionResult.Done;
+        });
+
+    public const int TemporaryPasswordLength = 20;
+
+    // The operator console has no acting account, so the self and last-administrator checks do not apply.
+    public bool TryPromoteFromConsole(string username) =>
+        ExecuteUnderUsersLock(() =>
+        {
+            var user = userRepository.FindByUsername(username);
+            if (user is null)
+            {
+                return false;
+            }
+
+            user.IsSuperUser = true;
+            user.IsSuspended = false;
+            userRepository.Update(user);
+            sessions?.Invalidate(user.Id);
+            return true;
+        });
+
+    public string? TryResetPasswordFromConsole(string username) =>
+        ExecuteUnderUsersLock(() =>
+        {
+            var user = userRepository.FindByUsername(username);
+            if (user is null)
+            {
+                return null;
+            }
+
+            var temporaryPassword = IssueTemporaryPassword(user);
+            sessions?.Invalidate(user.Id);
+            return temporaryPassword;
+        });
+
+    private string IssueTemporaryPassword(User user)
+    {
+        var temporaryPassword = NewTemporaryPassword();
+        user.PasswordHash = PasswordHashing.Hash(temporaryPassword);
+        user.MustChangePassword = true;
+        user.SecurityStamp = NewSecurityStamp();
+        userRepository.Update(user);
+        return temporaryPassword;
+    }
+
+    private AdminActionResult Administer(UserId actor, UserId target, Func<User, AdminActionResult> change)
+    {
+        if (actor == target)
+        {
+            return AdminActionResult.SelfNotAllowed;
+        }
+
+        var result = ExecuteUnderUsersLock(() => userRepository.FindById(target) is { } user ? change(user) : AdminActionResult.NotFound);
+        sessions?.Invalidate(target);
+        return result;
+    }
+
+    // Callers hold the users lock, so two administrators cannot remove each other at the same time.
+    private bool IsLastActiveAdministrator(User user) =>
+        user.IsSuperUser && !user.IsSuspended && !userRepository.ExistsOtherActiveSuperUser(user.Id);
+
+    private void DeleteAccount(User user)
+    {
+        dashboardRepository.DeleteByUserId(user.Id);
+        connections?.DeleteByUserId(user.Id);
+        devices?.DeleteByUserId(user.Id);
+        pairingSessions?.DeleteByUserId(user.Id);
+        userRepository.Delete(user.Id);
+        sessions?.Invalidate(user.Id);
+    }
+
+    private static string NewTemporaryPassword()
+    {
+        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+        return RandomNumberGenerator.GetString(alphabet, TemporaryPasswordLength);
+    }
+
+    private T ExecuteUnderUsersLock<T>(Func<T> operation) =>
+        unitOfWork is null ? operation() : unitOfWork.ExecuteExclusive(UsersLock, operation);
+
+    private const string UsersLock = "users";
+
+    /// <summary>Returns the account when the password matches, upgrading a legacy password hash on the way.</summary>
+    public User? VerifyCredentials(string username, string password)
+    {
+        var user = GetUserByUsername(username);
+        if (user is null)
+        {
+            PasswordHashing.SimulateVerification(password);
+            return null;
+        }
+
+        switch (PasswordHashing.Verify(user.PasswordHash, password))
+        {
+            case PasswordCheck.ValidNeedsRehash:
+                user.PasswordHash = PasswordHashing.Hash(password);
+                userRepository.Update(user);
+                return user;
+            case PasswordCheck.Valid:
+                return user;
+            default:
+                return null;
+        }
+    }
+
+    /// <summary>Creates a regular account. Administrators are only made by setup or by promoting an account.</summary>
+    public bool TryCreateUser(string username, string password, bool mustChangePassword = false)
+    {
+        // Usernames that differ only in case would let one account pass itself off as another.
+        if (userRepository.ExistsByUsername(username) || userRepository.ExistsByUsernameIgnoreCase(username))
         {
             return false;
         }
@@ -67,53 +306,46 @@ public sealed class UserService(IUserRepository userRepository, IDashboardReposi
         var user = new User
         {
             Username = username,
-            PasswordHash = ComputeSha256Hash(password),
-            IsSuperUser = isSuperUser,
-            RenderingEnabled = false
+            PasswordHash = PasswordHashing.Hash(password),
+            RenderingEnabled = false,
+            SecurityStamp = NewSecurityStamp(),
+            CreatedAt = DateTimeOffset.UtcNow,
+            MustChangePassword = mustChangePassword
         };
 
         return userRepository.TryInsert(user);
     }
 
-    public bool TryChangeNickname(UserId userId, string? newNickname) =>
-        GetUserById(userId)
-        .Match(
-            user =>
-            {
-                user.Nickname = string.IsNullOrWhiteSpace(newNickname) ? null : newNickname;
-                userRepository.Update(user);
-                return true;
-            },
-            () => false);
-
-    public bool TryChangePassword(UserId userId, string oldPassword, string newPassword) =>
-        userRepository.FindById(userId)
-            .Where(user => string.Equals(user.PasswordHash, ComputeSha256Hash(oldPassword), StringComparison.Ordinal))
-            .Match(
-                user =>
-                {
-                    var newHash = ComputeSha256Hash(newPassword);
-                    if (string.Equals(user.PasswordHash, newHash, StringComparison.Ordinal))
-                    {
-                        return false;
-                    }
-
-                    user.PasswordHash = newHash;
-                    userRepository.Update(user);
-                    return true;
-                },
-                () => false
-            );
-
-    public static string ComputeSha256Hash(string rawData)
+    public bool TryChangeNickname(UserId userId, string? newNickname)
     {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(rawData));
-        var builder = new StringBuilder();
-        foreach (var b in bytes)
+        var user = GetUserById(userId);
+        if (user is null)
         {
-            builder.Append(b.ToString("x2"));
+            return false;
         }
 
-        return builder.ToString();
+        user.Nickname = string.IsNullOrWhiteSpace(newNickname) ? null : newNickname;
+        userRepository.Update(user);
+        return true;
     }
+
+    public bool TryChangePassword(UserId userId, string oldPassword, string newPassword)
+    {
+        var user = userRepository.FindById(userId);
+        if (user is null
+            || PasswordHashing.Verify(user.PasswordHash, oldPassword) == PasswordCheck.Failed
+            || PasswordHashing.Verify(user.PasswordHash, newPassword) != PasswordCheck.Failed)
+        {
+            return false;
+        }
+
+        user.PasswordHash = PasswordHashing.Hash(newPassword);
+        user.MustChangePassword = false;
+        user.SecurityStamp = NewSecurityStamp();
+        userRepository.Update(user);
+        sessions?.Invalidate(user.Id);
+        return true;
+    }
+
+    private static string NewSecurityStamp() => Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
 }

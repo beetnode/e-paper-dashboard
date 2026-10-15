@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 
@@ -6,15 +6,15 @@ namespace EPaperDashboard.Data.PostgreSql;
 
 internal sealed class PostgresPairingSessionRepository(PostgresDbContext context) : IPairingSessionRepository
 {
-    public Maybe<PairingSession> FindById(PairingSessionId id) => Maybe.From(
+    public PairingSession? FindById(PairingSessionId id) =>
         context.FindOne<PairingSession>("SELECT document FROM izboard_pairing_sessions WHERE id = @id",
-            PostgresDbContext.Parameter("id", id.Value)));
+            PostgresDbContext.Parameter("id", id.Value));
 
-    public Maybe<PairingSession> FindByCode(string code) => Maybe.From(
+    public PairingSession? FindByCode(string code) =>
         context.FindOne<PairingSession>(
             "SELECT document FROM izboard_pairing_sessions WHERE code = @code" +
             (context.InTransaction ? " FOR UPDATE" : ""),
-            PostgresDbContext.Parameter("code", code)));
+            PostgresDbContext.Parameter("code", code));
 
     public void Insert(PairingSession session)
     {
@@ -35,6 +35,10 @@ internal sealed class PostgresPairingSessionRepository(PostgresDbContext context
     public void DeleteExpired(DateTimeOffset before) => context.Execute(
         "DELETE FROM izboard_pairing_sessions WHERE expires_at <= @before",
         PostgresDbContext.Parameter("before", before.ToUniversalTime()));
+
+    public void DeleteByUserId(UserId userId) => context.Execute(
+        "DELETE FROM izboard_pairing_sessions WHERE document->>'UserId' = @user_id",
+        PostgresDbContext.Parameter("user_id", userId.Value));
 
     public bool HasActiveSessions(DateTimeOffset now) => context.Exists("""
         SELECT EXISTS (SELECT 1 FROM izboard_pairing_sessions

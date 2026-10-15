@@ -24,6 +24,10 @@ export interface PlaywrightComponentStatus {
 export type UserRenderingComponentStatus = Pick<PlaywrightComponentStatus, 'state' | 'supported' | 'ready'>;
 export interface UserRenderingStatus {
   enabled: boolean;
+  /** False when an administrator turned off rendering for this account; the user cannot enable it then. */
+  allowed?: boolean;
+  /** Whether this user may prepare the server-wide rendering component (administrators only). */
+  canManage: boolean;
   component: UserRenderingComponentStatus;
 }
 

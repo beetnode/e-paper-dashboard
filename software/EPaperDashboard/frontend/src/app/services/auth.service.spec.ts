@@ -14,11 +14,11 @@ describe('AuthService account creation', () => {
   afterEach(() => http.verify());
 
   it('uses a dedicated setup endpoint and records the administrator returned by the server', () => {
-    auth.setup({ username: 'admin', password: 'password' }).subscribe();
+    auth.setup({ username: 'admin', password: 'password', setupCode: 'ABCD-2345' }).subscribe();
     const request = http.expectOne('/api/auth/setup');
     expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual({ username: 'admin', password: 'password' });
-    request.flush({ id: 'admin-id', username: 'admin', isSuperUser: true, deploymentMode: 'standalone' });
+    expect(request.request.body).toEqual({ username: 'admin', password: 'password', setupCode: 'ABCD-2345' });
+    request.flush({ id: 'admin-id', username: 'admin', isSuperUser: true, userManagementEnabled: true });
     expect(auth.currentUser()?.isSuperUser).toBe(true);
     expect(auth.isAuthReady()).toBe(true);
   });

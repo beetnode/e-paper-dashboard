@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services;
@@ -11,15 +11,15 @@ namespace EPaperDashboard.UnitTests.Services;
 public class DashboardServiceTests
 {
     [Fact]
-    public void GetDashboardById_RepositoryReturnsNone_PropagatesMaybeNone()
+    public void GetDashboardById_RepositoryReturnsNone_PropagatesNull()
     {
         var repo = new Mock<IDashboardRepository>();
-        repo.Setup(r => r.FindById(It.IsAny<DashboardId>())).Returns(Maybe<Dashboard>.None);
+        repo.Setup(r => r.FindById(It.IsAny<DashboardId>())).Returns((Dashboard?)null);
         var sut = new DashboardService(repo.Object);
 
         var result = sut.GetDashboardById(DashboardId.New());
 
-        result.HasValue.Should().BeFalse();
+        result.Should().BeNull();
     }
 
     [Fact]
@@ -32,8 +32,8 @@ public class DashboardServiceTests
 
         var result = sut.GetDashboardById(dashboard.Id);
 
-        result.HasValue.Should().BeTrue();
-        result.Value.Should().BeSameAs(dashboard);
+        result.Should().NotBeNull();
+        result.Should().BeSameAs(dashboard);
     }
 
     [Fact]

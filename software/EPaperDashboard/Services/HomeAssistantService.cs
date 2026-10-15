@@ -2,7 +2,7 @@
 using System.Text.Json;
 using System.Net.WebSockets;
 using System.Text;
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Models;
 
 namespace EPaperDashboard.Services;
@@ -19,7 +19,7 @@ public class HomeAssistantService(
     private readonly ILogger<HomeAssistantService> _logger = logger;
     private readonly HomeAssistantConnectionService _connection = connection;
 
-    public async Task<Result<List<HassUrlInfo>, string>> FetchDashboards(ProviderConnection homeAssistant)
+    public async Task<Result<List<HassUrlInfo>>> FetchDashboards(ProviderConnection homeAssistant)
     {
         var connectionInfo = _connection.GetConnectionInfo(homeAssistant);
         if (connectionInfo.IsFailure)
@@ -45,7 +45,7 @@ public class HomeAssistantService(
         }
     }
 
-    public async Task<Result<List<HassEntity>, string>> FetchEntities(ProviderConnection homeAssistant, CancellationToken cancellationToken = default)
+    public async Task<Result<List<HassEntity>>> FetchEntities(ProviderConnection homeAssistant, CancellationToken cancellationToken = default)
     {
         var connectionInfo = _connection.GetConnectionInfo(homeAssistant);
         if (connectionInfo.IsFailure)
@@ -150,7 +150,7 @@ public class HomeAssistantService(
         }
     }
 
-    public async Task<Result<bool, string>> SendNotification(Dashboard dashboard, string message, string title = "EPaper Dashboard")
+    public async Task<Result<bool>> SendNotification(Dashboard dashboard, string message, string title = "EPaper Dashboard")
     {
         // Dashboards rendering a named connection notify that Home Assistant instance, others the add-on's.
         var connection = _connection.ResolveConnection(dashboard, dashboard.HomeAssistantConnectionId);

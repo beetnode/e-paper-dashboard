@@ -1,5 +1,5 @@
 using System.Text.Json;
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 
 namespace EPaperDashboard.Services.Ai;
 
@@ -10,7 +10,7 @@ public sealed class HomeAssistantAiService(
     string? agentId,
     ILogger<HomeAssistantAiService> logger) : IAiService
 {
-    public async Task<Result<string, string>> GenerateCompletionAsync(
+    public async Task<Result<string>> GenerateCompletionAsync(
         string systemPrompt,
         string userPrompt,
         CancellationToken cancellationToken = default,
@@ -66,7 +66,7 @@ public sealed class HomeAssistantAiService(
                     if (!string.IsNullOrEmpty(text))
                     {
                         logger.LogInformation("HA AI returned response ({Length} chars)", text.Length);
-                        return Result.Success<string, string>(text);
+                        return Result.Success<string>(text);
                     }
                 }
             }
@@ -77,20 +77,20 @@ public sealed class HomeAssistantAiService(
                     ? msg.GetString() ?? "Unknown error"
                     : "Unknown error";
                 logger.LogError("HA conversation API error: {Error}", errorMessage);
-                return Result.Failure<string, string>($"Home Assistant AI error: {errorMessage}");
+                return Result.Failure<string>($"Home Assistant AI error: {errorMessage}");
             }
 
             logger.LogWarning("HA AI returned unexpected response: {Response}", responseStr);
-            return Result.Failure<string, string>("Home Assistant AI returned an unexpected response");
+            return Result.Failure<string>("Home Assistant AI returned an unexpected response");
         }
         catch (OperationCanceledException)
         {
-            return Result.Failure<string, string>("AI request was cancelled");
+            return Result.Failure<string>("AI request was cancelled");
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Home Assistant AI request failed");
-            return Result.Failure<string, string>($"Home Assistant AI request failed: {ex.Message}");
+            return Result.Failure<string>($"Home Assistant AI request failed: {ex.Message}");
         }
     }
 }

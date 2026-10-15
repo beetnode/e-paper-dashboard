@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Models;
 
 namespace EPaperDashboard.Services.Ai;
@@ -16,7 +16,7 @@ public sealed class AiDashboardGenerationService(
     TimeProvider timeProvider,
     ILogger<AiDashboardGenerationService> logger)
 {
-    public async Task<Result<AiGenerationResult, string>> GenerateAsync(
+    public async Task<Result<AiGenerationResult>> GenerateAsync(
         Dashboard dashboard,
         string? promptOverride = null,
         CancellationToken cancellationToken = default)
@@ -118,11 +118,11 @@ public sealed class AiDashboardGenerationService(
         };
     }
 
-    private Result<AiGenerationResult, string> StoreError(Dashboard dashboard, string error)
+    private Result<AiGenerationResult> StoreError(Dashboard dashboard, string error)
     {
         dashboard.LastAiGenerationError = error;
         dashboardService.UpdateDashboard(dashboard);
-        return Result.Failure<AiGenerationResult, string>(error);
+        return Result.Failure<AiGenerationResult>(error);
     }
 
     private static LayoutConfig CreateDefaultLayoutConfig(Dashboard dashboard)
@@ -168,7 +168,6 @@ public sealed class AiDashboardGenerationService(
             return dashboard.AiConfig;
         }
 
-        var user = userService.GetUserById(dashboard.UserId);
-        return user.HasValue ? user.Value.AiConfig : null;
+        return userService.GetAiConfig(dashboard.UserId);
     }
 }

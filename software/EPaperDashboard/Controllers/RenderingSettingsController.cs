@@ -18,7 +18,7 @@ public sealed class RenderingSettingsController(
     {
         var enabled = access.IsEnabled(CurrentUserId);
         var status = manager.GetStatus();
-        return Ok(new { enabled, component = new
+        return Ok(new { enabled, allowed = access.IsAllowed(CurrentUserId), canManage = IsSuperUser, component = new
         {
             status.State,
             status.Supported,
@@ -33,9 +33,16 @@ public sealed class RenderingSettingsController(
         {
             access.RequireAccount(CurrentUserId);
             // Unsupported installations must not persist an enabled setting.
-            if (request.Enabled) manager.StartInstallation(onlyIfNeeded: true);
+            if (request.Enabled && !manager.GetStatus().Supported)
+                throw new PlatformNotSupportedException();
+            // The component is shared by every account, so only an administrator may download it.
+            if (request.Enabled && IsSuperUser) manager.StartInstallation(onlyIfNeeded: true);
             access.SetEnabled(CurrentUserId, request.Enabled);
             return await GetStatus();
+        }
+        catch (RenderingRequestException exception)
+        {
+            return BadRequest(new { message = exception.Message });
         }
         catch (Exception exception) when (exception is PlatformNotSupportedException or InvalidOperationException)
         {

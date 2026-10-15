@@ -1,6 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Models;
 using Microsoft.AspNetCore.WebUtilities;
 using static EPaperDashboard.Services.Plugins.Google.GoogleOAuthService;
@@ -17,11 +17,11 @@ public sealed class GooglePlugin(GoogleOAuthService oauth, IHttpClientFactory cl
     public IReadOnlyCollection<string> AuthorizationCredentialKeys { get; } = [RefreshTokenKey];
     public bool IsAuthorized(IReadOnlyDictionary<string, string> credentials) =>
         credentials.TryGetValue(RefreshTokenKey, out var token) && !string.IsNullOrEmpty(token);
-    public Result<(string Url, string State), string> StartAuthorization(ProviderConnection connection, HttpContext httpContext) => oauth.Start(connection);
-    public async Task<UnitResult<string>> CompleteAuthorizationAsync(string? state, string? browserState, string? code, CancellationToken cancellationToken)
+    public Result<(string Url, string State)> StartAuthorization(ProviderConnection connection, HttpContext httpContext) => oauth.Start(connection);
+    public async Task<Result> CompleteAuthorizationAsync(string? state, string? browserState, string? code, CancellationToken cancellationToken)
     {
         var result = await oauth.CompleteAsync(state, browserState, code, cancellationToken);
-        return result.IsFailure ? UnitResult.Failure(result.Error) : UnitResult.Success<string>();
+        return result.IsFailure ? Result.Failure(result.Error) : Result.Success();
     }
 
     public string? ValidateCredentials(IReadOnlyDictionary<string, string> credentials)
@@ -37,7 +37,7 @@ public sealed class GooglePlugin(GoogleOAuthService oauth, IHttpClientFactory cl
         return null;
     }
 
-    public async Task<Result<List<DataSource>, string>> DiscoverAsync(ProviderContext context, CancellationToken cancellationToken)
+    public async Task<Result<List<DataSource>>> DiscoverAsync(ProviderContext context, CancellationToken cancellationToken)
     {
         if (context.Connection is null) return "A Google connection is required";
         var token = await oauth.AccessTokenAsync(context.Connection, cancellationToken);
@@ -57,7 +57,7 @@ public sealed class GooglePlugin(GoogleOAuthService oauth, IHttpClientFactory cl
         })).ToList();
     }
 
-    public async Task<Result<SourceData, string>> FetchAsync(ProviderContext context, SourceQuery query, CancellationToken cancellationToken)
+    public async Task<Result<SourceData>> FetchAsync(ProviderContext context, SourceQuery query, CancellationToken cancellationToken)
     {
         if (context.Connection is null) return "A Google connection is required";
         var calendar = query.Capability == SourceCapabilities.Calendar && query.SourceId.StartsWith("calendar/", StringComparison.Ordinal);
@@ -99,7 +99,7 @@ public sealed class GooglePlugin(GoogleOAuthService oauth, IHttpClientFactory cl
     }
     private static string Date(JsonElement value) => value.TryGetProperty("dateTime", out var date) ? date.GetString() ?? "" : String(value, "date");
 
-    private async Task<Result<List<JsonElement>, string>> GetItems(string url, string token, CancellationToken ct)
+    private async Task<Result<List<JsonElement>>> GetItems(string url, string token, CancellationToken ct)
     {
         var items = new List<JsonElement>();
         string? pageToken = null;

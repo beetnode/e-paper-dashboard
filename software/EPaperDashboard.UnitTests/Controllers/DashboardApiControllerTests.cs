@@ -1,4 +1,3 @@
-using CSharpFunctionalExtensions;
 using EPaperDashboard.Controllers;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
@@ -18,6 +17,9 @@ public class DashboardApiControllerTests
 {
     private readonly Mock<IDashboardRepository> _dashboardRepository = new();
     private readonly Mock<IUserRepository> _userRepository = new();
+
+    public DashboardApiControllerTests() =>
+        _dashboardRepository.Setup(r => r.FindByUserId(It.IsAny<UserId>())).Returns([]);
     private readonly Mock<IDeploymentStrategy> _deploymentStrategy = new();
     private readonly ProviderConnectionStore _connections = InMemoryProviderConnectionRepository.CreateStore();
 
@@ -30,7 +32,7 @@ public class DashboardApiControllerTests
     public void GetDashboards_UserDoesNotExist_ReturnsUnauthorized()
     {
         var userId = UserId.New();
-        _userRepository.Setup(r => r.FindById(userId)).Returns(Maybe<User>.None);
+        _userRepository.Setup(r => r.FindById(userId)).Returns((User?)null);
         var sut = CreateSut().WithUser(userId);
 
         var result = sut.GetDashboards();
@@ -79,7 +81,7 @@ public class DashboardApiControllerTests
     public void GetDashboard_NotFound_ReturnsNotFound()
     {
         var dashboardId = DashboardId.New();
-        _dashboardRepository.Setup(r => r.FindById(dashboardId)).Returns(Maybe<Dashboard>.None);
+        _dashboardRepository.Setup(r => r.FindById(dashboardId)).Returns((Dashboard?)null);
         var sut = CreateSut().WithUser(UserId.New());
 
         var result = sut.GetDashboard(dashboardId.Value);
@@ -119,7 +121,7 @@ public class DashboardApiControllerTests
     public void CreateDashboard_UnauthenticatedUser_ReturnsUnauthorized()
     {
         var userId = UserId.New();
-        _userRepository.Setup(r => r.FindById(userId)).Returns(Maybe<User>.None);
+        _userRepository.Setup(r => r.FindById(userId)).Returns((User?)null);
         var sut = CreateSut().WithUser(userId);
 
         var result = sut.CreateDashboard(new CreateDashboardRequest("New Dashboard", null, null, null, null));
@@ -330,5 +332,20 @@ public class DashboardApiControllerTests
 
         result.Should().BeOfType<ForbidResult>();
         _dashboardRepository.Verify(r => r.Delete(It.IsAny<DashboardId>()), Times.Never);
+    }
+
+    [Fact]
+    public void CreateDashboard_AtTheDashboardLimit_ReturnsBadRequest()
+    {
+        var userId = UserId.New();
+        _userRepository.Setup(r => r.FindById(userId)).Returns(new User { Id = userId });
+        _dashboardRepository.Setup(r => r.FindByUserId(userId))
+            .Returns(Enumerable.Range(0, UserLimits.MaxDashboards).Select(_ => new Dashboard { UserId = userId }).ToList());
+        var sut = CreateSut().WithUser(userId);
+
+        sut.CreateDashboard(new CreateDashboardRequest("One more", null, null, null, null))
+            .Should().BeOfType<BadRequestObjectResult>();
+
+        _dashboardRepository.Verify(r => r.Insert(It.IsAny<Dashboard>()), Times.Never);
     }
 }

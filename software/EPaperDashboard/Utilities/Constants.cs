@@ -31,14 +31,19 @@ public static class Constants
 
     public const string SupervisorCoreUrl = "http://supervisor/core";
 
-    public const string HomeAssistantCoreUrl = "http://localhost:8123";
-    
     public const string IngressPathHeader = "X-Ingress-Path";
+
+    public const int DefaultDevicePort = 8129;
     
     public const string IsSuperUserClaim = "IsSuperUser";
+    public const string SecurityStampClaim = "SecurityStamp";
+    public const string MustChangePasswordClaim = "MustChangePassword";
     public const string HomeAssistantIngressClaim = "HomeAssistantIngress";
-    public const string HomeAssistantAdminUserId = "ha-admin";
     public const string HomeAssistantAdminUserName = "Home Assistant Admin";
     
+    /// <summary>
+    /// The add-on's ingress user. It has no user record; <see cref="Services.UserService"/> is the only place
+    /// that knows how its account and settings are stored.
+    /// </summary>
     public static readonly UserId HomeAssistantVirtualUserId = new UserId("000000000000000000000001");
 }

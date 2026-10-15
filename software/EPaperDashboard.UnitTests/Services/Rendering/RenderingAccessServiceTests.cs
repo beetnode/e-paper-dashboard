@@ -15,9 +15,10 @@ public sealed class RenderingAccessServiceTests
     private readonly Mock<IUserRepository> _users = new();
     private readonly Mock<IDashboardRepository> _dashboards = new();
     private readonly Mock<IDeploymentStrategy> _deployment = new();
-    public RenderingAccessServiceTests() => _deployment.SetupGet(d => d.Mode).Returns(DeploymentMode.Standalone);
+    public RenderingAccessServiceTests() => _deployment.SetupGet(d => d.IsUserManagementEnabled).Returns(true);
 
-    private RenderingAccessService Create() => new(_users.Object, _dashboards.Object, _deployment.Object,
+    private RenderingAccessService Create() => new(
+        new UserService(_users.Object, _dashboards.Object, deployment: _deployment.Object), _dashboards.Object,
         new UserRenderScheduler(new ConfigurationBuilder().Build()));
 
     [Fact]
@@ -96,7 +97,7 @@ public sealed class RenderingAccessServiceTests
     [Fact]
     public void AddonAllowsOnlyItsIngressIdentity()
     {
-        _deployment.SetupGet(d => d.Mode).Returns(DeploymentMode.Addon);
+        _deployment.SetupGet(d => d.IsUserManagementEnabled).Returns(false);
         var access = Create();
         access.IsEnabled(Constants.HomeAssistantVirtualUserId).Should().BeFalse();
         _users.Setup(r => r.GetRenderingEnabled(Constants.HomeAssistantVirtualUserId)).Returns(true);
@@ -104,5 +105,35 @@ public sealed class RenderingAccessServiceTests
         access.IsEnabled(UserId.New()).Should().BeFalse();
         access.SetEnabled(Constants.HomeAssistantVirtualUserId, false);
         _users.Verify(r => r.SetRenderingEnabled(Constants.HomeAssistantVirtualUserId, false), Times.Once);
+    }
+
+    [Fact]
+    public void RevokedAccountsHaveNoAccessEvenWhenOptedIn()
+    {
+        var revoked = new User { Id = UserId.New(), RenderingAllowed = false };
+        _users.Setup(r => r.FindById(revoked.Id)).Returns(revoked);
+        _users.Setup(r => r.GetRenderingEnabled(revoked.Id)).Returns(true);
+
+        Create().IsEnabled(revoked.Id).Should().BeFalse();
+    }
+
+    [Fact]
+    public void AddonOwnerIsNeverRevoked()
+    {
+        _users.Setup(r => r.GetRenderingEnabled(Constants.HomeAssistantVirtualUserId)).Returns(true);
+
+        Create().IsEnabled(Constants.HomeAssistantVirtualUserId).Should().BeTrue();
+    }
+
+    [Fact]
+    public void RevokedAccountsCannotOptIn()
+    {
+        var revoked = new User { Id = UserId.New(), RenderingAllowed = false };
+        _users.Setup(r => r.FindById(revoked.Id)).Returns(revoked);
+
+        var access = Create();
+        access.IsAllowed(revoked.Id).Should().BeFalse();
+        FluentActions.Invoking(() => access.SetEnabled(revoked.Id, true)).Should().Throw<RenderingRequestException>();
+        _users.Verify(r => r.SetRenderingEnabled(revoked.Id, true), Times.Never);
     }
 }

@@ -13,7 +13,7 @@ The server component of the izBoard system. An ASP.NET Core web application with
 - E-Paper optimized image processing
 - Device management, claim-code pairing, and OTA firmware delivery
 - Configurable update schedules
-- Multi-user accounts with one-time administrator setup (standalone mode)
+- Multi-user accounts with one-time administrator setup, account administration and recovery (standalone mode)
 - LiteDB storage by default, or PostgreSQL for hosted deployments
 - Deployable as standalone Docker or Home Assistant Add-on
 - Optional Home Assistant dashboard screenshots through an on-demand, sandboxed rendering component
@@ -48,9 +48,23 @@ services:
 
 ### First-start accounts
 
-Open the web UI and create the **service administrator** through the one-time setup page.
-Complete setup before exposing a fresh installation to other people: the first successful setup request claims administration.
-The administrator manages accounts and shared server components. Ordinary users register separately and never receive administrator permissions.
+Open the web UI and create the **service administrator** through the one-time setup page. Setup asks for a **setup code**
+that the service writes to its log at every start until setup is complete, so only someone who can read the logs can
+claim a fresh instance:
+
+```bash
+docker compose -f docker-compose.base.yml logs app | grep -i "setup code"
+```
+
+The administrator manages accounts and shared server components. Ordinary users register separately and are never
+administrators by default. Administrators manage accounts under **Users**: they can make another account an administrator
+or remove those rights, suspend and reinstate accounts, issue a temporary password, and delete accounts. At least one
+active administrator always remains. Administrators never see other users' dashboards, devices or connections.
+Suspending an account signs it out and stops its devices from receiving updates. Administrators can also turn off
+browser rendering for an account, which takes precedence over that user's own setting.
+
+Each account can create up to 50 dashboards, pair up to 20 devices and add up to 20 connections. Existing items above a
+limit are kept; only new ones are refused. Usernames are unique regardless of letter case. The add-on is not limited.
 Existing accounts, administrator permissions, dashboards, and devices are preserved. Existing installations do not reopen setup,
 even if their accounts are later deleted. The old superuser environment variables are no longer read or required.
 Home Assistant add-on deployments continue using ingress authentication and disable local account setup and registration.
@@ -58,9 +72,26 @@ The add-on uses one shared identity: its rendering setting and queue apply to ev
 
 PostgreSQL upgrades require the maintenance migration described below; it records durable setup state and rendering preferences.
 
+#### Account recovery
+
+There is no email-based password reset. If no administrator can sign in, run the recovery command inside the service's
+container. It promotes an account to an active administrator, or prints a temporary password that must be changed at the
+next sign-in:
+
+```bash
+docker compose -f docker-compose.base.yml run --rm --no-deps app dotnet EPaperDashboard.dll --users promote alice
+docker compose -f docker-compose.base.yml run --rm --no-deps app dotnet EPaperDashboard.dll --users reset-password alice
+```
+
+With the default LiteDB database, stop the service first (`docker compose -f docker-compose.base.yml stop app`), because the database file is
+opened exclusively. With PostgreSQL the command can run while the service is up; running sessions pick up the change
+within 30 seconds.
+
+Behind TLS the sign-in cookie is marked secure automatically. Hosted instances should only be served over HTTPS.
+
 ### Home Assistant Add-on
 
-Install via the [izBoard Home Assistant Add-on repository](https://github.com/beetnode/hass-add-ons/tree/master/e-paper-dashboard). Configure `CLIENT_URL` as a device-reachable endpoint, normally `http://homeassistant.local:8129`. Remote URLs work through a direct port, VPN, or reverse proxy; ingress URLs do not.
+Install via the [izBoard Home Assistant Add-on repository](https://github.com/beetnode/hass-add-ons/tree/master/izboard). Configure `CLIENT_URL` as a device-reachable endpoint, normally `http://homeassistant.local:8129`. Remote URLs work through a direct port, VPN, or reverse proxy; ingress URLs do not.
 
 The add-on image `izdevdigital/izboard-addon` is built from the `addon` target of `EPaperDashboard/Dockerfile` alongside the standalone image. It differs only in running as root (Supervisor mounts `/data` root-owned) and carrying Home Assistant labels.
 
@@ -68,12 +99,11 @@ The add-on image `izdevdigital/izboard-addon` is built from the `addon` target o
 
 | Variable | Required | Description |
 |---|---|---|
-| `CLIENT_URL` | Yes | Absolute HTTP or HTTPS URL reachable from the display network. In standalone/host mode it is also the Home Assistant OAuth client URL; in add-on mode it is the direct device endpoint. |
+| `CLIENT_URL` | Yes | Absolute HTTP or HTTPS URL reachable from the display network. In standalone mode it is also the Home Assistant OAuth client URL; in add-on mode it is the direct device endpoint. |
 | `TZ` | Recommended | Timezone (e.g. `Europe/London`) |
 | `APP_MODE` | No | Deployment mode: `standalone` (default) or `addon` |
 | `DATABASE_PROVIDER` | No | `litedb` (default) or `postgresql`. Independent of `APP_MODE`. |
 | `DATABASE_CONNECTION_STRING` | PostgreSQL only | Npgsql connection string for an existing PostgreSQL database. |
-| `HOME_ASSISTANT_HOST` | No | Host mode only: Home Assistant URL used when moving older dashboard settings into connections (default `http://localhost:8123`) |
 | `RENDERING_COMPONENT_REPOSITORY` | No | GitHub repository that publishes the optional rendering component (default: `beetnode/izBoard`) |
 | `RENDERING_COMPONENT_RELEASE_TAG` | No | Override the component release tag; normally set by the official image |
 | `RENDERING_COMPONENT_BASE_URL` | No | Direct component artifact source for manual deployment testing; bypasses GitHub release lookup |
@@ -90,7 +120,7 @@ The add-on image `izdevdigital/izboard-addon` is built from the `addon` target o
 | `8128` | Web UI and API |
 | `8129` | Device communication (pairing, firmware image retrieval, and configuration) |
 
-`CLIENT_URL` must describe the externally reachable URL after port mappings or a reverse proxy are applied. If displays are isolated on a VLAN, allow them to reach this URL. In standalone/host mode, expose the same URL to both the browser OAuth callback and the display API (normally through port `8128` or a reverse proxy). In add-on mode, use the exposed device port (`8129` by default), not the browser-only ingress URL.
+`CLIENT_URL` must describe the externally reachable URL after port mappings or a reverse proxy are applied. If displays are isolated on a VLAN, allow them to reach this URL. In standalone mode, expose the same URL to both the browser OAuth callback and the display API (normally through port `8128` or a reverse proxy). In add-on mode, use the exposed device port (`8129` by default), not the browser-only ingress URL.
 
 For HTTPS, the display verifies the server certificate against its embedded trusted root bundle and must be able to obtain network time on its first connection. Deployments using a private certificate authority must add that root to the firmware bundle before flashing.
 
@@ -159,7 +189,10 @@ users' Home Assistant servers: operators should restrict outbound access to appr
 and unrelated internal services. Container/browser isolation does not by itself provide an SSRF/network-access policy.
 
 The default image does not include the browser-rendering runtime or browser binaries. Custom layouts work without them.
-To render an existing Home Assistant dashboard, sign in with your own account, open **Settings → Rendering**, and select **Enable for my account**.
+The component is shared by every account on the server, so only the service administrator installs it: either with
+**Prepare rendering** after enabling rendering in **Settings → Rendering**, or with **Install** under **Settings → System**.
+Other users only opt in with **Enable for my account**; until the administrator prepares the component, rendering is
+shown as not available and they cannot start the download themselves.
 Apply the [e-paper theme](../home-assistant/README.md) to the captured view so it uses only the display colors.
 In add-on mode, open the same page through Home Assistant ingress; the control applies to the whole add-on.
 izBoard downloads the version-matched component for the current CPU architecture from the project's GitHub release, verifies its
@@ -170,9 +203,11 @@ the matching component; Home Assistant screenshots are unavailable until it is r
 renders and deletes all of its files from `/data`. Activation atomically switches between version directories, and interrupted
 installation/removal cleanup is completed on startup.
 
-CI builds and publishes component archives, but does not run renderer deployment/browser tests. Each component has a retained,
-version-addressed GitHub release (`rendering-v<major.minor.patch.build>`) published before its application image. Existing component
-releases are never overwritten, so older installations do not depend on the mutable development release.
+CI builds and publishes component archives, but does not run renderer deployment/browser tests. Each application release
+(`v<major.minor.patch>`) carries the component built from the same commit, attached before its application images are published.
+A published release's component is never overwritten, so released installations do not depend on mutable releases. Development (`latest`) images
+install from the `rendering-latest` release, which every master build replaces; an older development image reports a version
+mismatch once a newer build has replaced it.
 Developers manually verify deployments by setting `RENDERING_COMPONENT_BASE_URL` to a directory served over HTTP that contains the
 architecture-specific `.tar.gz` archive and its `.sha256` file.
 
@@ -187,8 +222,8 @@ docker compose -f docker-compose.base.yml -f docker-compose.rendering.yml up --b
 ```
 
 Set `CLIENT_URL=http://localhost:8128` in your local `.env` for this test. Open `http://localhost:8128`,
-complete administrator setup, then register a regular account. Open **Settings → Rendering** and select
-**Enable for my account**, followed by **Test rendering**. Set `IZBOARD_VERSION` to override the default test version; the application
+complete administrator setup and prepare rendering in **Settings → Rendering**, then register a regular account. Open
+**Settings → Rendering** and select **Enable for my account**, followed by **Test rendering**. Set `IZBOARD_VERSION` to override the default test version; the application
 and component builds always receive the same value.
 
 Before publishing, keep the pinned browser-runtime dependency current and manually verify installation, **Test component**,
@@ -207,12 +242,12 @@ An accepted job has a five-minute total deadline; runtime queue waiting and work
 
 User rendering preferences are persisted in the database. New accounts start disabled; existing accounts retain access until they
 explicitly disable it. Disabling cancels that account's queued and active work without removing shared files or draining other users' jobs.
-Other replicas observe preference changes and account deletion through a one-second access check. A newly used replica prepares
-its own matching runtime on the first render; the caller can retry once preparation completes. Replicas must have separate component
+Other replicas observe preference changes and account deletion through a one-second access check. Render requests never install the
+component; each replica must be prepared by the administrator. Replicas must have separate component
 directories and private renderer sockets. User preferences are shared through PostgreSQL; queue limits are per replica, not cluster-wide.
 
 The service administrator retains global component installation/removal and diagnostic controls under **Settings → System**. Removing a shared
-component affects all users on that replica; an enabled user's next render can prepare it again. Use deployment configuration to take
+component affects all users on that replica until the administrator installs it again. Use deployment configuration to take
 a renderer offline for maintenance. Users only enable/disable their own capability and cannot remove shared files.
 
 Fresh processes, browser contexts, temporary directories, stripped environments, and ownership checks provide application-level
@@ -221,7 +256,7 @@ hard per-user resource boundary, or enforced per-job network-egress policy. Host
 sandboxing.
 
 Only the single-user Home Assistant add-on retains an in-app-container compatibility worker with browser sandboxing disabled.
-Standalone and host deployments require the isolated sidecar and browser sandboxing; they never fall back to compatibility mode.
+Standalone deployments require the isolated sidecar and browser sandboxing; they never fall back to compatibility mode.
 
 Stop the stack and remove its isolated test data and generated component artifacts with:
 

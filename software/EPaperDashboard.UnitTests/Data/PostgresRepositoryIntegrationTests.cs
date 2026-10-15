@@ -77,27 +77,50 @@ public class PostgresRepositoryIntegrationTests
             };
             sessions.Insert(session);
 
-            users.FindByUsername(user.Username).Value.Id.Should().Be(user.Id);
+            users.FindByUsername(user.Username)!.Id.Should().Be(user.Id);
+            users.ExistsByUsernameIgnoreCase(user.Username.ToUpperInvariant()).Should().BeTrue();
             users.ExistsSuperUser().Should().BeTrue();
+            var suspendedAdmin = new User { Username = $"suspended-{suffix}", IsSuperUser = true, IsSuspended = true };
+            users.Insert(suspendedAdmin);
+            users.ExistsOtherActiveSuperUser(suspendedAdmin.Id).Should().BeTrue();
+            var otherAdmins = users.GetAll().Where(u => u.IsSuperUser && !u.IsSuspended && u.Id != user.Id).ToList();
+            users.ExistsOtherActiveSuperUser(user.Id).Should().Be(otherAdmins.Count > 0);
+            users.Delete(suspendedAdmin.Id);
             dashboards.FindByUserId(user.Id).Should().ContainSingle();
-            dashboards.FindById(dashboard.Id).Value.LayoutConfig!.Widgets[0].Config
+            dashboards.FindById(dashboard.Id)!.LayoutConfig!.Widgets[0].Config
                 .GetProperty("text").GetString().Should().Be("hello");
-            dashboards.FindById(dashboard.Id).Value.UpdateTimes.Should().ContainSingle()
+            dashboards.FindById(dashboard.Id)!.UpdateTimes.Should().ContainSingle()
                 .Which.Should().Be(new TimeOnly(8, 30));
-            devices.FindByIdentifier(device.DeviceIdentifier).Value.Id.Should().Be(device.Id);
-            devices.FindByApiKey(device.ApiKey).Value.Id.Should().Be(device.Id);
+            devices.FindByIdentifier(device.DeviceIdentifier)!.Id.Should().Be(device.Id);
+            devices.FindByApiKey(device.ApiKey)!.Id.Should().Be(device.Id);
             devices.FindByDashboardId(dashboard.Id).Should().ContainSingle();
-            sessions.FindByCode(session.Code).Value.PendingDeviceId.Should().Be(device.Id);
+            sessions.FindByCode(session.Code)!.PendingDeviceId.Should().Be(device.Id);
             sessions.HasActiveSessions(DateTimeOffset.UtcNow).Should().BeTrue();
 
             device.Name = "updated";
             devices.Update(device);
-            devices.FindById(device.Id).Value.Name.Should().Be("updated");
+            devices.FindById(device.Id)!.Name.Should().Be("updated");
             session.IsCompleted = true;
             sessions.Update(session);
-            sessions.FindById(session.Id).Value.IsCompleted.Should().BeTrue();
+            sessions.FindById(session.Id)!.IsCompleted.Should().BeTrue();
             sessions.DeleteExpired(DateTimeOffset.UtcNow.AddHours(1));
-            sessions.FindById(session.Id).HasValue.Should().BeFalse();
+            sessions.FindById(session.Id).Should().BeNull();
+
+            var otherUser = UserId.New();
+            var otherDevice = new Device { UserId = otherUser, DashboardId = dashboard.Id, DeviceIdentifier = $"other-{suffix}", ApiKey = $"other-key-{suffix}" };
+            devices.Insert(otherDevice);
+            var claimed = new PairingSession { Code = suffix[6..12].ToUpperInvariant(), UserId = user.Id, ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5) };
+            var otherSession = new PairingSession { Code = suffix[12..18].ToUpperInvariant(), UserId = otherUser, ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5) };
+            sessions.Insert(claimed);
+            sessions.Insert(otherSession);
+            devices.DeleteByUserId(user.Id);
+            sessions.DeleteByUserId(user.Id);
+            devices.FindByUserId(user.Id).Should().BeEmpty();
+            devices.FindById(otherDevice.Id).Should().NotBeNull();
+            sessions.FindById(claimed.Id).Should().BeNull();
+            sessions.FindById(otherSession.Id).Should().NotBeNull();
+            devices.Delete(otherDevice.Id);
+            sessions.DeleteExpired(DateTimeOffset.UtcNow.AddHours(1));
         }
         finally
         {
@@ -130,8 +153,8 @@ public class PostgresRepositoryIntegrationTests
         });
 
         operation.Should().Throw<InvalidOperationException>();
-        users.FindById(user.Id).HasValue.Should().BeFalse();
-        dashboards.FindById(dashboard.Id).HasValue.Should().BeFalse();
+        users.FindById(user.Id).Should().BeNull();
+        dashboards.FindById(dashboard.Id).Should().BeNull();
     }
 
     [PostgresFact]
@@ -156,8 +179,8 @@ public class PostgresRepositoryIntegrationTests
                 return true;
             });
 
-            users.FindById(user.Id).HasValue.Should().BeTrue();
-            dashboards.FindById(dashboard.Id).HasValue.Should().BeTrue();
+            users.FindById(user.Id).Should().NotBeNull();
+            dashboards.FindById(dashboard.Id).Should().NotBeNull();
         }
         finally
         {
@@ -193,7 +216,7 @@ public class PostgresRepositoryIntegrationTests
             using var services = CreateServices(schemaConnectionString);
             services.GetRequiredService<IPersistenceInitializer>().Initialize();
             var users = services.GetRequiredService<IUserRepository>();
-            users.FindById(user.Id).Value.PasswordHash.Should().Be("preserved-hash");
+            users.FindById(user.Id)!.PasswordHash.Should().Be("preserved-hash");
             using var versions = new NpgsqlCommand($"SELECT COUNT(*) FROM {schema}.izboard_schema_versions WHERE version = 1", connection);
             versions.ExecuteScalar().Should().Be(1L);
         }
@@ -312,6 +335,24 @@ public class PostgresRepositoryIntegrationTests
     }
 
     [PostgresFact]
+    public void SetupCode_IsSharedAcrossConnectionsUntilSetupCompletes()
+    {
+        WithEmptySchema(connectionString =>
+        {
+            Migrate(connectionString);
+            using var first = CreateServices(connectionString);
+            using var second = CreateServices(connectionString);
+            var a = new PostgresUserRepository(first.GetRequiredService<PostgresDbContext>());
+            var b = new PostgresUserRepository(second.GetRequiredService<PostgresDbContext>());
+
+            a.GetOrCreateSetupCode("FIRST111").Should().Be("FIRST111");
+            b.GetOrCreateSetupCode("SECOND22").Should().Be("FIRST111");
+            a.TryCreateAdministrator(new User { Username = "admin" }).Should().BeTrue();
+            b.GetOrCreateSetupCode("THIRD333").Should().Be("THIRD333");
+        });
+    }
+
+    [PostgresFact]
     public void Setup_IsAtomicAcrossConnectionsAndStaysClosedAfterDeletion()
     {
         WithEmptySchema(connectionString =>
@@ -330,6 +371,11 @@ public class PostgresRepositoryIntegrationTests
             admin.IsSuperUser.Should().BeTrue();
             users.SetRenderingEnabled(admin.Id, false);
             users.GetRenderingEnabled(admin.Id).Should().BeFalse();
+            users.GetAiConfig(admin.Id).Should().BeNull();
+            users.SetAiConfig(admin.Id, new AiConfig { ConnectionMode = AiConnectionMode.HomeAssistant });
+            users.SetRenderingEnabled(admin.Id, true);
+            users.GetAiConfig(admin.Id)!.ConnectionMode.Should().Be(AiConnectionMode.HomeAssistant);
+            users.GetRenderingEnabled(admin.Id).Should().BeTrue();
             users.Delete(admin.Id);
             users.IsSetupComplete().Should().BeTrue();
             users.TryCreateAdministrator(new User { Username = "attacker" }).Should().BeFalse();
@@ -383,7 +429,6 @@ public class PostgresRepositoryIntegrationTests
             // Instances share data protection keys in production; one ephemeral provider stands in for them.
             var protection = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
             var deployment = new Moq.Mock<EPaperDashboard.Services.IDeploymentStrategy>();
-            deployment.SetupGet(d => d.Mode).Returns(EPaperDashboard.Utilities.DeploymentMode.Standalone);
 
             Parallel.For(0, 3, _ =>
             {
@@ -391,7 +436,6 @@ public class PostgresRepositoryIntegrationTests
                 var connections = new EPaperDashboard.Services.Plugins.ProviderConnectionStore(new PostgresProviderConnectionRepository(context), protection);
                 new EPaperDashboard.Services.Plugins.HomeAssistant.LegacyHomeAssistantSettingsMigration(
                     new PostgresDashboardRepository(context), connections, new PostgresUnitOfWork(context), deployment.Object,
-                    Moq.Mock.Of<EPaperDashboard.Utilities.IEnvironmentConfiguration>(),
                     Microsoft.Extensions.Logging.Abstractions.NullLogger<EPaperDashboard.Services.Plugins.HomeAssistant.LegacyHomeAssistantSettingsMigration>.Instance).Run();
             });
 

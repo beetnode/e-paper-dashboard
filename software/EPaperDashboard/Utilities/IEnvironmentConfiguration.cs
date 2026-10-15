@@ -3,8 +3,6 @@ namespace EPaperDashboard.Utilities;
 public interface IEnvironmentConfiguration
 {
     DeploymentMode AppMode { get; }
-    bool IsAddonMode { get; }
-    string? HomeAssistantHost { get; }
     Uri? ClientUri { get; }
     TimeSpan DashboardScheduleCheckInterval { get; }
     TimeSpan DashboardMissedScheduleTolerance { get; }

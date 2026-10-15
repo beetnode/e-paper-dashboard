@@ -1,10 +1,10 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 
 namespace EPaperDashboard.Services;
 
-public sealed class DeviceService(IDeviceRepository deviceRepository)
+public sealed class DeviceService(IDeviceRepository deviceRepository, IUserRepository? users = null)
 {
     public List<Device> GetDevicesForDashboard(DashboardId dashboardId) =>
         deviceRepository.FindByDashboardId(dashboardId);
@@ -21,12 +21,15 @@ public sealed class DeviceService(IDeviceRepository deviceRepository)
     public void DeleteDevice(DeviceId deviceId) =>
         deviceRepository.Delete(deviceId);
 
-    public Maybe<Device> GetDeviceById(DeviceId deviceId) =>
+    public Device? GetDeviceById(DeviceId deviceId) =>
         deviceRepository.FindById(deviceId);
 
-    public Maybe<Device> GetDeviceByIdentifier(string deviceIdentifier) =>
+    public Device? GetDeviceByIdentifier(string deviceIdentifier) =>
         deviceRepository.FindByIdentifier(deviceIdentifier);
 
-    public Maybe<Device> GetDeviceByApiKey(string apiKey) =>
-        deviceRepository.FindByApiKey(apiKey);
+    /// <summary>Finds the device a key belongs to; keys of devices whose owner is suspended stop working.</summary>
+    public Device? GetDeviceByApiKey(string apiKey) =>
+        deviceRepository.FindByApiKey(apiKey) is { } device && users?.FindById(device.UserId)?.IsSuspended != true
+            ? device
+            : null;
 }

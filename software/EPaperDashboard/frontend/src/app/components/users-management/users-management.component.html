@@ -11,6 +11,21 @@
     }
   </div>
 
+  @if (temporaryPassword(); as temporary) {
+  <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2" role="status">
+    <i class="fa-solid fa-key" aria-hidden="true"></i>
+    <span>Temporary password for <strong>{{ temporary.username }}</strong>:</span>
+    <code class="user-select-all">{{ temporary.password }}</code>
+    <span class="small text-muted">Share it securely; it will not be shown again.</span>
+    <div class="ms-auto d-flex gap-2">
+      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="copyTemporaryPassword()">
+        <i class="fa-solid fa-copy me-1" aria-hidden="true"></i>Copy
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-secondary" (click)="dismissTemporaryPassword()">Done</button>
+    </div>
+  </div>
+  }
+
   @if (showAddForm()) {
   <section class="app-section-card mb-4" aria-labelledby="addUserTitle">
     <div class="app-section-header">
@@ -49,6 +64,10 @@
           }
         </div>
       </div>
+      <div class="form-check mb-3">
+        <input type="checkbox" id="mustChangePassword" class="form-check-input" formControlName="mustChangePassword" />
+        <label for="mustChangePassword" class="form-check-label">Require a new password at first sign-in</label>
+      </div>
       <div class="d-flex justify-content-end">
         <button type="submit" class="btn btn-primary" [disabled]="addUserForm.invalid || isAddingUser()">
           @if (isAddingUser()) {
@@ -84,11 +103,42 @@
         @if (user.isSuperUser) {
         <span class="app-status-chip app-status-chip-info">Administrator</span>
         }
+        @if (user.isSuspended) {
+        <span class="app-status-chip app-status-chip-danger">Suspended</span>
+        }
+        @if (!user.renderingAllowed) {
+        <span class="app-status-chip app-status-chip-muted">Rendering off</span>
+        }
+        @if (user.mustChangePassword) {
+        <span class="app-status-chip app-status-chip-warning">Must change password</span>
+        }
+        @if (isCurrentUser(user)) {
+        <span class="app-status-chip app-status-chip-muted">You</span>
+        }
       </div>
       <div class="app-list-item-actions">
-        @if (!user.isSuperUser) {
+        @if (!isCurrentUser(user)) {
+        <button type="button" (click)="setRole(user, !user.isSuperUser)" class="btn btn-ghost app-icon-button" [disabled]="isBusy(user)"
+          [attr.aria-label]="(user.isSuperUser ? 'Remove administrator rights from ' : 'Make administrator: ') + user.username"
+          [title]="user.isSuperUser ? 'Remove administrator rights' : 'Make administrator'">
+          <i class="fa-solid" [class.fa-user-shield]="!user.isSuperUser" [class.fa-user-minus]="user.isSuperUser" aria-hidden="true"></i>
+        </button>
+        <button type="button" (click)="setSuspended(user, !user.isSuspended)" class="btn btn-ghost app-icon-button" [disabled]="isBusy(user)"
+          [attr.aria-label]="(user.isSuspended ? 'Reinstate user ' : 'Suspend user ') + user.username"
+          [title]="user.isSuspended ? 'Reinstate' : 'Suspend'">
+          <i class="fa-solid" [class.fa-user-lock]="!user.isSuspended" [class.fa-user-check]="user.isSuspended" aria-hidden="true"></i>
+        </button>
+        <button type="button" (click)="setRenderingAllowed(user, !user.renderingAllowed)" class="btn btn-ghost app-icon-button" [disabled]="isBusy(user)"
+          [attr.aria-label]="(user.renderingAllowed ? 'Turn off rendering for ' : 'Allow rendering for ') + user.username"
+          [title]="user.renderingAllowed ? 'Turn off rendering' : 'Allow rendering'">
+          <i class="fa-solid" [class.fa-image]="user.renderingAllowed" [class.fa-ban]="!user.renderingAllowed" aria-hidden="true"></i>
+        </button>
+        <button type="button" (click)="resetPassword(user)" class="btn btn-ghost app-icon-button" [disabled]="isBusy(user)"
+          [attr.aria-label]="'Reset password for ' + user.username" title="Reset password">
+          <i class="fa-solid fa-key" aria-hidden="true"></i>
+        </button>
         <button type="button" (click)="deleteUser(user.id, user.username)" class="btn btn-ghost btn-ghost-danger app-icon-button"
-          [disabled]="isDeletingUser()[user.id]" [attr.aria-label]="'Delete user ' + user.username" title="Delete">
+          [disabled]="isBusy(user)" [attr.aria-label]="'Delete user ' + user.username" title="Delete">
           <i class="fa-solid fa-trash" aria-hidden="true"></i>
         </button>
         }

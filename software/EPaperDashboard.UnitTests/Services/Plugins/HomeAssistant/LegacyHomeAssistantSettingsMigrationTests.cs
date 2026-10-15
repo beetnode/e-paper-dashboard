@@ -1,5 +1,4 @@
 using System.Text.Json;
-using CSharpFunctionalExtensions;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
 using EPaperDashboard.Services;
@@ -19,7 +18,6 @@ public class LegacyHomeAssistantSettingsMigrationTests
     private readonly Dictionary<DashboardId, Dashboard> _stored = [];
     private readonly Mock<IDashboardRepository> _dashboards = new();
     private readonly Mock<IDeploymentStrategy> _deployment = new();
-    private readonly Mock<IEnvironmentConfiguration> _environment = new();
     private readonly ProviderConnectionStore _connections;
     private readonly UserId _owner = UserId.New();
 
@@ -27,20 +25,18 @@ public class LegacyHomeAssistantSettingsMigrationTests
     {
         _dashboards.Setup(r => r.GetAll()).Returns(() => _stored.Values.ToList());
         _dashboards.Setup(r => r.FindById(It.IsAny<DashboardId>()))
-            .Returns((DashboardId id) => _stored.TryGetValue(id, out var d) ? Maybe.From(d) : Maybe<Dashboard>.None);
+            .Returns((DashboardId id) => _stored.TryGetValue(id, out var d) ? (d) : (Dashboard?)null);
         _dashboards.Setup(r => r.Update(It.IsAny<Dashboard>())).Callback((Dashboard d) => _stored[d.Id] = d);
-        _deployment.SetupGet(d => d.Mode).Returns(DeploymentMode.Standalone);
         _connections = InMemoryProviderConnectionRepository.CreateStore(new HomeAssistantAddonConnection(_deployment.Object));
     }
 
     private void UseAddon()
     {
-        _deployment.SetupGet(d => d.Mode).Returns(DeploymentMode.Addon);
         _deployment.SetupGet(d => d.DefaultHomeAssistant).Returns(new HomeAssistantEndpoint("http://supervisor/core", "supervisor", "/websocket"));
     }
 
     private void Run() => new LegacyHomeAssistantSettingsMigration(_dashboards.Object, _connections, ImmediateUnitOfWork.Instance,
-        _deployment.Object, _environment.Object, NullLogger<LegacyHomeAssistantSettingsMigration>.Instance).Run();
+        _deployment.Object, NullLogger<LegacyHomeAssistantSettingsMigration>.Instance).Run();
 
     private Dashboard Store(string? host, string? token, RenderingMode mode = RenderingMode.Custom, object? config = null)
     {
@@ -122,18 +118,6 @@ public class LegacyHomeAssistantSettingsMigrationTests
         HomeAssistantConnections().Should().BeEmpty();
         dashboard.AccessToken.Should().BeNull();
         dashboard.LayoutConfig!.Widgets[0].Config.GetProperty("entityId").GetString().Should().Be("sensor.x");
-    }
-
-    [Fact]
-    public void HostMode_UsesTheConfiguredServer()
-    {
-        _deployment.SetupGet(d => d.Mode).Returns(DeploymentMode.Host);
-        _environment.SetupGet(e => e.HomeAssistantHost).Returns("http://core.test:8123");
-        Store("http://ignored.test", "token");
-
-        Run();
-
-        _connections.Credentials(HomeAssistantConnections().Single())["host"].Should().Be("http://core.test:8123");
     }
 
     [Fact]

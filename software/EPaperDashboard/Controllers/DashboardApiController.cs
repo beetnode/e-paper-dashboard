@@ -1,3 +1,4 @@
+using EPaperDashboard.Utilities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
@@ -19,24 +20,13 @@ public class DashboardApiController(DashboardService dashboardService, UserServi
     [HttpGet]
     public IActionResult GetDashboards()
     {
-        UserId userId;
-        
-        if (IsHomeAssistantIngress)
+        if (!_userService.HasAccount(CurrentUserId))
         {
-            userId = CurrentUserId;
-        }
-        else
-        {
-            var user = _userService.GetUserById(CurrentUserId);
-            if (user.HasNoValue)
-            {
-                return Unauthorized();
-            }
-            userId = user.Value.Id;
+            return Unauthorized();
         }
 
         // Never return persisted dashboards directly: responses expose only the fields the client needs.
-        var dashboards = _dashboardService.GetDashboardsForUser(userId)
+        var dashboards = _dashboardService.GetDashboardsForUser(CurrentUserId)
             .Select(dashboard => DashboardResponseDto.FromDashboard(dashboard, ResolveEffectiveAiConfigMode(dashboard)))
             .ToList();
         return Ok(dashboards);
@@ -51,29 +41,31 @@ public class DashboardApiController(DashboardService dashboardService, UserServi
         }
 
         var dashboard = _dashboardService.GetDashboardById(dashboardId);
-        if (dashboard.HasNoValue)
+        if (dashboard is null)
         {
             return NotFound(new { message = "Dashboard not found." });
         }
 
-        if (dashboard.Value.UserId != CurrentUserId)
+        if (dashboard.UserId != CurrentUserId)
         {
             return Forbid();
         }
 
-        return Ok(DashboardResponseDto.FromDashboard(dashboard.Value, ResolveEffectiveAiConfigMode(dashboard.Value)));
+        return Ok(DashboardResponseDto.FromDashboard(dashboard, ResolveEffectiveAiConfigMode(dashboard)));
     }
 
     [HttpPost]
     public IActionResult CreateDashboard([FromBody] CreateDashboardRequest request)
     {
-        if (!IsHomeAssistantIngress)
+        if (!_userService.HasAccount(CurrentUserId))
         {
-            var user = _userService.GetUserById(CurrentUserId);
-            if (user.HasNoValue)
-            {
-                return Unauthorized();
-            }
+            return Unauthorized();
+        }
+
+        if (UserLimits.AppliesTo(CurrentUserId)
+            && _dashboardService.GetDashboardsForUser(CurrentUserId).Count >= UserLimits.MaxDashboards)
+        {
+            return BadRequest(new { message = $"You can create up to {UserLimits.MaxDashboards} dashboards." });
         }
 
         var dashboard = new Dashboard
@@ -130,17 +122,17 @@ public class DashboardApiController(DashboardService dashboardService, UserServi
         }
 
         var dashboard = _dashboardService.GetDashboardById(dashboardId);
-        if (dashboard.HasNoValue)
+        if (dashboard is null)
         {
             return NotFound(new { message = "Dashboard not found." });
         }
 
-        if (dashboard.Value.UserId != CurrentUserId)
+        if (dashboard.UserId != CurrentUserId)
         {
             return Forbid();
         }
 
-        var updatedDashboard = dashboard.Value;
+        var updatedDashboard = dashboard;
         if (request.Name != null) updatedDashboard.Name = request.Name;
         if (request.Description != null) updatedDashboard.Description = request.Description;
 
@@ -212,12 +204,12 @@ public class DashboardApiController(DashboardService dashboardService, UserServi
         }
 
         var dashboard = _dashboardService.GetDashboardById(dashboardId);
-        if (dashboard.HasNoValue)
+        if (dashboard is null)
         {
             return NotFound(new { message = "Dashboard not found." });
         }
 
-        if (dashboard.Value.UserId != CurrentUserId)
+        if (dashboard.UserId != CurrentUserId)
         {
             return Forbid();
         }
@@ -270,10 +262,10 @@ public class DashboardApiController(DashboardService dashboardService, UserServi
             return dashboard.AiConfig.ConnectionMode.ToString();
         }
 
-        var user = _userService.GetUserById(dashboard.UserId);
-        if (user.HasValue && user.Value.AiConfig != null && user.Value.AiConfig.ConnectionMode != AiConnectionMode.None)
+        var globalConfig = _userService.GetAiConfig(dashboard.UserId);
+        if (globalConfig != null && globalConfig.ConnectionMode != AiConnectionMode.None)
         {
-            return user.Value.AiConfig.ConnectionMode.ToString();
+            return globalConfig.ConnectionMode.ToString();
         }
 
         return AiConnectionMode.None.ToString();

@@ -17,6 +17,6 @@ public sealed class ApiKeyPolicyEvaluator(DeviceService deviceService)
             return false;
         }
 
-        return deviceService.GetDeviceByApiKey(apiKey!).HasValue;
+        return deviceService.GetDeviceByApiKey(apiKey!) is not null;
     }
 }

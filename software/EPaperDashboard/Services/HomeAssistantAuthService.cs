@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text.Json;
-using CSharpFunctionalExtensions;
 using EPaperDashboard.Models;
 using EPaperDashboard.Utilities;
 using Microsoft.AspNetCore.DataProtection;
@@ -24,20 +23,16 @@ public class HomeAssistantAuthService(
     private static readonly TimeSpan StateLifetime = TimeSpan.FromMinutes(5);
     private readonly IDataProtector _stateProtector = dataProtection.CreateProtector("izboard.home-assistant.sign-in.v1");
 
-    public Result<(string Url, string State), string> StartConnectionAuth(ProviderConnection connection, string host, HttpContext? httpContext)
+    public Result<(string Url, string State)> StartConnectionAuth(ProviderConnection connection, string host, HttpContext? httpContext)
     {
         if (!Uri.TryCreate(host, UriKind.Absolute, out var hostUri))
             return "Enter the Home Assistant server URL first.";
-        var clientUri = deploymentStrategy.GetOAuthClientUri(httpContext);
-        if (clientUri == null)
-            return deploymentStrategy.Mode == DeploymentMode.Addon
-                ? "Could not determine ingress URL from request. Ensure you're accessing the addon through Home Assistant ingress."
-                : "CLIENT_URL is not configured. This is required for Home Assistant sign-in.";
+        var client = deploymentStrategy.GetHomeAssistantOAuthClient(httpContext);
+        if (client.IsFailure)
+            return client.Error;
 
         var hostUrl = hostUri.ToString().TrimEnd('/');
-        var appUrl = clientUri.ToString().TrimEnd('/');
-        // Home Assistant accepts redirect URIs on the client ID's origin. Under ingress that origin is Home Assistant's.
-        var clientId = deploymentStrategy.Mode == DeploymentMode.Addon ? clientUri.GetLeftPart(UriPartial.Authority) : appUrl;
+        var (appUrl, clientId) = client.Value;
         var state = _stateProtector.Protect(JsonSerializer.Serialize(new StateData(
             hostUrl, clientId, connection.Id, connection.UserId.Value, timeProvider.GetUtcNow().ToUnixTimeSeconds())));
         var redirectUri = $"{appUrl}/api/providers/home-assistant/callback";
@@ -46,7 +41,7 @@ public class HomeAssistantAuthService(
     }
 
     /// <summary>Exchanges the authorization code and creates a long-lived token for the connection named in the protected state.</summary>
-    public async Task<Result<ConnectionAuthorization, string>> CompleteConnectionAuthAsync(string? code, string? state, CancellationToken cancellationToken)
+    public async Task<Result<ConnectionAuthorization>> CompleteConnectionAuthAsync(string? code, string? state, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(state))
             return "Home Assistant sign-in was cancelled or expired.";

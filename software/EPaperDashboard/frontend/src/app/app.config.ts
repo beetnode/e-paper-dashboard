@@ -4,6 +4,7 @@ import { provideHttpClient, withInterceptorsFromDi, HTTP_INTERCEPTORS } from '@a
 
 import { routes } from './app.routes';
 import { BaseHrefInterceptor } from './interceptors/base-href.interceptor';
+import { PasswordChangeInterceptor } from './interceptors/password-change.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -11,6 +12,7 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
     provideHttpClient(withInterceptorsFromDi()),
-    { provide: HTTP_INTERCEPTORS, useClass: BaseHrefInterceptor, multi: true }
+    { provide: HTTP_INTERCEPTORS, useClass: BaseHrefInterceptor, multi: true },
+    { provide: HTTP_INTERCEPTORS, useClass: PasswordChangeInterceptor, multi: true }
   ]
 };

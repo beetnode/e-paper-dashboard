@@ -1,40 +1,40 @@
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
-using EPaperDashboard.Utilities;
 
 namespace EPaperDashboard.Services.Rendering;
 
 public sealed class RenderingAccessService(
-    IUserRepository users, IDashboardRepository dashboards, IDeploymentStrategy deployment, UserRenderScheduler scheduler)
+    UserService users, IDashboardRepository dashboards, UserRenderScheduler scheduler)
 {
-    public bool IsEnabled(UserId owner)
-    {
-        if (deployment.Mode == DeploymentMode.Addon)
-            return owner == Constants.HomeAssistantVirtualUserId && (users.GetRenderingEnabled(owner) ?? false);
-        var user = users.FindById(owner);
-        return user.HasValue && (users.GetRenderingEnabled(owner) ?? user.Value.RenderingEnabled ?? false);
-    }
+    public bool IsEnabled(UserId owner) => users.IsRenderingEnabled(owner);
+
+    public bool IsAllowed(UserId owner) => users.IsRenderingAllowed(owner);
 
     public void RequireAccount(UserId owner)
     {
-        if (deployment.Mode == DeploymentMode.Addon ? owner != Constants.HomeAssistantVirtualUserId : users.FindById(owner).HasNoValue)
+        if (!users.HasAccount(owner))
             throw new RenderingRequestException("Account no longer exists.");
     }
 
     public void SetEnabled(UserId owner, bool enabled)
     {
-        RequireAccount(owner);
-        users.SetRenderingEnabled(owner, enabled);
+        if (enabled && users.HasAccount(owner) && !users.IsRenderingAllowed(owner))
+            throw new RenderingRequestException("An administrator turned off rendering for this account.");
+        if (!users.TrySetRenderingEnabled(owner, enabled))
+            throw new RenderingRequestException("Account no longer exists.");
         if (!enabled) scheduler.CancelUser(owner);
     }
 
     public void RequireAccess(UserId owner, DashboardId? dashboardId = null)
     {
-        if (!IsEnabled(owner)) throw new RenderingRequestException("Enable rendering in Rendering settings.");
+        if (!IsEnabled(owner))
+            throw new RenderingRequestException(users.HasAccount(owner) && !IsAllowed(owner)
+                ? "An administrator turned off rendering for this account."
+                : "Enable rendering in Rendering settings.");
         if (dashboardId is { } id)
         {
             var dashboard = dashboards.FindById(id);
-            if (dashboard.HasNoValue || dashboard.Value.UserId != owner)
+            if (dashboard is null || dashboard.UserId != owner)
                 throw new RenderingRequestException("Dashboard is not accessible to this rendering account.");
         }
     }

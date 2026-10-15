@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Controllers;
 using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Models;
@@ -57,7 +57,7 @@ public class DevicesControllerTests
     public void UpdateDevice_NotFound_ReturnsNotFound()
     {
         var deviceId = DeviceId.New();
-        _deviceRepository.Setup(r => r.FindById(deviceId)).Returns(Maybe<Device>.None);
+        _deviceRepository.Setup(r => r.FindById(deviceId)).Returns((Device?)null);
         var sut = CreateSut().WithUser(UserId.New());
 
         var result = sut.UpdateDevice(deviceId.Value, new UpdateDeviceRequest(null, null));
@@ -101,7 +101,7 @@ public class DevicesControllerTests
         var targetDashboardId = DashboardId.New();
         var device = new Device { Id = deviceId, UserId = userId };
         _deviceRepository.Setup(r => r.FindById(deviceId)).Returns(device);
-        _dashboardRepository.Setup(r => r.FindById(targetDashboardId)).Returns(Maybe<Dashboard>.None);
+        _dashboardRepository.Setup(r => r.FindById(targetDashboardId)).Returns((Dashboard?)null);
         var sut = CreateSut().WithUser(userId);
 
         var result = sut.UpdateDevice(deviceId.Value, new UpdateDeviceRequest(null, targetDashboardId.Value));

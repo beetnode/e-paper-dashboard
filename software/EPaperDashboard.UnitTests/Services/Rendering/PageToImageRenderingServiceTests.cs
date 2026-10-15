@@ -52,7 +52,7 @@ public sealed class PageToImageRenderingServiceTests : IDisposable
             .RenderHtmlAsync(owner, "<html></html>", new Size(200, 100));
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Should().Be("Rendering is not installed on this server. Enable rendering in Rendering settings.");
+        result.Error.Should().Be("Rendering is not available on this server yet.");
         manager.GetStatus().State.Should().Be(PlaywrightComponentState.NotInstalled);
     }
 
@@ -60,8 +60,9 @@ public sealed class PageToImageRenderingServiceTests : IDisposable
         PlaywrightComponentManager? manager = null, PlaywrightComponentRuntime? runtime = null)
     {
         var deployment = new Mock<IDeploymentStrategy>();
-        deployment.SetupGet(d => d.Mode).Returns(DeploymentMode.Standalone);
-        var access = new RenderingAccessService(users, Mock.Of<IDashboardRepository>(), deployment.Object,
+        deployment.SetupGet(d => d.IsUserManagementEnabled).Returns(true);
+        var access = new RenderingAccessService(
+            new UserService(users, Mock.Of<IDashboardRepository>(), deployment: deployment.Object), Mock.Of<IDashboardRepository>(),
             new UserRenderScheduler(new ConfigurationBuilder().Build()));
         // Access failures occur before any component, HTTP, or image work is permitted.
         return new PageToImageRenderingService(Mock.Of<IHttpClientFactory>(), Mock.Of<IImageFactory>(), manager!, runtime!,

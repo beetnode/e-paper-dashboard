@@ -1,4 +1,3 @@
-using CSharpFunctionalExtensions;
 using EPaperDashboard.Models;
 using EPaperDashboard.Utilities;
 namespace EPaperDashboard.Services.Plugins.HomeAssistant;
@@ -39,7 +38,7 @@ public sealed class HomeAssistantDashboardTargetResolver(
     /// <summary>Whether a connection can render Home Assistant dashboards; the add-on's default connection cannot.</summary>
     public bool CanRender(ProviderConnection connection) => !connections.IsDefault(connection);
 
-    public Result<(string Host, string Token), string> ResolveServer(Dashboard dashboard)
+    public Result<(string Host, string Token)> ResolveServer(Dashboard dashboard)
     {
         if (!UsesConnection(dashboard))
             return "Dashboard configuration incomplete. Select a Home Assistant connection with a long-lived access token for this dashboard.";
@@ -49,7 +48,7 @@ public sealed class HomeAssistantDashboardTargetResolver(
         return ConnectionServer(connection);
     }
 
-    public Result<Uri, string> ResolveUri(Dashboard dashboard)
+    public Result<Uri> ResolveUri(Dashboard dashboard)
     {
         var server = ResolveServer(dashboard);
         if (server.IsFailure) return server.Error;
@@ -60,7 +59,7 @@ public sealed class HomeAssistantDashboardTargetResolver(
         return new Uri(hostUri, pathUri);
     }
 
-    public Result<HomeAssistantDashboardTarget, string> Resolve(Dashboard dashboard)
+    public Result<HomeAssistantDashboardTarget> Resolve(Dashboard dashboard)
     {
         var uri = ResolveUri(dashboard);
         if (uri.IsFailure) return uri.Error;

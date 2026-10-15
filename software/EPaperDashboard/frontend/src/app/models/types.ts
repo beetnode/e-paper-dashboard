@@ -1,11 +1,14 @@
-export type DeploymentMode = 'addon' | 'host' | 'standalone';
-
 export interface User {
   id: string;
   username: string;
   nickname?: string;
   isSuperUser: boolean;
-  deploymentMode?: DeploymentMode;
+  /** An administrator issued a temporary password; the user must choose a new one before doing anything else. */
+  mustChangePassword?: boolean;
+  /** False when the deployment signs everyone in as one shared user (the Home Assistant add-on). */
+  userManagementEnabled?: boolean;
+  /** The deployment provides a Home Assistant connection of its own (the add-on's server). */
+  hasDefaultHomeAssistantConnection?: boolean;
 }
 
 export interface LoginRequest {
@@ -16,6 +19,11 @@ export interface LoginRequest {
 export interface RegisterRequest {
   username: string;
   password: string;
+}
+
+export interface SetupRequest extends RegisterRequest {
+  /** One-time code the server writes to its log until the first administrator exists. */
+  setupCode: string;
 }
 
 export type DashboardOrientation = 'Landscape' | 'Portrait';

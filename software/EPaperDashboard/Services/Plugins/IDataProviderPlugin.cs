@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+using EPaperDashboard.Utilities;
 using System.Text.Json;
 using EPaperDashboard.Models.Rendering;
 using EPaperDashboard.Models;
@@ -53,10 +53,10 @@ public interface IDataProviderPlugin
     // A bespoke widget may request an arbitrary plugin capability in addition to common data.
     PluginWidgetRequest? GetWidgetDataRequest(WidgetConfigEntry widget) => null;
     string? ValidateCredentials(IReadOnlyDictionary<string, string> credentials);
-    Task<Result<List<DataSource>, string>> DiscoverAsync(ProviderContext context, CancellationToken cancellationToken);
-    Task<Result<SourceData, string>> FetchAsync(ProviderContext context, SourceQuery query, CancellationToken cancellationToken);
+    Task<Result<List<DataSource>>> DiscoverAsync(ProviderContext context, CancellationToken cancellationToken);
+    Task<Result<SourceData>> FetchAsync(ProviderContext context, SourceQuery query, CancellationToken cancellationToken);
 
-    async Task<Result<Dictionary<string, SourceData>, string>> FetchManyAsync(ProviderContext context, string capability, string[] sourceIds, int hours, CancellationToken cancellationToken)
+    async Task<Result<Dictionary<string, SourceData>>> FetchManyAsync(ProviderContext context, string capability, string[] sourceIds, int hours, CancellationToken cancellationToken)
     {
         var values = new Dictionary<string, SourceData>();
         foreach (var sourceId in sourceIds)
@@ -83,8 +83,8 @@ public interface IOAuthDataProviderPlugin : IDataProviderPlugin
     IReadOnlyCollection<string> AuthorizationCredentialKeys { get; }
     bool IsAuthorized(IReadOnlyDictionary<string, string> credentials);
     /// <summary>Returns the provider sign-in URL and a one-time state value that the core binds to the browser.</summary>
-    Result<(string Url, string State), string> StartAuthorization(ProviderConnection connection, HttpContext httpContext);
-    Task<UnitResult<string>> CompleteAuthorizationAsync(string? state, string? browserState, string? code, CancellationToken cancellationToken);
+    Result<(string Url, string State)> StartAuthorization(ProviderConnection connection, HttpContext httpContext);
+    Task<Result> CompleteAuthorizationAsync(string? state, string? browserState, string? code, CancellationToken cancellationToken);
 }
 
 public sealed class ProviderRegistry

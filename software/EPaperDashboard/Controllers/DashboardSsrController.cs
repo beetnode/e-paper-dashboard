@@ -5,7 +5,6 @@ using EPaperDashboard.Services.Rendering;
 using EPaperDashboard.Models;
 using EPaperDashboard.Models.Rendering;
 using EPaperDashboard.Utilities;
-using CSharpFunctionalExtensions;
 using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Formats.Bmp;
 using SixLabors.ImageSharp.Formats.Jpeg;
@@ -45,21 +44,21 @@ public class DashboardSsrController(
         }
 
         var dashboard = dashboardService.GetDashboardById(dashboardId);
-        if (dashboard.HasNoValue)
+        if (dashboard is null)
             return NotFound("Dashboard not found");
 
-        if (dashboard.Value.UserId != CurrentUserId)
+        if (dashboard.UserId != CurrentUserId)
             return Forbid();
 
-        if (dashboard.Value.LayoutConfig == null)
+        if (dashboard.LayoutConfig == null)
             return BadRequest("Dashboard has no layout configuration. Open the designer and create a layout first.");
 
         try
         {
-            var layoutToRender = dashboard.Value.GetMergedLayoutConfig();
+            var layoutToRender = dashboard.GetMergedLayoutConfig();
 
             using var rawImage = await dashboardImageRenderingService.RenderDashboardImageAsync(
-                dashboard.Value.Id.ToString(),
+                dashboard.Id.ToString(),
                 layoutToRender,
                 HttpContext.RequestAborted,
                 bypassCache: refresh);
@@ -90,10 +89,10 @@ public class DashboardSsrController(
             return BadRequest("Invalid dashboard ID");
 
         var dashboard = dashboardService.GetDashboardById(dashboardId);
-        if (dashboard.HasNoValue)
+        if (dashboard is null)
             return NotFound("Dashboard not found");
 
-        if (dashboard.Value.UserId != CurrentUserId)
+        if (dashboard.UserId != CurrentUserId)
             return Forbid();
 
         var validationError = TransientLayoutValidator.Validate(layout);
@@ -102,9 +101,9 @@ public class DashboardSsrController(
 
         try
         {
-            var layoutToRender = dashboard.Value.GetMergedLayoutConfig(layout);
+            var layoutToRender = dashboard.GetMergedLayoutConfig(layout);
             using var rawImage = await dashboardImageRenderingService.RenderDashboardImageAsync(
-                dashboard.Value.Id.ToString(),
+                dashboard.Id.ToString(),
                 layoutToRender,
                 HttpContext.RequestAborted,
                 bypassCache: refresh,
@@ -138,10 +137,10 @@ public class DashboardSsrController(
             return BadRequest("Invalid dashboard ID");
 
         var dashboard = dashboardService.GetDashboardById(dashboardId);
-        if (dashboard.HasNoValue)
+        if (dashboard is null)
             return NotFound("Dashboard not found");
 
-        if (dashboard.Value.UserId != CurrentUserId)
+        if (dashboard.UserId != CurrentUserId)
             return Forbid();
 
         if (request.Layout is null)
@@ -158,7 +157,7 @@ public class DashboardSsrController(
             // ignored and generated widgets could be duplicated.
             var layoutToRender = request.Layout;
             var render = await dashboardImageRenderingService.RenderDesignerPreviewAsync(
-                dashboard.Value.Id.ToString(),
+                dashboard.Id.ToString(),
                 layoutToRender,
                 HttpContext.RequestAborted,
                 bypassCache: request.RefreshData);
@@ -173,7 +172,7 @@ public class DashboardSsrController(
 
             var png = stream.ToArray();
             var token = designerPreviewImageStore.Add(
-                CurrentUserId.ToString(), dashboard.Value.Id.ToString(), png);
+                CurrentUserId.ToString(), dashboard.Id.ToString(), png);
             return Ok(new DashboardDesignerPreviewResponse(
                 request.Revision,
                 image.Width,
@@ -200,11 +199,11 @@ public class DashboardSsrController(
             return BadRequest("Invalid dashboard ID");
 
         var dashboard = dashboardService.GetDashboardById(dashboardId);
-        if (dashboard.HasNoValue) return NotFound();
-        if (dashboard.Value.UserId != CurrentUserId) return Forbid();
+        if (dashboard is null) return NotFound();
+        if (dashboard.UserId != CurrentUserId) return Forbid();
 
         return designerPreviewImageStore.TryGet(
-            token, CurrentUserId.ToString(), dashboard.Value.Id.ToString(), out var png)
+            token, CurrentUserId.ToString(), dashboard.Id.ToString(), out var png)
                 ? File(png, "image/png")
                 : NotFound();
     }
@@ -222,19 +221,19 @@ public class DashboardSsrController(
             return BadRequest("Invalid dashboard ID");
 
         var dashboard = dashboardService.GetDashboardById(dashboardId);
-        if (dashboard.HasNoValue)
+        if (dashboard is null)
             return NotFound("Dashboard not found");
 
-        if (dashboard.Value.UserId != CurrentUserId)
+        if (dashboard.UserId != CurrentUserId)
             return Forbid();
 
         var validationError = TransientLayoutValidator.Validate(layout);
         if (validationError is not null)
             return BadRequest(validationError);
 
-        var layoutToResolve = dashboard.Value.GetMergedLayoutConfig(layout);
+        var layoutToResolve = dashboard.GetMergedLayoutConfig(layout);
         var data = await dashboardImageRenderingService.FetchDashboardDataAsync(
-            dashboard.Value.Id.ToString(),
+            dashboard.Id.ToString(),
             layoutToResolve,
             HttpContext.RequestAborted,
             bypassCache: true);
@@ -253,18 +252,18 @@ public class DashboardSsrController(
             return BadRequest("Invalid dashboard ID");
 
         var dashboard = dashboardService.GetDashboardById(dashboardId);
-        if (dashboard.HasNoValue)
+        if (dashboard is null)
             return NotFound("Dashboard not found");
 
-        if (dashboard.Value.UserId != CurrentUserId)
+        if (dashboard.UserId != CurrentUserId)
             return Forbid();
 
-        var (width, height) = dashboard.Value.GetEffectiveSize();
+        var (width, height) = dashboard.GetEffectiveSize();
         var imageSize = new Size(width, height);
 
-        return dashboard.Value.RenderingMode == RenderingMode.Custom
-            ? await RenderCustomPreview(dashboard.Value, imageSize, format)
-            : await RenderHomeAssistantPreview(dashboard.Value, imageSize, format);
+        return dashboard.RenderingMode == RenderingMode.Custom
+            ? await RenderCustomPreview(dashboard, imageSize, format)
+            : await RenderHomeAssistantPreview(dashboard, imageSize, format);
     }
 
     private async Task<IActionResult> RenderCustomPreview(Dashboard dashboard, Size imageSize, string format)
