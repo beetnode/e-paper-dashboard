@@ -57,14 +57,14 @@ public abstract class DashboardOwnerBaseAttribute : Attribute
 
         // Get dashboard
         var dashboardMaybe = dashboardService.GetDashboardById(dashboardIdTyped);
-        if (dashboardMaybe.HasNoValue)
+        if (dashboardMaybe is null)
         {
             context.Result = new NotFoundObjectResult(new { error = "Dashboard not found." });
             return;
         }
 
         // Check ownership
-        if (dashboardMaybe.Value.UserId != userId)
+        if (dashboardMaybe.UserId != userId)
         {
             context.Result = new ForbidResult();
             return;

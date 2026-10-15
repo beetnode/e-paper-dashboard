@@ -5,8 +5,8 @@ namespace EPaperDashboard.Data.Repositories;
 
 public interface IUserRepository
 {
-    Maybe<User> FindById(UserId id);
-    Maybe<User> FindByUsername(string username);
+    User? FindById(UserId id);
+    User? FindByUsername(string username);
     List<User> GetAll();
     bool ExistsByUsername(string username);
     bool ExistsByUsernameIgnoreCase(string username);

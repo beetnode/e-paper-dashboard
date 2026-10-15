@@ -26,7 +26,7 @@ public class LegacyHomeAssistantSettingsMigrationTests
     {
         _dashboards.Setup(r => r.GetAll()).Returns(() => _stored.Values.ToList());
         _dashboards.Setup(r => r.FindById(It.IsAny<DashboardId>()))
-            .Returns((DashboardId id) => _stored.TryGetValue(id, out var d) ? Maybe.From(d) : Maybe<Dashboard>.None);
+            .Returns((DashboardId id) => _stored.TryGetValue(id, out var d) ? (d) : (Dashboard?)null);
         _dashboards.Setup(r => r.Update(It.IsAny<Dashboard>())).Callback((Dashboard d) => _stored[d.Id] = d);
         _connections = InMemoryProviderConnectionRepository.CreateStore(new HomeAssistantAddonConnection(_deployment.Object));
     }

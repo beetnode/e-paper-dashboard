@@ -33,7 +33,7 @@ public class DashboardApiControllerTests
     public void GetDashboards_UserDoesNotExist_ReturnsUnauthorized()
     {
         var userId = UserId.New();
-        _userRepository.Setup(r => r.FindById(userId)).Returns(Maybe<User>.None);
+        _userRepository.Setup(r => r.FindById(userId)).Returns((User?)null);
         var sut = CreateSut().WithUser(userId);
 
         var result = sut.GetDashboards();
@@ -82,7 +82,7 @@ public class DashboardApiControllerTests
     public void GetDashboard_NotFound_ReturnsNotFound()
     {
         var dashboardId = DashboardId.New();
-        _dashboardRepository.Setup(r => r.FindById(dashboardId)).Returns(Maybe<Dashboard>.None);
+        _dashboardRepository.Setup(r => r.FindById(dashboardId)).Returns((Dashboard?)null);
         var sut = CreateSut().WithUser(UserId.New());
 
         var result = sut.GetDashboard(dashboardId.Value);
@@ -122,7 +122,7 @@ public class DashboardApiControllerTests
     public void CreateDashboard_UnauthenticatedUser_ReturnsUnauthorized()
     {
         var userId = UserId.New();
-        _userRepository.Setup(r => r.FindById(userId)).Returns(Maybe<User>.None);
+        _userRepository.Setup(r => r.FindById(userId)).Returns((User?)null);
         var sut = CreateSut().WithUser(userId);
 
         var result = sut.CreateDashboard(new CreateDashboardRequest("New Dashboard", null, null, null, null));

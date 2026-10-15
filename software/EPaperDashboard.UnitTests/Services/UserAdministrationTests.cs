@@ -84,7 +84,7 @@ public class UserAdministrationTests
     public void AdminActions_ReportUnknownAccounts()
     {
         var ghost = UserId.New();
-        _users.Setup(r => r.FindById(ghost)).Returns(Maybe<User>.None);
+        _users.Setup(r => r.FindById(ghost)).Returns((User?)null);
         var sut = CreateSut();
 
         sut.SetSuperUser(_admin.Id, ghost, true).Should().Be(AdminActionResult.NotFound);
@@ -126,7 +126,7 @@ public class UserAdministrationTests
         var sut = CreateSut();
 
         sut.HasAccount(_bob.Id).Should().BeFalse();
-        sut.VerifyCredentials("bob", "secret").Value.IsSuspended.Should().BeTrue();
+        sut.VerifyCredentials("bob", "secret")!.IsSuspended.Should().BeTrue();
     }
 
     [Fact]

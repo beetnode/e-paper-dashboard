@@ -95,7 +95,7 @@ public class AiContentProviderTests
     public async Task GenerateContentAsync_DashboardNotFound_ReturnsFailure()
     {
         var dashboardId = DashboardId.New();
-        _dashboardRepository.Setup(r => r.FindById(dashboardId)).Returns(Maybe<Dashboard>.None);
+        _dashboardRepository.Setup(r => r.FindById(dashboardId)).Returns((Dashboard?)null);
         var sut = CreateSut();
 
         var result = await sut.GenerateContentAsync(dashboardId.Value, "prompt", CancellationToken.None);

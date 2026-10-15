@@ -25,7 +25,7 @@ public sealed class UserSessionValidator(IUserRepository users, TimeProvider tim
 {
     public static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(30);
 
-    private readonly ConcurrentDictionary<UserId, (Maybe<User> User, DateTimeOffset LoadedAt)> _cache = new();
+    private readonly ConcurrentDictionary<UserId, (User? User, DateTimeOffset LoadedAt)> _cache = new();
 
     public SessionCheck Validate(ClaimsPrincipal principal)
     {
@@ -35,13 +35,12 @@ public sealed class UserSessionValidator(IUserRepository users, TimeProvider tim
             return new SessionCheck(SessionState.Reject);
         }
 
-        var account = Load(id);
-        if (account.HasNoValue || account.Value.IsSuspended)
+        var user = Load(id);
+        if (user is null || user.IsSuspended)
         {
             return new SessionCheck(SessionState.Reject);
         }
 
-        var user = account.Value;
         var stamp = principal.FindFirst(Constants.SecurityStampClaim)?.Value;
         if (user.SecurityStamp is not null && !string.Equals(stamp, user.SecurityStamp, StringComparison.Ordinal))
         {
@@ -58,7 +57,7 @@ public sealed class UserSessionValidator(IUserRepository users, TimeProvider tim
 
     public void Invalidate(UserId id) => _cache.TryRemove(id, out _);
 
-    private Maybe<User> Load(UserId id)
+    private User? Load(UserId id)
     {
         var now = time.GetUtcNow();
         if (_cache.TryGetValue(id, out var cached) && now - cached.LoadedAt < CacheDuration)

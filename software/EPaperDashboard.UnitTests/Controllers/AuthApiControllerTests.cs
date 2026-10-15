@@ -96,7 +96,7 @@ public class AuthApiControllerTests
     [Fact]
     public async Task Register_NewUsername_CreatesUserSignsInAndReturnsUserInfo()
     {
-        _userRepository.Setup(r => r.FindByUsername("newuser")).Returns(Maybe<User>.None);
+        _userRepository.Setup(r => r.FindByUsername("newuser")).Returns((User?)null);
         User? inserted = null;
         _userRepository.Setup(r => r.TryInsert(It.IsAny<User>())).Callback<User>(u =>
         {
@@ -237,7 +237,7 @@ public class AuthApiControllerTests
     public void GetCurrentUser_StandaloneModeUserNotFound_ReturnsUnauthorized()
     {
         var userId = UserId.New();
-        _userRepository.Setup(r => r.FindById(userId)).Returns(Maybe<User>.None);
+        _userRepository.Setup(r => r.FindById(userId)).Returns((User?)null);
         var sut = CreateSut(userId);
 
         var result = sut.GetCurrentUser();

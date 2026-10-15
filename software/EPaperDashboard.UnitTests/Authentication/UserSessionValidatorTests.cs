@@ -31,7 +31,7 @@ public class UserSessionValidatorTests
     public void Validate_DeletedAccount_IsRejected()
     {
         var principal = UserClaims.Create(_alice);
-        _users.Setup(r => r.FindById(_alice.Id)).Returns(Maybe<User>.None);
+        _users.Setup(r => r.FindById(_alice.Id)).Returns((User?)null);
 
         CreateSut().Validate(principal).State.Should().Be(SessionState.Reject);
     }
@@ -103,7 +103,7 @@ public class UserSessionValidatorTests
         var principal = UserClaims.Create(_alice);
         sut.Validate(principal);
 
-        _users.Setup(r => r.FindById(_alice.Id)).Returns(Maybe<User>.None);
+        _users.Setup(r => r.FindById(_alice.Id)).Returns((User?)null);
         sut.Invalidate(_alice.Id);
 
         sut.Validate(principal).State.Should().Be(SessionState.Reject);

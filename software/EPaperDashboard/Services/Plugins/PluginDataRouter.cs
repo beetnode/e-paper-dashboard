@@ -18,7 +18,7 @@ public sealed class PluginDataRouter(
     {
         if (!DashboardId.TryParse(id, out var typed)) return "Invalid dashboard ID";
         var result = dashboards.GetDashboardById(typed);
-        return result.HasValue ? result.Value : "Dashboard not found";
+        return result is not null ? result : "Dashboard not found";
     }
 
     public string CacheVersion(string dashboardId)

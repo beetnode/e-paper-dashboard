@@ -18,7 +18,7 @@ public sealed class DashboardService(IDashboardRepository dashboardRepository)
     public void DeleteDashboard(DashboardId dashboardId) =>
         dashboardRepository.Delete(dashboardId);
 
-    public Maybe<Dashboard> GetDashboardById(DashboardId dashboardId) =>
+    public Dashboard? GetDashboardById(DashboardId dashboardId) =>
         dashboardRepository.FindById(dashboardId);
 
     public IEnumerable<Dashboard> GetAllDashboards() =>

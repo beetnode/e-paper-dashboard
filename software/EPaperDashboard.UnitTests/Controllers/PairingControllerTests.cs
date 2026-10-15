@@ -72,7 +72,7 @@ public class PairingControllerTests
     [Fact]
     public void RegisterDevice_UnknownCode_ReturnsNotFound()
     {
-        _pairingSessionRepository.Setup(r => r.FindByCode("BADCOD")).Returns(Maybe<PairingSession>.None);
+        _pairingSessionRepository.Setup(r => r.FindByCode("BADCOD")).Returns((PairingSession?)null);
         var sut = CreateSut();
 
         var result = sut.RegisterDevice(new RegisterDeviceRequest("BADCOD", "device-1", null, null, null));
@@ -120,7 +120,7 @@ public class PairingControllerTests
             UserId = UserId.New()
         };
         _pairingSessionRepository.Setup(r => r.FindByCode("ABC123")).Returns(session);
-        _deviceRepository.Setup(r => r.FindByIdentifier("device-1")).Returns(Maybe<Device>.None);
+        _deviceRepository.Setup(r => r.FindByIdentifier("device-1")).Returns((Device?)null);
         var sut = CreateSut();
 
         var result = sut.RegisterDevice(new RegisterDeviceRequest("ABC123", "device-1", "My Device", null, null));
@@ -197,7 +197,7 @@ public class PairingControllerTests
     [Fact]
     public void GetPairingStatus_UnknownCode_ReturnsNotFound()
     {
-        _pairingSessionRepository.Setup(r => r.FindByCode("XYZ")).Returns(Maybe<PairingSession>.None);
+        _pairingSessionRepository.Setup(r => r.FindByCode("XYZ")).Returns((PairingSession?)null);
         var sut = CreateSut().WithUser(UserId.New());
 
         var result = sut.GetPairingStatus("XYZ");

@@ -41,17 +41,17 @@ public class DashboardApiController(DashboardService dashboardService, UserServi
         }
 
         var dashboard = _dashboardService.GetDashboardById(dashboardId);
-        if (dashboard.HasNoValue)
+        if (dashboard is null)
         {
             return NotFound(new { message = "Dashboard not found." });
         }
 
-        if (dashboard.Value.UserId != CurrentUserId)
+        if (dashboard.UserId != CurrentUserId)
         {
             return Forbid();
         }
 
-        return Ok(DashboardResponseDto.FromDashboard(dashboard.Value, ResolveEffectiveAiConfigMode(dashboard.Value)));
+        return Ok(DashboardResponseDto.FromDashboard(dashboard, ResolveEffectiveAiConfigMode(dashboard)));
     }
 
     [HttpPost]
@@ -122,17 +122,17 @@ public class DashboardApiController(DashboardService dashboardService, UserServi
         }
 
         var dashboard = _dashboardService.GetDashboardById(dashboardId);
-        if (dashboard.HasNoValue)
+        if (dashboard is null)
         {
             return NotFound(new { message = "Dashboard not found." });
         }
 
-        if (dashboard.Value.UserId != CurrentUserId)
+        if (dashboard.UserId != CurrentUserId)
         {
             return Forbid();
         }
 
-        var updatedDashboard = dashboard.Value;
+        var updatedDashboard = dashboard;
         if (request.Name != null) updatedDashboard.Name = request.Name;
         if (request.Description != null) updatedDashboard.Description = request.Description;
 
@@ -204,12 +204,12 @@ public class DashboardApiController(DashboardService dashboardService, UserServi
         }
 
         var dashboard = _dashboardService.GetDashboardById(dashboardId);
-        if (dashboard.HasNoValue)
+        if (dashboard is null)
         {
             return NotFound(new { message = "Dashboard not found." });
         }
 
-        if (dashboard.Value.UserId != CurrentUserId)
+        if (dashboard.UserId != CurrentUserId)
         {
             return Forbid();
         }

@@ -40,7 +40,7 @@ public class UsersApiControllerTests
     public void ChangeNickname_UserDoesNotExist_ReturnsBadRequest()
     {
         var userId = UserId.New();
-        _userRepository.Setup(r => r.FindById(userId)).Returns(CSharpFunctionalExtensions.Maybe<User>.None);
+        _userRepository.Setup(r => r.FindById(userId)).Returns((User?)null);
         var sut = CreateSut().WithUser(userId);
 
         var result = sut.ChangeNickname(new ChangeNicknameRequest("New Nick"));
@@ -253,7 +253,7 @@ public class UsersApiControllerTests
     public void SetSuspension_UnknownTarget_ReturnsNotFound()
     {
         var ghost = UserId.New();
-        _userRepository.Setup(r => r.FindById(ghost)).Returns(CSharpFunctionalExtensions.Maybe<User>.None);
+        _userRepository.Setup(r => r.FindById(ghost)).Returns((User?)null);
         var sut = CreateSut().WithUser(UserId.New(), isSuperUser: true);
 
         sut.SetSuspension(ghost.Value, new SetSuspensionRequest(true)).Should().BeOfType<NotFoundObjectResult>();

@@ -53,7 +53,7 @@ public class ApiKeyAuthenticationHandlerTests
     public async Task AuthenticateAsync_ApiKeyDoesNotMatchAnyDevice_Fails()
     {
         var deviceRepository = new Mock<IDeviceRepository>();
-        deviceRepository.Setup(r => r.FindByApiKey("bad-key")).Returns(Maybe<Device>.None);
+        deviceRepository.Setup(r => r.FindByApiKey("bad-key")).Returns((Device?)null);
 
         var (result, _) = await AuthenticateAsync(deviceRepository, "bad-key");
 

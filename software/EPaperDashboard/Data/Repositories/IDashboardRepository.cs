@@ -5,7 +5,7 @@ namespace EPaperDashboard.Data.Repositories;
 
 public interface IDashboardRepository
 {
-    Maybe<Dashboard> FindById(DashboardId id);
+    Dashboard? FindById(DashboardId id);
     List<Dashboard> FindByUserId(UserId userId);
     IEnumerable<Dashboard> GetAll();
     void Insert(Dashboard dashboard);

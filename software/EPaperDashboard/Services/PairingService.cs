@@ -62,23 +62,23 @@ public sealed class PairingService(
         }
     }
 
-    public Maybe<PairingSession> GetPairingSessionByCode(string code) =>
+    public PairingSession? GetPairingSessionByCode(string code) =>
         pairingSessionRepository.FindByCode(NormalizeCode(code));
 
-    public Maybe<PairingSession> RegisterDevice(string code, string deviceIdentifier, int? screenWidth = null, int? screenHeight = null)
+    public PairingSession? RegisterDevice(string code, string deviceIdentifier, int? screenWidth = null, int? screenHeight = null)
     {
         lock (_sync)
         {
             var session = pairingSessionRepository.FindByCode(NormalizeCode(code));
-            if (session.HasNoValue)
+            if (session is null)
             {
-                return Maybe<PairingSession>.None;
+                return null;
             }
 
-            var s = session.Value;
+            var s = session;
             if (s.ExpiresAt <= timeProvider.GetUtcNow() || s.Status != PairingStatus.Pending)
             {
-                return Maybe<PairingSession>.None;
+                return null;
             }
 
             s.DeviceIdentifier = deviceIdentifier;
@@ -118,9 +118,9 @@ public sealed class PairingService(
             var tokenHash = HashRegistrationToken(registrationToken);
             var existing = pairingSessionRepository.FindByCode(normalizedCode);
 
-            if (existing.HasValue)
+            if (existing is not null)
             {
-                var session = existing.Value;
+                var session = existing;
                 if (RegistrationTokenMatches(session, registrationToken)
                     && string.Equals(session.DeviceIdentifier, deviceIdentifier, StringComparison.OrdinalIgnoreCase))
                 {
@@ -164,13 +164,13 @@ public sealed class PairingService(
             {
                 var now = timeProvider.GetUtcNow();
                 var maybeSession = pairingSessionRepository.FindByCode(normalizedCode);
-                if (maybeSession.HasNoValue || string.IsNullOrWhiteSpace(maybeSession.Value.RegistrationTokenHash))
+                if (maybeSession is null || string.IsNullOrWhiteSpace(maybeSession.RegistrationTokenHash))
                 {
                     return PairingResult<Device>.Failed(
                         PairingFailure.NotFound, "Pending device not found");
                 }
 
-                var session = maybeSession.Value;
+                var session = maybeSession;
                 if (session.ExpiresAt <= now)
                 {
                     pairingSessionRepository.DeleteExpired(now);
@@ -184,9 +184,9 @@ public sealed class PairingService(
                 }
 
                 var existingDevice = deviceService.GetDeviceByIdentifier(session.DeviceIdentifier!);
-                if (existingDevice.HasValue)
+                if (existingDevice is not null)
                 {
-                    if (existingDevice.Value.UserId != userId)
+                    if (existingDevice.UserId != userId)
                     {
                         return PairingResult<Device>.Failed(
                             PairingFailure.DeviceOwnedByAnotherUser,
@@ -225,12 +225,12 @@ public sealed class PairingService(
         {
             var now = timeProvider.GetUtcNow();
             var maybeSession = pairingSessionRepository.FindByCode(normalizedCode);
-            if (maybeSession.HasNoValue)
+            if (maybeSession is null)
             {
                 return PairingResult<PairingSession>.Failed(PairingFailure.NotFound, "Pending device not found");
             }
 
-            var session = maybeSession.Value;
+            var session = maybeSession;
             if (session.ExpiresAt <= now)
             {
                 pairingSessionRepository.DeleteExpired(now);
@@ -250,7 +250,7 @@ public sealed class PairingService(
                 {
                     var existingDevice = deviceService.GetDeviceByIdentifier(session.DeviceIdentifier!);
                     var device = CreatePendingDevice(existingDevice, session, session.UserId, now, session.ApiKey);
-                    if (existingDevice.HasValue)
+                    if (existingDevice is not null)
                     {
                         deviceService.UpdateDevice(device);
                     }
@@ -297,7 +297,7 @@ public sealed class PairingService(
         for (var attempt = 0; attempt < 20; attempt++)
         {
             var code = GenerateCode();
-            if (pairingSessionRepository.FindByCode(code).HasNoValue)
+            if (pairingSessionRepository.FindByCode(code) is null)
             {
                 return code;
             }
@@ -313,13 +313,12 @@ public sealed class PairingService(
     }
 
     private static Device CreatePendingDevice(
-        Maybe<Device> existingDevice,
+        Device? existing,
         PairingSession session,
         UserId userId,
         DateTimeOffset now,
         string? apiKey = null)
     {
-        var existing = existingDevice.GetValueOrDefault();
         return new Device
         {
             Id = existing?.Id ?? (session.PendingDeviceId != DeviceId.Empty

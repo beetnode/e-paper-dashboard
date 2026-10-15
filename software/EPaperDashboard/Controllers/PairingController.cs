@@ -60,24 +60,24 @@ public class PairingController(
         }
 
         var session = _pairingService.GetPairingSessionByCode(request.Code);
-        if (session.HasNoValue)
+        if (session is null)
         {
             return NotFound("Invalid pairing code");
         }
 
-        if (session.Value.ExpiresAt < DateTimeOffset.UtcNow)
+        if (session.ExpiresAt < DateTimeOffset.UtcNow)
         {
             return BadRequest("Pairing code expired");
         }
 
-        if (session.Value.Status != PairingStatus.Pending)
+        if (session.Status != PairingStatus.Pending)
         {
             return BadRequest("Pairing session is not in a valid state");
         }
 
         var existingDevice = _deviceService.GetDeviceByIdentifier(request.DeviceIdentifier);
 
-        if (existingDevice.HasValue && existingDevice.Value.UserId != session.Value.UserId)
+        if (existingDevice is not null && existingDevice.UserId != session.UserId)
         {
             return Conflict("Device is owned by another user and must be released before it can be paired");
         }
@@ -85,38 +85,38 @@ public class PairingController(
         var registered = _pairingService.RegisterDevice(
             request.Code, request.DeviceIdentifier, request.ScreenWidth, request.ScreenHeight);
 
-        if (registered.HasNoValue)
+        if (registered is null)
         {
             return StatusCode(500, "Failed to register device");
         }
 
-        if (existingDevice.HasValue)
+        if (existingDevice is not null)
         {
-            existingDevice.Value.ApiKey = registered.Value.ApiKey;
-            existingDevice.Value.PairedAt = DateTimeOffset.UtcNow;
-            existingDevice.Value.ScreenWidth = registered.Value.ScreenWidth;
-            existingDevice.Value.ScreenHeight = registered.Value.ScreenHeight;
+            existingDevice.ApiKey = registered.ApiKey;
+            existingDevice.PairedAt = DateTimeOffset.UtcNow;
+            existingDevice.ScreenWidth = registered.ScreenWidth;
+            existingDevice.ScreenHeight = registered.ScreenHeight;
 
-            _deviceService.UpdateDevice(existingDevice.Value);
+            _deviceService.UpdateDevice(existingDevice);
         }
         else
         {
             var device = new Models.Device
             {
-                UserId = registered.Value.UserId,
-                DeviceIdentifier = registered.Value.DeviceIdentifier!,
-                Name = request.DeviceName ?? registered.Value.DeviceIdentifier!,
-                ApiKey = registered.Value.ApiKey,
+                UserId = registered.UserId,
+                DeviceIdentifier = registered.DeviceIdentifier!,
+                Name = request.DeviceName ?? registered.DeviceIdentifier!,
+                ApiKey = registered.ApiKey,
                 PairedAt = DateTimeOffset.UtcNow,
-                ScreenWidth = registered.Value.ScreenWidth,
-                ScreenHeight = registered.Value.ScreenHeight
+                ScreenWidth = registered.ScreenWidth,
+                ScreenHeight = registered.ScreenHeight
             };
             _deviceService.AddDevice(device);
         }
 
         return Ok(new RegisterDeviceResponse
         {
-            ApiKey = registered.Value.ApiKey
+            ApiKey = registered.ApiKey
         });
     }
 
@@ -155,7 +155,12 @@ public class PairingController(
             return PairingError(result.Failure, result.Message!);
         }
 
-        var session = _pairingService.GetPairingSessionByCode(request.Code).Value;
+        var session = _pairingService.GetPairingSessionByCode(request.Code);
+        if (session is null)
+        {
+            return NotFound("Invalid pairing code");
+        }
+
         return Ok(new ClaimDeviceResponse(
             result.Value!.Id.Value,
             result.Value.DeviceIdentifier,
@@ -193,23 +198,23 @@ public class PairingController(
         }
 
         var session = _pairingService.GetPairingSessionByCode(code);
-        if (session.HasNoValue)
+        if (session is null)
         {
             return NotFound("Invalid pairing code");
         }
 
-        if (session.Value.UserId != CurrentUserId)
+        if (session.UserId != CurrentUserId)
         {
             return Forbid();
         }
 
-        if (session.Value.Status != PairingStatus.Completed
-            && _pairingService.GetSecondsUntilExpiry(session.Value) == 0)
+        if (session.Status != PairingStatus.Completed
+            && _pairingService.GetSecondsUntilExpiry(session) == 0)
         {
             return PairingError(PairingFailure.Expired, "Pairing confirmation expired");
         }
 
-        var statusString = session.Value.Status switch
+        var statusString = session.Status switch
         {
             PairingStatus.Pending => "pending",
             PairingStatus.Completed => "completed",
@@ -220,8 +225,8 @@ public class PairingController(
         return Ok(new PairingStatusResponse
         {
             Status = statusString,
-            DeviceIdentifier = session.Value.DeviceIdentifier,
-            ExpiresAt = session.Value.ExpiresAt
+            DeviceIdentifier = session.DeviceIdentifier,
+            ExpiresAt = session.ExpiresAt
         });
     }
 

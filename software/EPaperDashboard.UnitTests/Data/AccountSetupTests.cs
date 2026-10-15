@@ -117,8 +117,8 @@ public sealed class AccountSetupTests : IDisposable
 
         devices.FindByUserId(alice).Should().BeEmpty();
         devices.FindByUserId(bob).Should().ContainSingle();
-        sessions.FindByCode("AAAAAA").HasValue.Should().BeFalse();
-        sessions.FindByCode("BBBBBB").HasValue.Should().BeTrue();
+        sessions.FindByCode("AAAAAA").Should().BeNull();
+        sessions.FindByCode("BBBBBB").Should().NotBeNull();
     }
 
     [Fact]

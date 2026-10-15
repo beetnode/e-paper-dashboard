@@ -77,7 +77,7 @@ public class PostgresRepositoryIntegrationTests
             };
             sessions.Insert(session);
 
-            users.FindByUsername(user.Username).Value.Id.Should().Be(user.Id);
+            users.FindByUsername(user.Username)!.Id.Should().Be(user.Id);
             users.ExistsByUsernameIgnoreCase(user.Username.ToUpperInvariant()).Should().BeTrue();
             users.ExistsSuperUser().Should().BeTrue();
             var suspendedAdmin = new User { Username = $"suspended-{suffix}", IsSuperUser = true, IsSuspended = true };
@@ -87,24 +87,24 @@ public class PostgresRepositoryIntegrationTests
             users.ExistsOtherActiveSuperUser(user.Id).Should().Be(otherAdmins.Count > 0);
             users.Delete(suspendedAdmin.Id);
             dashboards.FindByUserId(user.Id).Should().ContainSingle();
-            dashboards.FindById(dashboard.Id).Value.LayoutConfig!.Widgets[0].Config
+            dashboards.FindById(dashboard.Id)!.LayoutConfig!.Widgets[0].Config
                 .GetProperty("text").GetString().Should().Be("hello");
-            dashboards.FindById(dashboard.Id).Value.UpdateTimes.Should().ContainSingle()
+            dashboards.FindById(dashboard.Id)!.UpdateTimes.Should().ContainSingle()
                 .Which.Should().Be(new TimeOnly(8, 30));
-            devices.FindByIdentifier(device.DeviceIdentifier).Value.Id.Should().Be(device.Id);
-            devices.FindByApiKey(device.ApiKey).Value.Id.Should().Be(device.Id);
+            devices.FindByIdentifier(device.DeviceIdentifier)!.Id.Should().Be(device.Id);
+            devices.FindByApiKey(device.ApiKey)!.Id.Should().Be(device.Id);
             devices.FindByDashboardId(dashboard.Id).Should().ContainSingle();
-            sessions.FindByCode(session.Code).Value.PendingDeviceId.Should().Be(device.Id);
+            sessions.FindByCode(session.Code)!.PendingDeviceId.Should().Be(device.Id);
             sessions.HasActiveSessions(DateTimeOffset.UtcNow).Should().BeTrue();
 
             device.Name = "updated";
             devices.Update(device);
-            devices.FindById(device.Id).Value.Name.Should().Be("updated");
+            devices.FindById(device.Id)!.Name.Should().Be("updated");
             session.IsCompleted = true;
             sessions.Update(session);
-            sessions.FindById(session.Id).Value.IsCompleted.Should().BeTrue();
+            sessions.FindById(session.Id)!.IsCompleted.Should().BeTrue();
             sessions.DeleteExpired(DateTimeOffset.UtcNow.AddHours(1));
-            sessions.FindById(session.Id).HasValue.Should().BeFalse();
+            sessions.FindById(session.Id).Should().BeNull();
 
             var otherUser = UserId.New();
             var otherDevice = new Device { UserId = otherUser, DashboardId = dashboard.Id, DeviceIdentifier = $"other-{suffix}", ApiKey = $"other-key-{suffix}" };
@@ -116,9 +116,9 @@ public class PostgresRepositoryIntegrationTests
             devices.DeleteByUserId(user.Id);
             sessions.DeleteByUserId(user.Id);
             devices.FindByUserId(user.Id).Should().BeEmpty();
-            devices.FindById(otherDevice.Id).HasValue.Should().BeTrue();
-            sessions.FindById(claimed.Id).HasValue.Should().BeFalse();
-            sessions.FindById(otherSession.Id).HasValue.Should().BeTrue();
+            devices.FindById(otherDevice.Id).Should().NotBeNull();
+            sessions.FindById(claimed.Id).Should().BeNull();
+            sessions.FindById(otherSession.Id).Should().NotBeNull();
             devices.Delete(otherDevice.Id);
             sessions.DeleteExpired(DateTimeOffset.UtcNow.AddHours(1));
         }
@@ -153,8 +153,8 @@ public class PostgresRepositoryIntegrationTests
         });
 
         operation.Should().Throw<InvalidOperationException>();
-        users.FindById(user.Id).HasValue.Should().BeFalse();
-        dashboards.FindById(dashboard.Id).HasValue.Should().BeFalse();
+        users.FindById(user.Id).Should().BeNull();
+        dashboards.FindById(dashboard.Id).Should().BeNull();
     }
 
     [PostgresFact]
@@ -179,8 +179,8 @@ public class PostgresRepositoryIntegrationTests
                 return true;
             });
 
-            users.FindById(user.Id).HasValue.Should().BeTrue();
-            dashboards.FindById(dashboard.Id).HasValue.Should().BeTrue();
+            users.FindById(user.Id).Should().NotBeNull();
+            dashboards.FindById(dashboard.Id).Should().NotBeNull();
         }
         finally
         {
@@ -216,7 +216,7 @@ public class PostgresRepositoryIntegrationTests
             using var services = CreateServices(schemaConnectionString);
             services.GetRequiredService<IPersistenceInitializer>().Initialize();
             var users = services.GetRequiredService<IUserRepository>();
-            users.FindById(user.Id).Value.PasswordHash.Should().Be("preserved-hash");
+            users.FindById(user.Id)!.PasswordHash.Should().Be("preserved-hash");
             using var versions = new NpgsqlCommand($"SELECT COUNT(*) FROM {schema}.izboard_schema_versions WHERE version = 1", connection);
             versions.ExecuteScalar().Should().Be(1L);
         }

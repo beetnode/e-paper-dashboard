@@ -8,10 +8,10 @@ namespace EPaperDashboard.Data.LiteDb;
 
 internal sealed class LiteDbUserRepository(LiteDbContext context) : IUserRepository
 {
-    public Maybe<User> FindById(UserId id) =>
+    public User? FindById(UserId id) =>
         context.Users.FindById(new ObjectId(id.Value));
 
-    public Maybe<User> FindByUsername(string username) =>
+    public User? FindByUsername(string username) =>
         context.Users.FindOne(u => u.Username == username);
 
     public List<User> GetAll() =>

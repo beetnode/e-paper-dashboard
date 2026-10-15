@@ -7,7 +7,7 @@ namespace EPaperDashboard.Data.LiteDb;
 
 internal sealed class LiteDbDashboardRepository(LiteDbContext context) : IDashboardRepository
 {
-    public Maybe<Dashboard> FindById(DashboardId id) =>
+    public Dashboard? FindById(DashboardId id) =>
         context.Dashboards.FindById(new ObjectId(id.Value));
 
     public List<Dashboard> FindByUserId(UserId userId) =>

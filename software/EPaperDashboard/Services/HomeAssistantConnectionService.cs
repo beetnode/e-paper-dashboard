@@ -60,7 +60,7 @@ public class HomeAssistantConnectionService(
     {
         if (!DashboardId.TryParse(dashboardId, out var id)) return "Invalid dashboard ID format";
         var dashboard = _dashboardService.GetDashboardById(id);
-        return dashboard.HasNoValue ? "Dashboard not found" : ResolveConnection(dashboard.Value, connectionId);
+        return dashboard is null ? "Dashboard not found" : ResolveConnection(dashboard, connectionId);
     }
 
     /// <summary>Resolves the server and token of a connection. Callers must have checked that it belongs to the requesting user.</summary>

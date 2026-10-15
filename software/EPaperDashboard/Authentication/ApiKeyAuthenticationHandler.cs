@@ -23,7 +23,7 @@ public sealed class ApiKeyAuthenticationHandler(
             return Task.FromResult(AuthenticateResult.Fail("Missing or empty API Key"));
         }
 
-        if (_deviceService.GetDeviceByApiKey(apiKey!).HasNoValue)
+        if (_deviceService.GetDeviceByApiKey(apiKey!) is null)
         {
             return Task.FromResult(AuthenticateResult.Fail("Invalid API Key"));
         }

@@ -407,12 +407,12 @@ public sealed class AiApiController(
         }
 
         var dashboard = dashboardService.GetDashboardById(id);
-        if (dashboard.HasNoValue || dashboard.Value.UserId != CurrentUserId)
+        if (dashboard is null || dashboard.UserId != CurrentUserId)
         {
             return null;
         }
 
-        return dashboard.Value;
+        return dashboard;
     }
 
     private void DisableAiOnDashboardsWithoutOverride(UserId userId)

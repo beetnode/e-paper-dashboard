@@ -6,9 +6,9 @@ namespace EPaperDashboard.Data.PostgreSql;
 
 internal sealed class PostgresDashboardRepository(PostgresDbContext context) : IDashboardRepository
 {
-    public Maybe<Dashboard> FindById(DashboardId id) => Maybe.From(
+    public Dashboard? FindById(DashboardId id) =>
         context.FindOne<Dashboard>("SELECT document FROM izboard_dashboards WHERE id = @id",
-            PostgresDbContext.Parameter("id", id.Value)));
+            PostgresDbContext.Parameter("id", id.Value));
 
     public List<Dashboard> FindByUserId(UserId userId) => context.FindMany<Dashboard>(
         "SELECT document FROM izboard_dashboards WHERE user_id = @user_id",
