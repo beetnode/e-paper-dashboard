@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using EPaperDashboard.Utilities;
 
 namespace EPaperDashboard.Services.Firmware;
@@ -16,6 +17,9 @@ public sealed class FirmwareUpdateService : BackgroundService
 
     private FirmwareReleaseInfo? _latestRelease;
     private string? _cachedBinaryPath;
+    private CachedMd5? _cachedMd5;
+
+    private sealed record CachedMd5(string Path, string Hash);
 
     public FirmwareUpdateService(
         IFirmwareReleaseProvider provider,
@@ -41,6 +45,35 @@ public sealed class FirmwareUpdateService : BackgroundService
     /// Both the device-facing version header and the UI's update badge depend on this.
     /// </summary>
     public bool IsOtaReady => GetReadyBinaryPath() is not null;
+
+    /// <summary>
+    /// Lowercase hex MD5 of the ready cached binary, or null when none is ready.
+    /// Devices pass it to the OTA updater to verify the image before flashing.
+    /// Computed once per cached binary.
+    /// </summary>
+    public string? GetFirmwareMd5()
+    {
+        var path = GetReadyBinaryPath();
+        if (path is null)
+            return null;
+
+        var cached = _cachedMd5;
+        if (cached?.Path == path)
+            return cached.Hash;
+
+        try
+        {
+            using var stream = File.OpenRead(path);
+            var hash = Convert.ToHexStringLower(MD5.HashData(stream));
+            _cachedMd5 = new CachedMd5(path, hash);
+            return hash;
+        }
+        catch (IOException ex)
+        {
+            _logger.LogWarning(ex, "Failed to compute MD5 of cached firmware binary {Path}", path);
+            return null;
+        }
+    }
 
     /// <summary>
     /// Gets the path to the cached firmware binary, downloading it if necessary.
@@ -196,6 +229,7 @@ public sealed class FirmwareUpdateService : BackgroundService
 
             // Cache the new binary
             var cachePath = GetCachePath(version);
+            _cachedMd5 = null;
             await File.WriteAllBytesAsync(cachePath, binary, cancellationToken);
             _cachedBinaryPath = cachePath;
 

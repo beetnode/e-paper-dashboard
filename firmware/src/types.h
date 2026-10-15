@@ -17,10 +17,12 @@ struct DeviceConfig {
 struct ResponseHeaders {
   bool isSuccess = false;
   String firmwareVersion;
+  String firmwareMd5;
   long contentLength = -1;
 };
 
 struct DeviceStatus {
+  bool success = false;
   uint64_t waitSeconds = 0;
   String latestFirmwareVersion;
 };

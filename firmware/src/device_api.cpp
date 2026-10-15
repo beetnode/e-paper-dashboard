@@ -31,26 +31,48 @@ String hostHeader(const String& host, int port)
 
 DeviceApi::DeviceApi(Logger& logger, Network& network) : _logger(logger), _network(network) {}
 
+bool DeviceApi::openSuccessfulResponse(const String& path, const DeviceConfig& config,
+                                       ResponseHeaders& headers)
+{
+  for (int attempt = 1; attempt <= Retry::RequestAttempts; ++attempt)
+  {
+    if (attempt > 1)
+    {
+      _logger.printf("Retrying %s (attempt %d/%d)...\n", path.c_str(), attempt, Retry::RequestAttempts);
+      delay(Retry::RequestRetryDelayMs);
+    }
+
+    if (!_network.sendGetRequest(path, config))
+    {
+      continue;
+    }
+
+    headers = _network.readResponseHeaders();
+    if (headers.isSuccess)
+    {
+      return true;
+    }
+
+    _logger.println("The request was not successful");
+    _network.close();
+  }
+  return false;
+}
+
 DeviceStatus DeviceApi::fetchDeviceStatus(const DeviceConfig& config)
 {
   _logger.println("Fetching device configuration...");
 
   DeviceStatus result;
 
-  if (!_network.sendGetRequest("/api/configuration/next-update-wait-seconds", config))
+  ResponseHeaders headers;
+  if (!openSuccessfulResponse("/api/configuration/next-update-wait-seconds", config, headers))
   {
-    _logger.println("Failed to connect to fetch device config");
+    _logger.println("Failed to fetch device config");
     return result;
   }
 
-  auto headers = _network.readResponseHeaders();
-  if (!headers.isSuccess)
-  {
-    _logger.println("Device config request was not successful");
-    _network.close();
-    return result;
-  }
-
+  result.success = true;
   result.latestFirmwareVersion = headers.firmwareVersion;
 
   String delayString{};
@@ -77,23 +99,16 @@ DeviceStatus DeviceApi::fetchDeviceStatus(const DeviceConfig& config)
   return result;
 }
 
-void DeviceApi::fetchAndDisplayImage(const DeviceConfig& config, DisplayManager& display)
+bool DeviceApi::fetchAndDisplayImage(const DeviceConfig& config, DisplayManager& display)
 {
   _logger.println("Connecting to the remote server...");
 
   _network.setTimeout(5000);
-  if (!_network.sendGetRequest("/api/render/binary", config))
+  ResponseHeaders headers;
+  if (!openSuccessfulResponse("/api/render/binary", config, headers))
   {
-    _logger.println("Failed to connect to the remote server...");
-    return;
-  }
-
-  auto headers = _network.readResponseHeaders();
-  if (!headers.isSuccess)
-  {
-    _logger.println("The request was not successful...");
-    _network.close();
-    return;
+    _logger.println("Failed to fetch the image");
+    return false;
   }
 
   _logger.println("Reading image content...");
@@ -147,6 +162,7 @@ void DeviceApi::fetchAndDisplayImage(const DeviceConfig& config, DisplayManager&
   _logger.println();
 
   _network.close();
+  return y >= DisplayConst::Height;
 }
 
 bool DeviceApi::postPairingRequest(const String& path, const String& body,

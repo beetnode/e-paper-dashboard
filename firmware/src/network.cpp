@@ -39,7 +39,25 @@ WiFiClient& Network::activeClient()
 bool Network::connectToWiFi(const String& ssid, const String& password)
 {
   _logger.println("Found stored configuration!");
-  _logger.println("Connecting to WiFi");
+  constexpr int maxAttempts = 2;
+  for (int attempt = 1; attempt <= maxAttempts; ++attempt)
+  {
+    _logger.printf("Connecting to WiFi (attempt %d/%d)\n", attempt, maxAttempts);
+    if (waitForWiFi(ssid, password))
+    {
+      _logger.println("WiFi connected");
+      _logger.print("IP address: ");
+      _logger.println(WiFi.localIP());
+      return true;
+    }
+    WiFi.disconnect(true);
+    delay(1000);
+  }
+  return false;
+}
+
+bool Network::waitForWiFi(const String& ssid, const String& password)
+{
   constexpr int maxRetries = 20;
   int retries = 0;
   WiFi.begin(ssid.c_str(), password.c_str());
@@ -48,14 +66,7 @@ bool Network::connectToWiFi(const String& ssid, const String& password)
     ++retries;
     delay(500);
   }
-  if (WiFi.status() != WL_CONNECTED)
-  {
-    return false;
-  }
-  _logger.println("WiFi connected");
-  _logger.print("IP address: ");
-  _logger.println(WiFi.localIP());
-  return true;
+  return WiFi.status() == WL_CONNECTED;
 }
 
 bool Network::sendGetRequest(const String& url, const DeviceConfig& config)
@@ -107,6 +118,12 @@ ResponseHeaders Network::readResponseHeaders()
     {
       headers.firmwareVersion = line.substring(strlen("X-Firmware-Version:"));
       headers.firmwareVersion.trim();
+    }
+
+    if (line.startsWith("X-Firmware-MD5:"))
+    {
+      headers.firmwareMd5 = line.substring(strlen("X-Firmware-MD5:"));
+      headers.firmwareMd5.trim();
     }
 
     if (line.startsWith("Content-Length:"))

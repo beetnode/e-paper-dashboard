@@ -2,6 +2,21 @@
 #include "constants.h"
 #include <driver/rtc_io.h>
 
+namespace {
+// RTC memory survives deep sleep, so consecutive failed wakes can be counted.
+RTC_DATA_ATTR uint8_t failedWakeCount = 0;
+
+uint64_t backoffSeconds(uint8_t failures)
+{
+  uint64_t seconds = Retry::BackoffBaseSeconds;
+  for (uint8_t i = 0; i < failures && seconds < Retry::BackoffMaxSeconds; ++i)
+  {
+    seconds *= 2;
+  }
+  return min(seconds, min(Retry::BackoffMaxSeconds, Timing::FallbackRefreshSeconds));
+}
+}
+
 void Hardware::startDeepSleep(uint64_t waitSeconds)
 {
   uint64_t waitMicroseconds = waitSeconds * Timing::SecToUsec;
@@ -10,6 +25,23 @@ void Hardware::startDeepSleep(uint64_t waitSeconds)
   rtc_gpio_pullup_dis(Pin::ResetWakeup);
   rtc_gpio_pulldown_en(Pin::ResetWakeup);
   esp_deep_sleep_start();
+}
+
+void Hardware::sleepAfterFailure()
+{
+  const uint64_t waitSeconds = backoffSeconds(failedWakeCount);
+  if (failedWakeCount < UINT8_MAX)
+  {
+    ++failedWakeCount;
+  }
+  Serial.printf("Retrying after failure #%u in %llu seconds\n",
+                failedWakeCount, static_cast<unsigned long long>(waitSeconds));
+  startDeepSleep(waitSeconds);
+}
+
+void Hardware::resetFailureBackoff()
+{
+  failedWakeCount = 0;
 }
 
 bool Hardware::isResetRequested()
