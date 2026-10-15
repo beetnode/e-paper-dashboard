@@ -193,6 +193,7 @@ The component is shared by every account on the server, so only the service admi
 **Prepare rendering** after enabling rendering in **Settings → Rendering**, or with **Install** under **Settings → System**.
 Other users only opt in with **Enable for my account**; until the administrator prepares the component, rendering is
 shown as not available and they cannot start the download themselves.
+Apply the [e-paper theme](../home-assistant/README.md) to the captured view so it uses only the display colors.
 In add-on mode, open the same page through Home Assistant ingress; the control applies to the whole add-on.
 izBoard downloads the version-matched component for the current CPU architecture from the project's GitHub release, verifies its
 SHA-256 checksum, performs a browser readiness test, and activates it immediately. The component is stored in the persistent `/data` volume, so it survives image
