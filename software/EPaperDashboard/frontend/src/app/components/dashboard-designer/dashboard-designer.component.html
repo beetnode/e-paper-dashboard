@@ -182,10 +182,14 @@
               @if (renderedCanvasImageUrl()) {
                 <img class="rendered-canvas-image" [src]="renderedCanvasImageUrl()"
                   alt="Backend-rendered dashboard preview" draggable="false" />
+                @for (patch of renderPatches(); track patch.key) {
+                  <div class="render-patch" [ngStyle]="patch.style"></div>
+                }
               }
               <div class="grid-overlay" [ngStyle]="gridOverlayStyle()"></div>
               @for (widget of layout().widgets; track widget.id) {
               <div class="widget-container" [ngStyle]="widgetStyles()[widget.id]"
+                [class.render-pending]="unrenderedWidgetIds().has(widget.id)"
                 role="button" tabindex="0" [attr.aria-label]="widgetDisplayName(widget) + ' widget. Use arrow keys to move, Shift and arrows to resize.'"
                 [attr.aria-pressed]="selectedWidget()?.id === widget.id"
                 (pointerdown)="onWidgetPointerDown($event, widget)"
@@ -227,7 +231,7 @@
                   @if (selectedWidgetSupportsElementEditing()) {
                       <button class="widget-edit-toggle-btn"
                         [class.active]="elementEditingWidgetId() === selectedWidget()!.id"
-                        [disabled]="renderedCanvasLoading() || !selectedWidgetGeometry()"
+                        [disabled]="!selectedWidgetGeometry()"
                         (pointerdown)="$event.stopPropagation()"
                         (click)="toggleElementEditing(selectedWidget()!)"
                         [title]="elementEditingWidgetId() === selectedWidget()!.id ? 'Finish editing widget elements' : 'Edit widget elements'">
@@ -246,6 +250,7 @@
                           [snapStep]="getSelectedWidgetSnapStep()"
                           [showGuides]="getSelectedWidgetShowGuides()"
                           [previewImageUrl]="renderedCanvasImageUrl()"
+                          [maskColor]="selectedWidgetBackground()"
                           [previewWidth]="layout().width"
                           [previewHeight]="layout().height"
                           (elementChange)="onEditableElementChange($event)" />
@@ -330,7 +335,7 @@
       <i class="fa-solid fa-sliders" aria-hidden="true"></i> Edit
     </button>
     @if (selectedWidgetSupportsElementEditing()) {
-      <button type="button" class="toolbar-btn" (click)="toggleElementEditing(selectedWidget()!)" [disabled]="renderedCanvasLoading() || !selectedWidgetGeometry()">
+      <button type="button" class="toolbar-btn" (click)="toggleElementEditing(selectedWidget()!)" [disabled]="!selectedWidgetGeometry()">
         <i class="fa-solid fa-arrows-up-down-left-right" aria-hidden="true"></i> {{ elementEditingWidgetId() === selectedWidget()!.id ? 'Done' : 'Edit layout' }}
       </button>
     }

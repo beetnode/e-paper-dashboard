@@ -21,6 +21,13 @@ import { RenderedPreviewModalComponent } from '../rendered-preview-modal/rendere
 import { WidgetElementOverlayComponent } from '../widget-element-overlay/widget-element-overlay.component';
 import { WidgetPickerComponent, WidgetPickerDragStart } from '../widget-picker/widget-picker.component';
 import {
+  buildRenderPatches,
+  gridRect,
+  isWidgetRenderCurrent,
+  RenderPatch,
+  widgetBackgroundColor,
+} from '../../models/designer-render-patches';
+import {
   applyEditableElementChange,
   EditableElementChange,
 } from '../../models/widget-element-layout';
@@ -71,6 +78,17 @@ const PANEL_DRAWER_MAX_WIDTH = 992;
 /** Below this width the layers panel starts hidden so the canvas keeps its space. */
 const LAYERS_PANEL_MIN_WIDTH = 1400;
 const RECENT_WIDGETS_STORAGE_KEY = 'designer.recentWidgets';
+
+/** Resolves once the image is decoded and cached, or failed to load; the swap happens either way. */
+function preloadImage(url: string): Promise<void> {
+  const image = new Image();
+  const loaded = new Promise<void>(resolve => {
+    image.onload = () => resolve();
+    image.onerror = () => resolve();
+  });
+  image.src = url;
+  return typeof image.decode === 'function' ? image.decode().catch(() => loaded) : loaded;
+}
 
 type LayoutColorProperty = 'canvasBackgroundColor' | 'widgetBackgroundColor' | 'widgetBorderColor'
   | 'widgetTitleTextColor' | 'widgetTextColor' | 'iconColor';
@@ -161,10 +179,12 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   private resizeTimer: any = null;
   private renderPreviewTimer: ReturnType<typeof setTimeout> | null = null;
   private renderPreviewRevision = 0;
-  /** Signature of the layout behind the current preview image, and of the last requested render. */
-  private renderedLayoutSignature = signal('');
+  /** Layout behind the current preview image, and signature of the last requested render. */
+  private readonly renderedLayout = signal<DashboardLayout | null>(null);
   private requestedLayoutSignature = '';
   private forceRefreshOnNextRender = false;
+  /** Set by discrete edits (drop, add, delete) so their render skips the typing debounce. */
+  private renderNextChangeImmediately = false;
   private viewportWidth = signal(typeof window !== 'undefined' ? window.innerWidth : 1280);
   /** Tablet widths: properties and settings open in the drawer instead of a fixed column. */
   panelAsDrawer = computed(() => !this.isMobile() && this.viewportWidth() < PANEL_DRAWER_MAX_WIDTH);
@@ -549,6 +569,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       position: slot,
       name: widget.name ? `${widget.name} copy` : undefined,
     };
+    this.renderNextChangeImmediately = true;
     this.layout.update(value => ({ ...value, widgets: [...value.widgets, copy] }));
     this.selectWidget(copy);
   }
@@ -681,6 +702,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     const originalIndex = this.layout().widgets.findIndex(item => item.id === widget.id);
     if (originalIndex < 0) return;
 
+    this.renderNextChangeImmediately = true;
     this.layout.update(layout => ({
       ...layout,
       widgets: layout.widgets.filter(w => w.id !== widget.id)
@@ -692,6 +714,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       'Widget removed.',
       'Undo',
       () => {
+        this.renderNextChangeImmediately = true;
         this.layout.update(layout => {
           const widgets = [...layout.widgets];
           widgets.splice(Math.min(originalIndex, widgets.length), 0, widget);
@@ -774,6 +797,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
           position: { ...g.position },
           config: createDefaultWidgetConfig(widget.type)
         };
+        this.renderNextChangeImmediately = true;
         this.layout.update(l => ({ ...l, widgets: [...l.widgets, newWidget] }));
         this.selectWidget(newWidget);
         this.rememberWidgetUse(widget.type);
@@ -800,6 +824,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       position,
       config: createDefaultWidgetConfig(widget.type)
     };
+    this.renderNextChangeImmediately = true;
     this.layout.update(l => ({ ...l, widgets: [...l.widgets, newWidget] }));
     this.selectWidget(newWidget);
     this.rememberWidgetUse(widget.type);
@@ -915,12 +940,26 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     this.selectedWidget.set(updated);
   }
 
-  /** Renderer geometry for the selection, only while the preview matches the current layout. */
+  /**
+   * Renderer geometry for the selection. It stays available while a newer render is pending, as
+   * long as the widget still occupies its rendered cells, so element editing is not interrupted.
+   */
   readonly selectedWidgetGeometry = computed<WidgetRenderGeometry | undefined>(() => {
-    if (this.renderedCanvasLoading() || this.renderedLayoutSignature() !== this.renderLayoutSignature()) return undefined;
     const selected = this.selectedWidget();
-    return selected ? this.renderedWidgetGeometry()[selected.id] : undefined;
+    return selected ? this.currentWidgetGeometry(selected) : undefined;
   });
+
+  /** Background behind the selected widget, used to hide element pixels that have moved away. */
+  readonly selectedWidgetBackground = computed(() => {
+    const selected = this.selectedWidget();
+    return selected ? widgetBackgroundColor(selected, this.layout()) : '';
+  });
+
+  private currentWidgetGeometry(widget: WidgetConfig): WidgetRenderGeometry | undefined {
+    const rendered = this.renderedLayout();
+    if (!rendered || !isWidgetRenderCurrent(rendered, this.layout(), widget)) return undefined;
+    return this.renderedWidgetGeometry()[widget.id];
+  }
 
   selectedWidgetSupportsElementEditing(): boolean {
     const selected = this.selectedWidget();
@@ -1005,6 +1044,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     const updated = applyEditableElementChange(selected, change);
     if (updated === selected) return;
 
+    this.renderNextChangeImmediately = true;
     this.layout.update(layout => ({
       ...layout,
       widgets: layout.widgets.map(widget => widget.id === updated.id ? updated : widget),
@@ -1074,6 +1114,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       isDragging = false;
       const g = this.ghost();
       if (g) {
+        this.renderNextChangeImmediately = true;
         this.layout.update(l => ({
           ...l,
           widgets: l.widgets.map(w => w.id === g.id ? { ...w, position: { ...g.position } } : w)
@@ -1171,6 +1212,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       isResizing = false;
       const g = this.ghost();
       if (g) {
+        this.renderNextChangeImmediately = true;
         this.layout.update(l => ({
           ...l,
           widgets: l.widgets.map(w => w.id === g.id ? { ...w, position: { ...g.position } } : w)
@@ -1634,6 +1676,8 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     if (!this.dashboardId || this.isLoading()) return;
 
     this.forceRefreshOnNextRender ||= refreshData;
+    if (this.renderNextChangeImmediately) delayMs = 0;
+    this.renderNextChangeImmediately = false;
     if (this.renderPreviewTimer) clearTimeout(this.renderPreviewTimer);
     this.renderPreviewTimer = setTimeout(() => {
       this.renderPreviewTimer = null;
@@ -1658,11 +1702,16 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     this.renderPreviewSubscription = this.renderPreviewService
       .render(this.dashboardId, renderLayout, revision, refreshData)
       .subscribe({
-        next: preview => {
+        next: async preview => {
           if (preview.revision !== this.renderPreviewRevision) return;
 
-          this.renderedCanvasImageUrl.set(this.renderPreviewService.toImageUrl(preview));
-          this.renderedLayoutSignature.set(renderLayoutSignature);
+          // Swap only once the new image is decoded, so geometry never runs ahead of the pixels.
+          const imageUrl = this.renderPreviewService.toImageUrl(preview);
+          await preloadImage(imageUrl);
+          if (preview.revision !== this.renderPreviewRevision) return;
+
+          this.renderedCanvasImageUrl.set(imageUrl);
+          this.renderedLayout.set(renderLayout);
           this.renderedCanvasAt.set(preview.renderedAt);
           this.renderedWidgetGeometry.set(Object.fromEntries(
             preview.widgets.map(widget => [widget.id, widget]),
@@ -1692,6 +1741,41 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
       : { ...layout, widgets: [...layout.widgets, ...generatedWidgets] };
   });
   private readonly renderLayoutSignature = computed(() => JSON.stringify(this.renderLayout()));
+
+  /** Shows moved, resized and removed widgets in place on the last image until the next render lands. */
+  readonly renderPatches = computed(() => {
+    const imageUrl = this.renderedCanvasImageUrl();
+    const rendered = this.renderedLayout();
+    if (!imageUrl || !rendered) return [];
+    const geometry = this.renderedWidgetGeometry();
+    const bounds = Object.fromEntries(Object.entries(geometry).map(([id, item]) => [id, item.bounds]));
+    return buildRenderPatches({ layout: rendered, bounds }, this.renderLayout())
+      .map(patch => ({ key: patch.key, style: this.renderPatchStyle(patch, imageUrl, rendered) }));
+  });
+
+  /** Widgets added since the last render; their shell label stands in until the image has them. */
+  readonly unrenderedWidgetIds = computed(() => {
+    const rendered = this.renderedLayout();
+    if (!rendered) return new Set<string>();
+    const renderedIds = new Set(rendered.widgets.map(widget => widget.id));
+    return new Set(this.layout().widgets.filter(widget => !renderedIds.has(widget.id)).map(widget => widget.id));
+  });
+
+  private renderPatchStyle(patch: RenderPatch, imageUrl: string, rendered: DashboardLayout): Record<string, string> {
+    const style: Record<string, string> = {
+      left: `${patch.rect.x}px`,
+      top: `${patch.rect.y}px`,
+      width: `${patch.rect.width}px`,
+      height: `${patch.rect.height}px`,
+    };
+    if (patch.color) style['backgroundColor'] = patch.color;
+    if (patch.crop) {
+      style['backgroundImage'] = `url("${imageUrl}")`;
+      style['backgroundSize'] = `${rendered.width}px ${rendered.height}px`;
+      style['backgroundPosition'] = `${-patch.crop.x}px ${-patch.crop.y}px`;
+    }
+    return style;
+  }
 
   // Template styles are memoised so change detection during drags does not rebuild them.
   readonly canvasStyle = computed(() => this.buildCanvasStyle());
@@ -1786,7 +1870,7 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
   private buildWidgetStyle(widget: WidgetConfig): any {
     const layout = this.layout();
     const borderColor = widget.colorOverrides?.widgetBorderColor || layout.colorScheme.widgetBorderColor || layout.colorScheme.foreground;
-    const backgroundColor = widget.colorOverrides?.widgetBackgroundColor || layout.colorScheme.widgetBackgroundColor || layout.colorScheme.background;
+    const backgroundColor = widgetBackgroundColor(widget, layout);
     return {
       gridColumn: `${widget.position.x + 1} / span ${widget.position.w}`,
       gridRow: `${widget.position.y + 1} / span ${widget.position.h}`,
@@ -1820,39 +1904,24 @@ export class DashboardDesignerComponent implements OnInit, OnDestroy, HasUnsaved
     return widget ? { ...this.widgetRect(widget), pointerEvents: 'none', zIndex: 95 } : null;
   });
 
-  /** Widget rectangle in unscaled canvas pixels, preferring renderer-resolved bounds. */
+  /**
+   * Widget rectangle in unscaled canvas pixels. Renderer-resolved bounds are preferred, but only
+   * while the image shows the widget where the layout has it; otherwise a pending move would
+   * snap the outline back to the old cells until the next render lands.
+   */
   private widgetRect(widget: WidgetConfig): Record<string, string> {
-    const layout = this.layout();
-    const padding = layout.canvasPadding ?? 0;
-    const gap     = layout.widgetGap ?? 0;
-    const cols    = layout.gridCols;
-    const rows    = layout.gridRows;
-
-    // Laid out in unscaled device pixels inside the (possibly scaled) canvas.
-    const totalW = layout.width;
-    const totalH = layout.height;
-
-    const cellW = (totalW - 2 * padding - gap * (cols - 1)) / cols;
-    const cellH = (totalH - 2 * padding - gap * (rows - 1)) / rows;
-
     // During drag/resize the live position is in ghost(), not layout()
     const ghost = this.ghost();
-    const p = (ghost?.id === widget.id ? ghost.position : null) ?? widget.position;
-
-    const resolvedBounds = ghost?.id === widget.id
-      ? null
-      : this.renderedWidgetGeometry()[widget.id]?.bounds;
-    const left   = resolvedBounds?.x ?? padding + p.x * (cellW + gap);
-    const top    = resolvedBounds?.y ?? padding + p.y * (cellH + gap);
-    const width  = resolvedBounds?.width ?? p.w * cellW + (p.w - 1) * gap;
-    const height = resolvedBounds?.height ?? p.h * cellH + (p.h - 1) * gap;
+    const rect = ghost?.id === widget.id
+      ? gridRect(ghost.position, this.layout())
+      : this.currentWidgetGeometry(widget)?.bounds ?? gridRect(widget.position, this.layout());
 
     return {
       position: 'absolute',
-      left:   `${left}px`,
-      top:    `${top}px`,
-      width:  `${width}px`,
-      height: `${height}px`,
+      left:   `${rect.x}px`,
+      top:    `${rect.y}px`,
+      width:  `${rect.width}px`,
+      height: `${rect.height}px`,
       boxSizing: 'border-box',
     };
   }
