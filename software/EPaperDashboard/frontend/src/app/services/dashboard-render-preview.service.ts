@@ -1,7 +1,9 @@
 import { inject, Injectable } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { DashboardLayout } from '../models/types';
+import { resolveApiUrl } from '../pipes/resolve-url.pipe';
 import type { DataSourceStatus } from './dashboard-preview-data.service';
 
 export interface RenderRectangle {
@@ -53,6 +55,7 @@ export interface DashboardRenderPreview {
 @Injectable({ providedIn: 'root' })
 export class DashboardRenderPreviewService {
   private readonly http = inject(HttpClient);
+  private readonly document = inject(DOCUMENT);
 
   render(
     dashboardId: string,
@@ -66,7 +69,8 @@ export class DashboardRenderPreviewService {
     );
   }
 
+  /** The image is loaded by `<img>`, not HttpClient, so it must carry the ingress base path itself. */
   toImageUrl(preview: DashboardRenderPreview): string {
-    return preview.imageUrl;
+    return resolveApiUrl(this.document, preview.imageUrl);
   }
 }

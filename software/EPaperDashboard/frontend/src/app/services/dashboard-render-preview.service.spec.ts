@@ -52,15 +52,34 @@ describe('DashboardRenderPreviewService', () => {
     });
   });
 
+  const preview = {
+    revision: 1,
+    width: 1,
+    height: 1,
+    imageUrl: '/api/dashboards/dashboard-1/designer-preview/token/image',
+    renderedAt: '2026-08-30T00:00:00Z',
+    widgets: [],
+    sourceStatuses: {},
+  };
+
   it('uses the bounded binary image URL returned by the backend', () => {
-    expect(service.toImageUrl({
-      revision: 1,
-      width: 1,
-      height: 1,
-      imageUrl: '/api/dashboards/dashboard-1/designer-preview/token/image',
-      renderedAt: '2026-08-30T00:00:00Z',
-      widgets: [],
-      sourceStatuses: {},
-    })).toBe('/api/dashboards/dashboard-1/designer-preview/token/image');
+    expect(service.toImageUrl(preview)).toBe('/api/dashboards/dashboard-1/designer-preview/token/image');
+  });
+
+  describe('in Home Assistant ingress mode', () => {
+    let base: HTMLBaseElement;
+
+    beforeEach(() => {
+      base = document.createElement('base');
+      base.setAttribute('href', '/api/hassio_ingress/abc123/');
+      document.head.prepend(base);
+    });
+
+    afterEach(() => base.remove());
+
+    it('prefixes the image URL with the ingress base href', () => {
+      expect(service.toImageUrl(preview))
+        .toBe('/api/hassio_ingress/abc123/api/dashboards/dashboard-1/designer-preview/token/image');
+    });
   });
 });
