@@ -17,7 +17,8 @@ struct DeviceConfig {
 struct ResponseHeaders {
   bool isSuccess = false;
   String firmwareVersion;
-  String firmwareMd5;
+  String firmwareSha256;
+  String firmwareSignature;
   long contentLength = -1;
 };
 

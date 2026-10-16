@@ -74,7 +74,25 @@ jobs:
           echo "No stl artifacts found"
         fi
         cd ..
-        
+
+    - name: Sign OTA firmware
+      env:
+        FIRMWARE_SIGNING_KEY: ${{ secrets.FIRMWARE_SIGNING_KEY }}
+      run: |
+        # Devices refuse unsigned OTA images, so a release without a signature must not be published.
+        if [ -z "$FIRMWARE_SIGNING_KEY" ]; then
+          echo "::error::FIRMWARE_SIGNING_KEY secret is not set"
+          exit 1
+        fi
+        VERSION=${{ steps.tag.outputs.version }}
+        KEY_FILE=$(mktemp)
+        trap 'rm -f "$KEY_FILE"' EXIT
+        printf '%s\n' "$FIRMWARE_SIGNING_KEY" > "$KEY_FILE"
+        ./firmware/scripts/sign-firmware.sh \
+          firmware-${VERSION}.bin "$VERSION" "$KEY_FILE" \
+          firmware/data/signing/firmware_signing_public.pem \
+          firmware-${VERSION}.bin.sig
+
     - name: Create release body
       id: release_body
       run: |
@@ -108,6 +126,7 @@ jobs:
         files: |
           firmware-${{ steps.tag.outputs.version }}.zip
           firmware-${{ steps.tag.outputs.version }}.bin
+          firmware-${{ steps.tag.outputs.version }}.bin.sig
           stl-${{ steps.tag.outputs.version }}.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -120,7 +139,7 @@ jobs:
         echo "**Tag:** ${{ steps.tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "#### Artifacts:" >> $GITHUB_STEP_SUMMARY
-        echo "- ✅ Firmware (ESP32) — attached as firmware.zip and standalone firmware.bin for OTA" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Firmware (ESP32) — attached as firmware.zip and standalone signed firmware.bin + .sig for OTA" >> $GITHUB_STEP_SUMMARY
         echo "- ✅ Docker Image: \`izdevdigital/e-paper-dashboard:${{ steps.tag.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
         echo "- ✅ Add-on Image: \`izdevdigital/izboard-addon:${{ steps.tag.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
         echo "- ✅ Rendering component image: \`izdevdigital/izboard-rendering:${{ steps.tag.outputs.version }}\` (amd64 + arm64)" >> $GITHUB_STEP_SUMMARY

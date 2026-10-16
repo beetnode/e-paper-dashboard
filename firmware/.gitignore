@@ -3,3 +3,7 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+
+# Firmware signing private keys must never be committed
+*.key
+*private*.pem

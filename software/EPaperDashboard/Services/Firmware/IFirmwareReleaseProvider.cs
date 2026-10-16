@@ -12,7 +12,7 @@ public interface IFirmwareReleaseProvider
     Task<FirmwareReleaseInfo?> GetLatestReleaseAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Downloads the firmware binary from the given URL.
+    /// Downloads a release asset (the firmware binary or its signature) from the given URL.
     /// </summary>
     Task<byte[]?> DownloadFirmwareBinaryAsync(string downloadUrl, CancellationToken cancellationToken = default);
 }

@@ -33,6 +33,19 @@ The claim code expires after ten minutes. Wi-Fi, server, and pending claim detai
 
 HTTPS server certificates are checked against the trusted root bundle in `data/cert/x509_crt_bundle.bin`. Replace and regenerate that bundle when a deployment uses a private certificate authority. The device must be able to obtain network time before its first verified HTTPS connection.
 
+### Signed OTA updates
+
+The device installs an OTA image only when its SHA-256 matches the `X-Firmware-SHA256` header and the `X-Firmware-Signature` header holds a valid ECDSA P-256 signature from the release pipeline. The signature covers a manifest binding the release version to the image hash, so an older signed image cannot be offered as a newer release. Unsigned or tampered images are discarded before the update partition is marked bootable.
+
+The public key is compiled in from `data/signing/firmware_signing_public.pem`; the build fails without it. To set up signing (once per repository, or for a fork with its own key):
+
+```bash
+./scripts/generate-signing-key.sh ~/izboard-firmware-signing.key
+gh secret set FIRMWARE_SIGNING_KEY < ~/izboard-firmware-signing.key
+```
+
+Commit the generated public key and keep the private key offline. The release workflow signs `firmware-<version>.bin` with `scripts/sign-firmware.sh`, checks the signature against the committed public key, and publishes `firmware-<version>.bin.sig` next to the binary. Rotating the key requires shipping a firmware that trusts the new key, signed with the old one.
+
 ### Device Controls
 
 | Action | How |

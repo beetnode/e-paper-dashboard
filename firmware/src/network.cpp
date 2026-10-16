@@ -120,10 +120,16 @@ ResponseHeaders Network::readResponseHeaders()
       headers.firmwareVersion.trim();
     }
 
-    if (line.startsWith("X-Firmware-MD5:"))
+    if (line.startsWith("X-Firmware-SHA256:"))
     {
-      headers.firmwareMd5 = line.substring(strlen("X-Firmware-MD5:"));
-      headers.firmwareMd5.trim();
+      headers.firmwareSha256 = line.substring(strlen("X-Firmware-SHA256:"));
+      headers.firmwareSha256.trim();
+    }
+
+    if (line.startsWith("X-Firmware-Signature:"))
+    {
+      headers.firmwareSignature = line.substring(strlen("X-Firmware-Signature:"));
+      headers.firmwareSignature.trim();
     }
 
     if (line.startsWith("Content-Length:"))

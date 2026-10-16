@@ -7,4 +7,6 @@ public static class HttpHeaderNames
     public const string DeviceFirmwareVersionHeaderName = "X-Device-Firmware-Version";
     public const string DeviceIdHeaderName = "X-Device-Id";
     public const string FirmwareMd5HeaderName = "X-Firmware-MD5";
+    public const string FirmwareSha256HeaderName = "X-Firmware-SHA256";
+    public const string FirmwareSignatureHeaderName = "X-Firmware-Signature";
 }
