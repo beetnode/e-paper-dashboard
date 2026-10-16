@@ -40,11 +40,6 @@ internal sealed class PostgresPairingSessionRepository(PostgresDbContext context
         "DELETE FROM izboard_pairing_sessions WHERE document->>'UserId' = @user_id",
         PostgresDbContext.Parameter("user_id", userId.Value));
 
-    public bool HasActiveSessions(DateTimeOffset now) => context.Exists("""
-        SELECT EXISTS (SELECT 1 FROM izboard_pairing_sessions
-            WHERE NOT is_completed AND expires_at > @now)
-        """, PostgresDbContext.Parameter("now", now.ToUniversalTime()));
-
     private static Npgsql.NpgsqlParameter[] Parameters(PairingSession session) =>
     [
         PostgresDbContext.Parameter("id", session.Id.Value),

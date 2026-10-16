@@ -11,5 +11,4 @@ public interface IPairingSessionRepository
     void Update(PairingSession session);
     void DeleteExpired(DateTimeOffset before);
     void DeleteByUserId(UserId userId);
-    bool HasActiveSessions(DateTimeOffset now);
 }

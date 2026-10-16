@@ -32,25 +32,23 @@ public class DeviceAccessGuardTests
         DeviceAccessGuard.IsAccessible(endpoint).Should().BeTrue();
     }
 
-    [Fact]
-    public void RequiresActivePairing_NullEndpoint_ReturnsFalse()
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, true)]
+    public void IsServedOnPort_DeviceEndpointsOnlyOnDevicePortOthersOnlyOnWebPort(
+        bool deviceEndpoint, bool isDevicePort, bool expected)
     {
-        DeviceAccessGuard.RequiresActivePairing(null).Should().BeFalse();
+        var endpoint = deviceEndpoint ? EndpointWith(new DeviceAccessibleAttribute()) : EndpointWith();
+
+        DeviceAccessGuard.IsServedOnPort(endpoint, isDevicePort).Should().Be(expected);
     }
 
     [Fact]
-    public void RequiresActivePairing_AttributeWithoutFlag_ReturnsFalse()
+    public void IsServedOnPort_NoEndpoint_OnlyOnWebPort()
     {
-        var endpoint = EndpointWith(new DeviceAccessibleAttribute());
-
-        DeviceAccessGuard.RequiresActivePairing(endpoint).Should().BeFalse();
-    }
-
-    [Fact]
-    public void RequiresActivePairing_AttributeWithFlagSet_ReturnsTrue()
-    {
-        var endpoint = EndpointWith(new DeviceAccessibleAttribute { RequireActivePairing = true });
-
-        DeviceAccessGuard.RequiresActivePairing(endpoint).Should().BeTrue();
+        DeviceAccessGuard.IsServedOnPort(null, isDevicePort: false).Should().BeTrue();
+        DeviceAccessGuard.IsServedOnPort(null, isDevicePort: true).Should().BeFalse();
     }
 }

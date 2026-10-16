@@ -186,29 +186,13 @@ bool DeviceApi::postPairingRequest(const String& path, const String& body,
 
   _network.send(postRequest);
 
-  httpStatus = 0;
-  retryAfterSeconds = 0;
-  while (_network.connected() || _network.available())
+  const ResponseHeaders headers = _network.readResponseHeaders();
+  httpStatus = headers.statusCode;
+  retryAfterSeconds = headers.retryAfterSeconds;
+  if (httpStatus == 0)
   {
-    String line = _network.readStringUntil('\n');
-    if (httpStatus == 0 && line.startsWith("HTTP/"))
-    {
-      int spaceIdx = line.indexOf(' ');
-      if (spaceIdx > 0)
-      {
-        httpStatus = line.substring(spaceIdx + 1).toInt();
-      }
-    }
-
-    if (line.startsWith("Retry-After:"))
-    {
-      retryAfterSeconds = line.substring(strlen("Retry-After:")).toInt();
-    }
-
-    if (line == "\r")
-    {
-      break;
-    }
+    _network.close();
+    return false;
   }
 
   String raw = "";
@@ -239,8 +223,6 @@ bool DeviceApi::postPairingRequest(const String& path, const String& body,
                  : raw;
   response.trim();
 
-  _logger.print("HTTP status: ");
-  _logger.println(httpStatus);
   return true;
 }
 

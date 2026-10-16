@@ -96,7 +96,6 @@ public class PostgresRepositoryIntegrationTests
             devices.FindByApiKeyHash(device.ApiKeyHash)!.Id.Should().Be(device.Id);
             devices.FindByDashboardId(dashboard.Id).Should().ContainSingle();
             sessions.FindByCode(session.Code)!.PendingDeviceId.Should().Be(device.Id);
-            sessions.HasActiveSessions(DateTimeOffset.UtcNow).Should().BeTrue();
 
             device.Name = "updated";
             devices.Update(device);

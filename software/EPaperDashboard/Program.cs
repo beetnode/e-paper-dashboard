@@ -365,11 +365,6 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 	ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
 });
 
-app.UseCors(builder => builder
-	.AllowAnyOrigin()
-	.AllowAnyMethod()
-	.AllowAnyHeader());
-
 #if DEBUG
 if (app.Environment.IsDevelopment())
 {
@@ -390,30 +385,15 @@ app.UseRateLimiter();
 app.Use(async (context, next) =>
 {
 	var isDevicePort = context.Connection.LocalPort == devicePort;
-	
+
+	if (!EPaperDashboard.Guards.DeviceAccessGuard.IsServedOnPort(context.GetEndpoint(), isDevicePort))
+	{
+		context.Response.StatusCode = 404;
+		return;
+	}
+
 	if (isDevicePort)
 	{
-		var endpoint = context.GetEndpoint();
-
-		if (!EPaperDashboard.Guards.DeviceAccessGuard.IsAccessible(endpoint))
-		{
-			context.Response.StatusCode = 404;
-			return;
-		}
-
-		if (EPaperDashboard.Guards.DeviceAccessGuard.RequiresActivePairing(endpoint))
-		{
-			var pairingService = context.RequestServices.GetRequiredService<PairingService>();
-			pairingService.CleanupExpiredSessions();
-
-			if (!pairingService.HasActiveSessions())
-			{
-				context.Response.StatusCode = 503;
-				await context.Response.WriteAsync("Pairing service unavailable");
-				return;
-			}
-		}
-
 		// Add latest firmware version header to all device-port responses, but only once the
 		// binary is cached: an uncached download can outlast the device's OTA timeout and
 		// burn its limited retries for that version.

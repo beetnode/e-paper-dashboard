@@ -8,6 +8,19 @@ String hostHeader(const String& host, int port)
   return formattedHost + ":" + String(port);
 }
 
+constexpr size_t MaxHeaderLineBytes = 512;
+constexpr int MaxHeaderLines = 64;
+
+// Matches "Name: value" case-insensitively, as HTTP header names are.
+bool headerValue(const char* line, const char* name, String& value)
+{
+  const size_t nameLength = strlen(name);
+  if (strncasecmp(line, name, nameLength) != 0 || line[nameLength] != ':') return false;
+  value = line + nameLength + 1;
+  value.trim();
+  return true;
+}
+
 String toHex(const uint8_t* data, size_t length)
 {
   static const char digits[] = "0123456789abcdef";
@@ -83,52 +96,48 @@ bool Network::sendGetRequest(const String& url, DeviceConfig& config)
 ResponseHeaders Network::readResponseHeaders()
 {
   _logger.println("Reading headers...");
-  auto& c = _client;
   ResponseHeaders headers;
-  while (c.connected() || c.available())
+  char line[MaxHeaderLineBytes + 1];
+  for (int lineCount = 0; lineCount < MaxHeaderLines; ++lineCount)
   {
-    String line = c.readStringUntil('\n');
-    _logger.println(line);
+    if (!_client.connected() && !_client.available()) break;
 
-    if (!headers.isSuccess && line.startsWith("HTTP/"))
+    size_t length = _client.readBytesUntil('\n', line, MaxHeaderLineBytes);
+    if (length == 0) break;  // timed out or closed before the header block ended
+    if (length == MaxHeaderLineBytes)
     {
-      int spaceIdx = line.indexOf(' ');
-      if (spaceIdx > 0)
-      {
-        int statusCode = line.substring(spaceIdx + 1).toInt();
-        headers.isSuccess = (statusCode == 200);
-      }
-    }
-
-    if (line.startsWith("X-Firmware-Version:"))
-    {
-      headers.firmwareVersion = line.substring(strlen("X-Firmware-Version:"));
-      headers.firmwareVersion.trim();
-    }
-
-    if (line.startsWith("X-Firmware-SHA256:"))
-    {
-      headers.firmwareSha256 = line.substring(strlen("X-Firmware-SHA256:"));
-      headers.firmwareSha256.trim();
-    }
-
-    if (line.startsWith("X-Firmware-Signature:"))
-    {
-      headers.firmwareSignature = line.substring(strlen("X-Firmware-Signature:"));
-      headers.firmwareSignature.trim();
-    }
-
-    if (line.startsWith("Content-Length:"))
-    {
-      headers.contentLength = line.substring(strlen("Content-Length:")).toInt();
-    }
-
-    if (line == "\r")
-    {
+      _logger.println("Response header line too long, discarding response");
       break;
     }
+    line[length] = '\0';
+    if (line[length - 1] == '\r') line[--length] = '\0';
+
+    if (length == 0)
+    {
+      _logger.print("HTTP status: ");
+      _logger.println(headers.statusCode);
+      headers.isSuccess = headers.statusCode == 200;
+      return headers;
+    }
+
+    if (lineCount == 0)
+    {
+      const char* space = strchr(line, ' ');
+      if (strncmp(line, "HTTP/", 5) != 0 || space == nullptr) break;
+      headers.statusCode = atoi(space + 1);
+      continue;
+    }
+
+    String value;
+    if (headerValue(line, "X-Firmware-Version", value)) headers.firmwareVersion = value;
+    else if (headerValue(line, "X-Firmware-SHA256", value)) headers.firmwareSha256 = value;
+    else if (headerValue(line, "X-Firmware-Signature", value)) headers.firmwareSignature = value;
+    else if (headerValue(line, "Content-Length", value)) headers.contentLength = value.toInt();
+    else if (headerValue(line, "Retry-After", value)) headers.retryAfterSeconds = value.toInt();
   }
-  return headers;
+
+  _logger.println("Incomplete response headers");
+  return ResponseHeaders{};
 }
 
 bool Network::connectTo(const String& host, int port, String& serverFingerprint)

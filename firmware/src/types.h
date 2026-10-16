@@ -16,7 +16,10 @@ struct DeviceConfig {
 };
 
 struct ResponseHeaders {
+  // 0 when the status line or the header block could not be read completely.
+  int statusCode = 0;
   bool isSuccess = false;
+  unsigned long retryAfterSeconds = 0;
   String firmwareVersion;
   String firmwareSha256;
   String firmwareSignature;

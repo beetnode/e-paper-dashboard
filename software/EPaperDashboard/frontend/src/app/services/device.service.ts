@@ -20,11 +20,6 @@ export interface UpdateDeviceRequest {
   dashboardId?: string | null;
 }
 
-export interface StartPairingResponse {
-  code: string;
-  expiresAt: string;
-}
-
 export interface PairingStatusResponse {
   status: string;
   deviceIdentifier?: string;
@@ -64,10 +59,6 @@ export class DeviceService {
 
   deleteDevice(deviceId: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/devices/${deviceId}`);
-  }
-
-  startPairing(): Observable<StartPairingResponse> {
-    return this.http.post<StartPairingResponse>(`${this.baseUrl}/pairing/start`, {});
   }
 
   getPairingStatus(code: string): Observable<PairingStatusResponse> {

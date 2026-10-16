@@ -34,63 +34,13 @@ public sealed class PairingService(
     IUnitOfWork unitOfWork)
 {
     private const int CodeLength = 6;
-    private const int ExpiryMinutes = 5;
     private const int DeviceClaimExpiryMinutes = 10;
     private const int CredentialDeliveryExpiryMinutes = 2;
     private readonly object _sync = new();
     private readonly IUnitOfWork _unitOfWork = unitOfWork;
 
-    public PairingSession CreatePairingSession(UserId userId)
-    {
-        lock (_sync)
-        {
-            var now = timeProvider.GetUtcNow();
-            pairingSessionRepository.DeleteExpired(now);
-            var session = new PairingSession
-            {
-                UserId = userId,
-                Code = GenerateAvailableCode(),
-                CreatedAt = now,
-                ExpiresAt = now.AddMinutes(ExpiryMinutes),
-                Status = PairingStatus.Pending,
-                IsCompleted = false
-            };
-
-            pairingSessionRepository.Insert(session);
-            return session;
-        }
-    }
-
     public PairingSession? GetPairingSessionByCode(string code) =>
         pairingSessionRepository.FindByCode(NormalizeCode(code));
-
-    public PairingSession? RegisterDevice(string code, string deviceIdentifier, int? screenWidth = null, int? screenHeight = null)
-    {
-        lock (_sync)
-        {
-            var session = pairingSessionRepository.FindByCode(NormalizeCode(code));
-            if (session is null)
-            {
-                return null;
-            }
-
-            var s = session;
-            if (s.ExpiresAt <= timeProvider.GetUtcNow() || s.Status != PairingStatus.Pending)
-            {
-                return null;
-            }
-
-            s.DeviceIdentifier = deviceIdentifier;
-            s.ApiKey = DeviceApiKey.Generate();
-            s.Status = PairingStatus.Completed;
-            s.IsCompleted = true;
-
-            SetScreenDimensions(s, screenWidth, screenHeight);
-
-            pairingSessionRepository.Update(s);
-            return s;
-        }
-    }
 
     public PairingResult<PairingSession> AnnounceDevice(
         string code,
@@ -274,38 +224,8 @@ public sealed class PairingService(
     public void CleanupExpiredSessions() =>
         pairingSessionRepository.DeleteExpired(timeProvider.GetUtcNow());
 
-    public bool HasActiveSessions() =>
-        pairingSessionRepository.HasActiveSessions(timeProvider.GetUtcNow());
-
     public int GetSecondsUntilExpiry(PairingSession session) =>
         Math.Max(0, (int)Math.Ceiling((session.ExpiresAt - timeProvider.GetUtcNow()).TotalSeconds));
-
-    private static string GenerateCode()
-    {
-        var chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        var code = new char[CodeLength];
-
-        for (int i = 0; i < CodeLength; i++)
-        {
-            code[i] = chars[RandomNumberGenerator.GetInt32(chars.Length)];
-        }
-
-        return new string(code);
-    }
-
-    private string GenerateAvailableCode()
-    {
-        for (var attempt = 0; attempt < 20; attempt++)
-        {
-            var code = GenerateCode();
-            if (pairingSessionRepository.FindByCode(code) is null)
-            {
-                return code;
-            }
-        }
-
-        throw new InvalidOperationException("Could not allocate a unique pairing code");
-    }
 
     private static Device CreatePendingDevice(
         Device? existing,
