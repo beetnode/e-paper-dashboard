@@ -15,4 +15,6 @@ public interface IEnvironmentConfiguration
     string FirmwareGitHubRepo { get; }
     string FirmwareAssetPattern { get; }
     TimeSpan FirmwareCheckInterval { get; }
+    /// <summary>The device port as devices reach it, after any port mapping (DEVICE_PUBLIC_PORT).</summary>
+    int DevicePublicPort { get; }
 }

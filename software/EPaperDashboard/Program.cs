@@ -95,6 +95,11 @@ if (validationResult.IsFailure)
 	Environment.Exit(1);
 }
 
+// The device port speaks TLS only; devices pin this certificate when they pair.
+var deviceCertificate = DeviceCertificateStore.LoadOrCreate(Path.Combine(environmentConfiguration.ConfigDir, "device-tls"));
+builder.WebHost.ConfigureKestrel(options =>
+	options.ConfigureHttpsDefaults(https => https.ServerCertificate = deviceCertificate));
+
 var dataProtectionKeysDir = environmentConfiguration.DataProtectionKeysDir;
 Directory.CreateDirectory(dataProtectionKeysDir);
 builder.Services.AddDataProtection()
@@ -350,6 +355,8 @@ app.Services.GetRequiredService<LegacyHomeAssistantSettingsMigration>().Run();
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 app.Services.GetRequiredService<SetupCodeProvider>().AnnounceIfPending(logger);
+logger.LogInformation("Device port {DevicePort} serves TLS with certificate SHA-256 {Fingerprint}",
+	devicePort, DeviceCertificateStore.Fingerprint(deviceCertificate));
 var strategy = app.Services.GetRequiredService<IDeploymentStrategy>();
 
 // Only loopback proxies are trusted: ingress requests are recognized by the Supervisor's own address.

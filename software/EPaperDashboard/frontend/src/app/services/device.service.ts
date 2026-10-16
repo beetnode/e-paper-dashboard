@@ -33,6 +33,7 @@ export interface PairingStatusResponse {
 
 export interface PairingConfigurationResponse {
   clientUrl: string;
+  serverAddress: string;
 }
 
 export interface ClaimDeviceResponse {

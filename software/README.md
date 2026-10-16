@@ -38,11 +38,12 @@ services:
     image: izdevdigital/e-paper-dashboard:<tag>
     ports:
       - "<port>:8128"   # Web UI and API
-      - "<port>:8129"   # Device communication
+      - "<device-port>:8129"   # Device communication (TLS)
     volumes:
       - <host-path>/data:/data:rw
     environment:
       - CLIENT_URL=http://dashboard.local:<port>
+      - DEVICE_PUBLIC_PORT=<device-port>   # only when it is not 8129
       - TZ=<time-zone>
 ```
 
@@ -91,7 +92,7 @@ Behind TLS the sign-in cookie is marked secure automatically. Hosted instances s
 
 ### Home Assistant Add-on
 
-Install via the [izBoard Home Assistant Add-on repository](https://github.com/beetnode/hass-add-ons/tree/master/izboard). Configure `CLIENT_URL` as a device-reachable endpoint, normally `http://homeassistant.local:8129`. Remote URLs work through a direct port, VPN, or reverse proxy; ingress URLs do not.
+Install via the [izBoard Home Assistant Add-on repository](https://github.com/beetnode/hass-add-ons/tree/master/izboard). Configure `CLIENT_URL` with a host the display can reach, normally `http://homeassistant.local:8129`. Displays connect to that host on the exposed device port; ingress URLs do not work.
 
 The add-on image `izdevdigital/izboard-addon` is built from the `addon` target of `EPaperDashboard/Dockerfile` alongside the standalone image. It differs only in running as root (Supervisor mounts `/data` root-owned) and carrying Home Assistant labels.
 
@@ -99,7 +100,8 @@ The add-on image `izdevdigital/izboard-addon` is built from the `addon` target o
 
 | Variable | Required | Description |
 |---|---|---|
-| `CLIENT_URL` | Yes | Absolute HTTP or HTTPS URL reachable from the display network. In standalone mode it is also the Home Assistant OAuth client URL; in add-on mode it is the direct device endpoint. |
+| `CLIENT_URL` | Yes | Absolute HTTP or HTTPS URL. Its host must be reachable from the display network; displays connect to it on the device port. In standalone mode it is also the Home Assistant OAuth client URL. |
+| `DEVICE_PUBLIC_PORT` | No | Device port as displays reach it after port mapping (default: `8129`). The dashboard shows `<CLIENT_URL host>:<port>` as the server address to enter on the display. |
 | `TZ` | Recommended | Timezone (e.g. `Europe/London`) |
 | `APP_MODE` | No | Deployment mode: `standalone` (default) or `addon` |
 | `DATABASE_PROVIDER` | No | `litedb` (default) or `postgresql`. Independent of `APP_MODE`. |
@@ -117,11 +119,15 @@ The add-on image `izdevdigital/izboard-addon` is built from the `addon` target o
 | Port | Purpose |
 |---|---|
 | `8128` | Web UI and API |
-| `8129` | Device communication (pairing, firmware image retrieval, and configuration) |
+| `8129` | Device communication over TLS (pairing, firmware image retrieval, and configuration) |
 
-`CLIENT_URL` must describe the externally reachable URL after port mappings or a reverse proxy are applied. If displays are isolated on a VLAN, allow them to reach this URL. In standalone mode, expose the same URL to both the browser OAuth callback and the display API (normally through port `8128` or a reverse proxy). In add-on mode, use the exposed device port (`8129` by default), not the browser-only ingress URL.
+`CLIENT_URL` must describe the externally reachable URL after port mappings or a reverse proxy are applied. In standalone mode it serves the browser and the Home Assistant OAuth callback, normally through port `8128` or a reverse proxy. If displays are isolated on a VLAN, allow them to reach the device port on the `CLIENT_URL` host.
 
-For HTTPS, the display verifies the server certificate against its embedded trusted root bundle and must be able to obtain network time on its first connection. Deployments using a private certificate authority must add that root to the firmware bundle before flashing.
+The device port always uses TLS with a self-signed certificate the server creates on first start (`/data/device-tls/device-certificate.pfx`). Displays pin that certificate when they pair, like SSH does with a new host, and refuse to connect if it later changes. Consequences:
+
+- Back up `/data`. If the certificate is lost, every display shows "Server Identity Changed" and has to be paired again.
+- Expose port `8129` directly or through TCP passthrough. A proxy or load balancer that terminates TLS in front of it presents a different certificate and breaks pairing. Several instances behind one load balancer must share the same certificate.
+- Displays paired with firmware older than this release use plain HTTP and must be paired again after the server update.
 
 ### Data
 

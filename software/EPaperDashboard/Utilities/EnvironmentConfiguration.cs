@@ -8,6 +8,7 @@ public static class EnvironmentConfiguration
 	private const string DatabaseProviderKey = "DATABASE_PROVIDER";
 	private const string DatabaseConnectionStringKey = "DATABASE_CONNECTION_STRING";
 	private const string ClientUrlKey = "CLIENT_URL";
+	private const string DevicePublicPortKey = "DEVICE_PUBLIC_PORT";
 	private const string DashboardScheduleCheckIntervalMinutesKey = "DASHBOARD_SCHEDULE_CHECK_INTERVAL_MINUTES";
 	private const string DashboardMissedScheduleToleranceMinutesKey = "DASHBOARD_MISSED_SCHEDULE_TOLERANCE_MINUTES";
 	private const string FirmwareUpdateEnabledKey = "FIRMWARE_UPDATE_ENABLED";
@@ -93,6 +94,11 @@ public static class EnvironmentConfiguration
 	public static string FirmwareAssetPattern => _firmwareAssetPattern.Value;
 
 	public static TimeSpan FirmwareCheckInterval => _firmwareCheckInterval.Value;
+
+	private static readonly Lazy<int> _devicePublicPort = new(() =>
+		GetIntFromEnvOrConfig(DevicePublicPortKey, Constants.DefaultDevicePort));
+
+	public static int DevicePublicPort => _devicePublicPort.Value;
 
 	private static JsonDocument? LoadJsonConfig()
 	{

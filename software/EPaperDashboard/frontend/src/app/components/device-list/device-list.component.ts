@@ -150,17 +150,17 @@ import { Dashboard } from '../../models/types';
           @if (pairingMode() === 'device') {
             <div class="pairing-steps mt-3">
               <div class="pairing-step">
-                Copy the server URL before leaving this network:
+                Copy the server address before leaving this network:
                 @if (serverUrl()) {
                   <code>{{ serverUrl() }}</code>
                 } @else {
                   <span class="text-danger">CLIENT_URL is not configured</span>
                 }
-                <button type="button" class="btn btn-sm btn-link p-1" (click)="copyServerUrl()" aria-label="Copy server URL">
+                <button type="button" class="btn btn-sm btn-link p-1" (click)="copyServerUrl()" aria-label="Copy server address">
                   <i class="fa-solid" [ngClass]="serverUrlCopied() ? 'fa-check' : 'fa-copy'" aria-hidden="true"></i>
                 </button>
               </div>
-              <div class="pairing-step">Scan the Wi-Fi QR on the display, open its setup page, then enter your home Wi-Fi and paste the server URL. Submit once.</div>
+              <div class="pairing-step">Scan the Wi-Fi QR on the display, open its setup page, then enter your home Wi-Fi and paste the server address. Submit once.</div>
               <div class="pairing-step">
                 After submitting, reconnect to any network that can reach this dashboard. Enter the display code, then claim it.
                 <div class="input-group mt-2">
@@ -193,7 +193,7 @@ import { Dashboard } from '../../models/types';
               The code expires in {{ formattedPairingTime() }}.
             </div>
             <div class="pairing-steps">
-              <div class="pairing-step">Copy server URL <code>{{ serverUrl() }}</code> and pairing code <strong>{{ pairingCode() }}</strong>.</div>
+              <div class="pairing-step">Copy server address <code>{{ serverUrl() }}</code> and pairing code <strong>{{ pairingCode() }}</strong>.</div>
               <div class="pairing-step">Connect to the display setup Wi-Fi and enter home Wi-Fi, the server URL, and pairing code.</div>
               <div class="pairing-step"><i class="fa-solid fa-spinner fa-spin me-1" aria-hidden="true"></i>Waiting for the display to register.</div>
             </div>
@@ -427,7 +427,7 @@ export class DeviceListComponent implements OnDestroy {
 
   private loadPairingConfiguration(): void {
     this.deviceService.getPairingConfiguration().subscribe({
-      next: (configuration) => this.serverUrl.set(configuration.clientUrl),
+      next: (configuration) => this.serverUrl.set(configuration.serverAddress),
       error: () => this.serverUrl.set('')
     });
   }

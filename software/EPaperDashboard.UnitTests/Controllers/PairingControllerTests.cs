@@ -18,11 +18,12 @@ public class PairingControllerTests
     private readonly Mock<IDeviceRepository> _deviceRepository = new();
     private readonly FakeTimeProvider _timeProvider = new(new DateTimeOffset(2026, 3, 17, 8, 0, 0, TimeSpan.Zero));
 
-    private PairingController CreateSut(Uri? clientUri = null)
+    private PairingController CreateSut(Uri? clientUri = null, int devicePublicPort = 8129)
     {
         var deviceService = new DeviceService(_deviceRepository.Object);
         var configuration = new Mock<IEnvironmentConfiguration>();
         configuration.SetupGet(c => c.ClientUri).Returns(clientUri ?? new Uri("http://dashboard.local:8129"));
+        configuration.SetupGet(c => c.DevicePublicPort).Returns(devicePublicPort);
         return new PairingController(
             new PairingService(
                 _pairingSessionRepository.Object,
@@ -43,6 +44,21 @@ public class PairingControllerTests
         var response = result.Should().BeOfType<OkObjectResult>().Subject.Value
             .Should().BeOfType<PairingConfigurationResponse>().Subject;
         response.ClientUrl.Should().Be("https://devices.example.com/dashboard");
+    }
+
+    [Theory]
+    [InlineData("http://192.168.1.10:8128", 8129, "192.168.1.10:8129")]
+    [InlineData("https://izboard.example.com/dashboard", 9443, "izboard.example.com:9443")]
+    [InlineData("http://[fd00::10]:8128", 8129, "[fd00::10]:8129")]
+    public void GetPairingConfiguration_ServerAddressIsClientHostWithDevicePort(string clientUrl, int devicePort, string expected)
+    {
+        var sut = CreateSut(new Uri(clientUrl), devicePort);
+
+        var result = sut.GetPairingConfiguration();
+
+        var response = result.Should().BeOfType<OkObjectResult>().Subject.Value
+            .Should().BeOfType<PairingConfigurationResponse>().Subject;
+        response.ServerAddress.Should().Be(expected);
     }
 
     [Fact]

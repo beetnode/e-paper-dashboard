@@ -19,7 +19,7 @@ bool OtaUpdater::isNewerVersion(const char* current, const String& available) co
   return avPatch > curPatch;
 }
 
-OtaFailure OtaUpdater::perform(const DeviceConfig& config, const String& version)
+OtaFailure OtaUpdater::perform(DeviceConfig& config, const String& version)
 {
   _logger.println("Starting OTA firmware update...");
 

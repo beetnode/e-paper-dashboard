@@ -25,13 +25,13 @@ ESP32 firmware for the izBoard E-Paper dashboard device. Connects to an izBoard 
 
 1. Power on the ESP32 board
 2. The device shows a QR code for its password-protected `izBoard-XXXX` Wi-Fi access point and a six-character claim code
-3. Scan the QR once and use the captive portal to enter the home Wi-Fi credentials and the server's `CLIENT_URL`
+3. Scan the QR once and use the captive portal to enter the home Wi-Fi credentials and the server address shown in the dashboard (e.g. `192.168.1.100:8129`)
 4. From any network that can reach the server, open Devices and enter the claim code
 5. The device stays on home Wi-Fi, receives its credential, and begins fetching dashboards without rebooting
 
 The claim code expires after ten minutes. Wi-Fi, server, and pending claim details are saved before the device leaves setup mode, so an interrupted device can resume the claim after power is restored.
 
-HTTPS server certificates are checked against the trusted root bundle in `data/cert/x509_crt_bundle.bin`. Replace and regenerate that bundle when a deployment uses a private certificate authority. The device must be able to obtain network time before its first verified HTTPS connection.
+The device always talks to the server over TLS. On its first connection during pairing it pins the SHA-256 fingerprint of the server's self-signed certificate; every later connection checks that fingerprint before sending the device credential. If the certificate changes, the device refuses to connect and shows "Server Identity Changed"; hold the button for 10 seconds to reset and pair again. No root certificates or network time are needed.
 
 ### Signed OTA updates
 

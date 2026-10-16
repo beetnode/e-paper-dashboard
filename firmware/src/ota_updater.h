@@ -20,7 +20,7 @@ public:
   bool isNewerVersion(const char* current, const String& available) const;
   // Downloads and flashes the firmware, rebooting on success. Returns only on failure.
   // The image is installed only when its SHA-256 matches and its release signature verifies.
-  OtaFailure perform(const DeviceConfig& config, const String& version);
+  OtaFailure perform(DeviceConfig& config, const String& version);
   // Call early in setup(): restores the previous firmware when a freshly installed
   // one has booted Ota::MaxVerifyBoots times without reaching the dashboard.
   void verifyPendingUpdate();

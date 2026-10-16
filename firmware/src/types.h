@@ -11,7 +11,8 @@ struct DeviceConfig {
   String dashboardApiKey;
   String pairingCode;
   String registrationToken;
-  bool useHttps;
+  // Hex SHA-256 of the server certificate pinned on first connection; empty until then.
+  String serverFingerprint;
 };
 
 struct ResponseHeaders {

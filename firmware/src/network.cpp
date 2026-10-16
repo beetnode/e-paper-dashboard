@@ -1,40 +1,28 @@
 #include "network.h"
 #include "version.h"
-#include <time.h>
-
-extern const uint8_t rootca_crt_bundle_start[] asm("_binary_data_cert_x509_crt_bundle_bin_start");
 
 namespace {
-bool ensureClockIsSet(Logger& logger)
-{
-  constexpr time_t MinimumValidTime = 1704067200;
-  if (time(nullptr) >= MinimumValidTime) return true;
-
-  logger.println("Synchronizing time for HTTPS verification...");
-  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
-  for (int attempt = 0; attempt < 40; ++attempt)
-  {
-    if (time(nullptr) >= MinimumValidTime) return true;
-    delay(250);
-  }
-
-  logger.println("Could not synchronize time; HTTPS connection refused");
-  return false;
-}
-
 String hostHeader(const String& host, int port)
 {
   const String formattedHost = host.indexOf(':') >= 0 ? "[" + host + "]" : host;
   return formattedHost + ":" + String(port);
 }
+
+String toHex(const uint8_t* data, size_t length)
+{
+  static const char digits[] = "0123456789abcdef";
+  String hex;
+  hex.reserve(length * 2);
+  for (size_t i = 0; i < length; ++i)
+  {
+    hex += digits[data[i] >> 4];
+    hex += digits[data[i] & 0x0f];
+  }
+  return hex;
+}
 }
 
 Network::Network(Logger& logger) : _logger(logger) {}
-
-WiFiClient& Network::activeClient()
-{
-  return _useSecure ? static_cast<WiFiClient&>(_secureClient) : _client;
-}
 
 bool Network::connectToWiFi(const String& ssid, const String& password)
 {
@@ -69,9 +57,9 @@ bool Network::waitForWiFi(const String& ssid, const String& password)
   return WiFi.status() == WL_CONNECTED;
 }
 
-bool Network::sendGetRequest(const String& url, const DeviceConfig& config)
+bool Network::sendGetRequest(const String& url, DeviceConfig& config)
 {
-  if (!connectTo(config.dashboardUrl, config.devicePort, config.useHttps))
+  if (!connectTo(config.dashboardUrl, config.devicePort, config.serverFingerprint))
   {
     _logger.println("Failed to connect to the remote server...");
     return false;
@@ -79,7 +67,7 @@ bool Network::sendGetRequest(const String& url, const DeviceConfig& config)
   _logger.println("Successfully connected to the remote server!");
   _logger.println("Sending request...");
 
-  auto& c = activeClient();
+  auto& c = _client;
   c.println("GET " + config.dashboardBasePath + url + " HTTP/1.1");
   c.print("X-Api-Key: ");
   c.println(config.dashboardApiKey);
@@ -97,7 +85,7 @@ bool Network::sendGetRequest(const String& url, const DeviceConfig& config)
 ResponseHeaders Network::readResponseHeaders()
 {
   _logger.println("Reading headers...");
-  auto& c = activeClient();
+  auto& c = _client;
   ResponseHeaders headers;
   while (c.connected() || c.available())
   {
@@ -145,60 +133,82 @@ ResponseHeaders Network::readResponseHeaders()
   return headers;
 }
 
-bool Network::connectTo(const String& host, int port, bool useHttps)
+bool Network::connectTo(const String& host, int port, String& serverFingerprint)
 {
-  _useSecure = useHttps;
-  if (_useSecure)
+  _identityMismatch = false;
+  // The chain is not validated: the pinned fingerprint is the only trust anchor, which works
+  // for the server's self-signed certificate on a LAN and in hosted deployments alike.
+  _client.setInsecure();
+  if (!_client.connect(host.c_str(), port)) return false;
+
+  uint8_t fingerprint[32];
+  if (!_client.getFingerprintSHA256(fingerprint))
   {
-    if (!ensureClockIsSet(_logger)) return false;
-    _secureClient.setCACertBundle(rootca_crt_bundle_start);
-    return _secureClient.connect(host.c_str(), port);
+    _client.stop();
+    return false;
   }
-  return _client.connect(host.c_str(), port);
+
+  const String observed = toHex(fingerprint, sizeof(fingerprint));
+  if (serverFingerprint.length() == 0)
+  {
+    serverFingerprint = observed;
+    _logger.print("Pinned server certificate SHA-256: ");
+    _logger.println(observed);
+    return true;
+  }
+
+  if (!serverFingerprint.equalsIgnoreCase(observed))
+  {
+    _logger.print("Server certificate changed, refusing connection. Seen SHA-256: ");
+    _logger.println(observed);
+    _identityMismatch = true;
+    _client.stop();
+    return false;
+  }
+  return true;
 }
 
 void Network::send(const String& data)
 {
-  activeClient().print(data);
+  _client.print(data);
 }
 
 void Network::setTimeout(int timeoutMs)
 {
-  activeClient().setTimeout(timeoutMs);
+  _client.setTimeout(timeoutMs);
 }
 
 void Network::close()
 {
-  activeClient().stop();
-  _useSecure = false;
+  _client.stop();
 }
 
 bool Network::connected()
 {
-  return activeClient().connected();
+  return _client.connected();
 }
 
 int Network::available()
 {
-  return activeClient().available();
+  return _client.available();
 }
 
 size_t Network::read(uint8_t* buffer, size_t size)
 {
-  return activeClient().read(buffer, size);
+  return _client.read(buffer, size);
 }
 
 String Network::readStringUntil(char terminator)
 {
-  return activeClient().readStringUntil(terminator);
+  return _client.readStringUntil(terminator);
 }
 
 String Network::readString()
 {
-  return activeClient().readString();
+  return _client.readString();
 }
 
 WiFiClient& Network::client()
 {
-  return activeClient();
+  return _client;
 }

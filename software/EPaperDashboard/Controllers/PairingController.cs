@@ -32,7 +32,9 @@ public class PairingController(
                 statusCode: StatusCodes.Status503ServiceUnavailable);
         }
 
-        return Ok(new PairingConfigurationResponse(clientUri!.AbsoluteUri.TrimEnd('/')));
+        // Devices reach the TLS device port directly on the dashboard's host, not CLIENT_URL itself.
+        var serverAddress = $"{clientUri!.Host}:{_environmentConfiguration.DevicePublicPort}";
+        return Ok(new PairingConfigurationResponse(clientUri.AbsoluteUri.TrimEnd('/'), serverAddress));
     }
 
     [HttpPost("start")]
@@ -247,7 +249,7 @@ public class PairingController(
     }
 }
 
-public record PairingConfigurationResponse(string ClientUrl);
+public record PairingConfigurationResponse(string ClientUrl, string ServerAddress);
 
 public record StartPairingResponse
 {
