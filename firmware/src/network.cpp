@@ -75,8 +75,6 @@ bool Network::sendGetRequest(const String& url, DeviceConfig& config)
   c.println(hostHeader(config.dashboardUrl, config.devicePort));
   c.print("X-Device-Firmware-Version: ");
   c.println(FIRMWARE_VERSION);
-  c.print("X-Device-Id: ");
-  c.println(WiFi.macAddress());
   c.println("Connection: close");
   c.println();
   return true;

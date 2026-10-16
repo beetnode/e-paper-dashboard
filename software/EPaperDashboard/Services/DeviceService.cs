@@ -29,7 +29,7 @@ public sealed class DeviceService(IDeviceRepository deviceRepository, IUserRepos
 
     /// <summary>Finds the device a key belongs to; keys of devices whose owner is suspended stop working.</summary>
     public Device? GetDeviceByApiKey(string apiKey) =>
-        deviceRepository.FindByApiKey(apiKey) is { } device && users?.FindById(device.UserId)?.IsSuspended != true
+        deviceRepository.FindByApiKeyHash(DeviceApiKey.Hash(apiKey)) is { } device && users?.FindById(device.UserId)?.IsSuspended != true
             ? device
             : null;
 }

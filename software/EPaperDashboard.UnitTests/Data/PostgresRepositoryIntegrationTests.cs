@@ -1,3 +1,4 @@
+using EPaperDashboard.Services;
 using System.Text.Json;
 using EPaperDashboard.Data;
 using EPaperDashboard.Data.PostgreSql;
@@ -65,7 +66,7 @@ public class PostgresRepositoryIntegrationTests
                 UserId = user.Id,
                 DashboardId = dashboard.Id,
                 DeviceIdentifier = $"device-{suffix}",
-                ApiKey = $"key-{suffix}"
+                ApiKeyHash = DeviceApiKey.Hash($"key-{suffix}")
             };
             devices.Insert(device);
             var session = new PairingSession
@@ -92,7 +93,7 @@ public class PostgresRepositoryIntegrationTests
             dashboards.FindById(dashboard.Id)!.UpdateTimes.Should().ContainSingle()
                 .Which.Should().Be(new TimeOnly(8, 30));
             devices.FindByIdentifier(device.DeviceIdentifier)!.Id.Should().Be(device.Id);
-            devices.FindByApiKey(device.ApiKey)!.Id.Should().Be(device.Id);
+            devices.FindByApiKeyHash(device.ApiKeyHash)!.Id.Should().Be(device.Id);
             devices.FindByDashboardId(dashboard.Id).Should().ContainSingle();
             sessions.FindByCode(session.Code)!.PendingDeviceId.Should().Be(device.Id);
             sessions.HasActiveSessions(DateTimeOffset.UtcNow).Should().BeTrue();
@@ -107,7 +108,7 @@ public class PostgresRepositoryIntegrationTests
             sessions.FindById(session.Id).Should().BeNull();
 
             var otherUser = UserId.New();
-            var otherDevice = new Device { UserId = otherUser, DashboardId = dashboard.Id, DeviceIdentifier = $"other-{suffix}", ApiKey = $"other-key-{suffix}" };
+            var otherDevice = new Device { UserId = otherUser, DashboardId = dashboard.Id, DeviceIdentifier = $"other-{suffix}", ApiKeyHash = DeviceApiKey.Hash($"other-key-{suffix}") };
             devices.Insert(otherDevice);
             var claimed = new PairingSession { Code = suffix[6..12].ToUpperInvariant(), UserId = user.Id, ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5) };
             var otherSession = new PairingSession { Code = suffix[12..18].ToUpperInvariant(), UserId = otherUser, ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5) };
@@ -318,8 +319,8 @@ public class PostgresRepositoryIntegrationTests
             var devices = services.GetRequiredService<IDeviceRepository>();
             devices.Insert(new Device());
             devices.Insert(new Device());
-            devices.Insert(new Device { ApiKey = "unique-key", DeviceIdentifier = "unique-device" });
-            Action duplicateKey = () => devices.Insert(new Device { ApiKey = "unique-key" });
+            devices.Insert(new Device { ApiKeyHash = DeviceApiKey.Hash("unique-key"), DeviceIdentifier = "unique-device" });
+            Action duplicateKey = () => devices.Insert(new Device { ApiKeyHash = DeviceApiKey.Hash("unique-key") });
             duplicateKey.Should().Throw<PostgresException>().Which.SqlState.Should().Be("23505");
             Action duplicateIdentifier = () => devices.Insert(new Device { DeviceIdentifier = "unique-device" });
             duplicateIdentifier.Should().Throw<PostgresException>().Which.SqlState.Should().Be("23505");

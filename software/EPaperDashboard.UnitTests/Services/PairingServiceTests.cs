@@ -205,12 +205,14 @@ public class PairingServiceTests
         claim.IsSuccess.Should().BeTrue();
         insertedDevice.Should().NotBeNull();
         insertedDevice!.UserId.Should().Be(userId);
-        insertedDevice.ApiKey.Should().NotBeNullOrWhiteSpace();
+        insertedDevice.ApiKeyHash.Should().MatchRegex("^[0-9a-f]{64}$");
         stored!.ExpiresAt.Should().Be(FixedNow.AddMinutes(2));
         wrongTokenStatus.Failure.Should().Be(PairingFailure.InvalidRegistrationToken);
         status.IsSuccess.Should().BeTrue();
         status.Value!.Status.Should().Be(PairingStatus.Completed);
-        status.Value.ApiKey.Should().Be(insertedDevice.ApiKey);
+        status.Value.ApiKey.Should().NotBeNullOrWhiteSpace();
+        insertedDevice.ApiKeyHash.Should().Be(DeviceApiKey.Hash(status.Value.ApiKey))
+            .And.NotBe(status.Value.ApiKey);
     }
 
     [Fact]

@@ -14,9 +14,10 @@ internal sealed class PostgresDeviceRepository(PostgresDbContext context) : IDev
         context.FindOne<Device>("SELECT document FROM izboard_devices WHERE device_identifier = @identifier",
             PostgresDbContext.Parameter("identifier", deviceIdentifier));
 
-    public Device? FindByApiKey(string apiKey) =>
+    // The api_key column holds the key's hash, not the key.
+    public Device? FindByApiKeyHash(string apiKeyHash) =>
         context.FindOne<Device>("SELECT document FROM izboard_devices WHERE api_key = @api_key",
-            PostgresDbContext.Parameter("api_key", apiKey));
+            PostgresDbContext.Parameter("api_key", apiKeyHash));
 
     public List<Device> FindByDashboardId(DashboardId dashboardId) => context.FindMany<Device>(
         "SELECT document FROM izboard_devices WHERE dashboard_id = @dashboard_id",
@@ -55,7 +56,7 @@ internal sealed class PostgresDeviceRepository(PostgresDbContext context) : IDev
         PostgresDbContext.Parameter("user_id", device.UserId.Value),
         PostgresDbContext.Parameter("dashboard_id", device.DashboardId.Value),
         PostgresDbContext.Parameter("identifier", device.DeviceIdentifier),
-        PostgresDbContext.Parameter("api_key", device.ApiKey),
+        PostgresDbContext.Parameter("api_key", device.ApiKeyHash),
         PostgresDbContext.DocumentParameter(device)
     ];
 }

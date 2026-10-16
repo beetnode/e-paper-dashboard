@@ -52,7 +52,7 @@ public class ApiKeyAuthenticationHandlerTests
     public async Task AuthenticateAsync_ApiKeyDoesNotMatchAnyDevice_Fails()
     {
         var deviceRepository = new Mock<IDeviceRepository>();
-        deviceRepository.Setup(r => r.FindByApiKey("bad-key")).Returns((Device?)null);
+        deviceRepository.Setup(r => r.FindByApiKeyHash(DeviceApiKey.Hash("bad-key"))).Returns((Device?)null);
 
         var (result, _) = await AuthenticateAsync(deviceRepository, "bad-key");
 
@@ -64,7 +64,7 @@ public class ApiKeyAuthenticationHandlerTests
     public async Task AuthenticateAsync_ApiKeyMatchesDevice_SucceedsWithApiKeyClaim()
     {
         var deviceRepository = new Mock<IDeviceRepository>();
-        deviceRepository.Setup(r => r.FindByApiKey("good-key")).Returns(new Device { ApiKey = "good-key" });
+        deviceRepository.Setup(r => r.FindByApiKeyHash(DeviceApiKey.Hash("good-key"))).Returns(new Device { ApiKeyHash = DeviceApiKey.Hash("good-key") });
 
         var (result, _) = await AuthenticateAsync(deviceRepository, "good-key");
 

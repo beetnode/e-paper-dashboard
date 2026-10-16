@@ -94,7 +94,7 @@ public class PairingController(
 
         if (existingDevice is not null)
         {
-            existingDevice.ApiKey = registered.ApiKey;
+            existingDevice.ApiKeyHash = DeviceApiKey.Hash(registered.ApiKey);
             existingDevice.PairedAt = DateTimeOffset.UtcNow;
             existingDevice.ScreenWidth = registered.ScreenWidth;
             existingDevice.ScreenHeight = registered.ScreenHeight;
@@ -108,7 +108,7 @@ public class PairingController(
                 UserId = registered.UserId,
                 DeviceIdentifier = registered.DeviceIdentifier!,
                 Name = request.DeviceName ?? registered.DeviceIdentifier!,
-                ApiKey = registered.ApiKey,
+                ApiKeyHash = DeviceApiKey.Hash(registered.ApiKey),
                 PairedAt = DateTimeOffset.UtcNow,
                 ScreenWidth = registered.ScreenWidth,
                 ScreenHeight = registered.ScreenHeight

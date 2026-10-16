@@ -81,7 +81,7 @@ public sealed class PairingService(
             }
 
             s.DeviceIdentifier = deviceIdentifier;
-            s.ApiKey = GenerateApiKey();
+            s.ApiKey = DeviceApiKey.Generate();
             s.Status = PairingStatus.Completed;
             s.IsCompleted = true;
 
@@ -199,9 +199,11 @@ public sealed class PairingService(
                         PairingFailure.LimitReached, $"You can pair up to {UserLimits.MaxDevices} devices.");
                 }
 
-                var device = CreatePendingDevice(existingDevice, session, userId, now);
+                // The plaintext key waits in the session only until the device collects it.
+                var apiKey = DeviceApiKey.Generate();
+                var device = CreatePendingDevice(existingDevice, session, userId, now, apiKey);
                 session.UserId = userId;
-                session.ApiKey = device.ApiKey;
+                session.ApiKey = apiKey;
                 session.PendingDeviceId = device.Id;
                 session.ClaimedAt = now;
                 session.ExpiresAt = now.AddMinutes(CredentialDeliveryExpiryMinutes);
@@ -305,18 +307,12 @@ public sealed class PairingService(
         throw new InvalidOperationException("Could not allocate a unique pairing code");
     }
 
-    private static string GenerateApiKey()
-    {
-        var bytes = RandomNumberGenerator.GetBytes(32);
-        return Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-    }
-
     private static Device CreatePendingDevice(
         Device? existing,
         PairingSession session,
         UserId userId,
         DateTimeOffset now,
-        string? apiKey = null)
+        string apiKey)
     {
         return new Device
         {
@@ -327,7 +323,7 @@ public sealed class PairingService(
             DashboardId = existing?.DashboardId ?? DashboardId.Empty,
             DeviceIdentifier = session.DeviceIdentifier!,
             Name = existing?.Name ?? session.DeviceName ?? session.DeviceIdentifier!,
-            ApiKey = apiKey ?? GenerateApiKey(),
+            ApiKeyHash = DeviceApiKey.Hash(apiKey),
             PairedAt = now,
             LastSeenAt = existing?.LastSeenAt,
             FirmwareVersion = existing?.FirmwareVersion,

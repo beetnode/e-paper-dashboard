@@ -13,8 +13,8 @@ internal sealed class LiteDbDeviceRepository(LiteDbContext context) : IDeviceRep
     public Device? FindByIdentifier(string deviceIdentifier) =>
         context.Devices.FindOne(d => d.DeviceIdentifier == deviceIdentifier);
 
-    public Device? FindByApiKey(string apiKey) =>
-        context.Devices.FindOne(d => d.ApiKey == apiKey);
+    public Device? FindByApiKeyHash(string apiKeyHash) =>
+        context.Devices.FindOne(d => d.ApiKeyHash == apiKeyHash);
 
     public List<Device> FindByDashboardId(DashboardId dashboardId) =>
         context.Devices.Find(d => d.DashboardId == dashboardId).ToList();

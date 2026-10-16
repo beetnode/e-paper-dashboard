@@ -429,22 +429,10 @@ app.Use(async (context, next) =>
 		}
 
 		// Track device firmware version and update last seen timestamp
-		if (context.Request.Headers.TryGetValue(HttpHeaderNames.DeviceFirmwareVersionHeaderName, out var deviceFwVersion)
-			&& context.Request.Headers.TryGetValue(HttpHeaderNames.DeviceIdHeaderName, out var deviceIdHeader))
-		{
-			var deviceService = context.RequestServices.GetRequiredService<DeviceService>();
-			var device = deviceService.GetDeviceByIdentifier(deviceIdHeader.ToString());
-			if (device is not null)
-			{
-				var fwStr = deviceFwVersion.ToString();
-				var lastSeenTracker = context.RequestServices.GetRequiredService<DeviceLastSeenTracker>();
-				if (lastSeenTracker.ShouldUpdate(device, fwStr))
-				{
-					lastSeenTracker.Apply(device, fwStr);
-					deviceService.UpdateDevice(device);
-				}
-			}
-		}
+		context.RequestServices.GetRequiredService<DeviceLastSeenTracker>().Record(
+			context.RequestServices.GetRequiredService<DeviceService>(),
+			context.Request.Headers[HttpHeaderNames.ApiKeyHeaderName].ToString(),
+			context.Request.Headers[HttpHeaderNames.DeviceFirmwareVersionHeaderName].ToString());
 	}
 
 	await next();
