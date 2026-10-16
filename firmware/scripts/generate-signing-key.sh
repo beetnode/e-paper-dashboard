@@ -3,7 +3,8 @@
 #
 # The public key is written into the firmware sources and compiled into every build.
 # The private key must stay outside the repository; store it as the FIRMWARE_SIGNING_KEY
-# GitHub Actions secret, e.g. `gh secret set FIRMWARE_SIGNING_KEY < <private-key.pem>`.
+# secret of the `release` GitHub environment, e.g.
+# `gh secret set FIRMWARE_SIGNING_KEY --env release < <private-key.pem>`.
 #
 # Usage: generate-signing-key.sh <private-key-out>
 set -euo pipefail

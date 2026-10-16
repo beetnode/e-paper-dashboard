@@ -29,10 +29,12 @@ jobs:
   create-release:
     needs: [build-firmware, build-software, build-packaging]
     runs-on: ubuntu-latest
+    # FIRMWARE_SIGNING_KEY is a secret of this environment, which only v* tags may use.
+    environment: release
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       
     - name: Get tag version
       id: tag
@@ -44,13 +46,13 @@ jobs:
         echo "Release version: $VERSION"
         
     - name: Download firmware artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
       with:
         name: firmware-esp32-${{ needs.build-firmware.outputs.version }}
         path: ./release/firmware/
         
     - name: Download STL artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
       with:
         name: freecad-stl-files
         path: ./release/stl/
@@ -114,7 +116,7 @@ jobs:
         EOF
         
     - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
       with:
         tag_name: ${{ steps.tag.outputs.tag }}
         name: Release ${{ steps.tag.outputs.version }}

@@ -41,10 +41,10 @@ The public key is compiled in from `data/signing/firmware_signing_public.pem`; t
 
 ```bash
 ./scripts/generate-signing-key.sh ~/izboard-firmware-signing.key
-gh secret set FIRMWARE_SIGNING_KEY < ~/izboard-firmware-signing.key
+gh secret set FIRMWARE_SIGNING_KEY --env release < ~/izboard-firmware-signing.key
 ```
 
-Commit the generated public key and keep the private key offline. The release workflow signs `firmware-<version>.bin` with `scripts/sign-firmware.sh`, checks the signature against the committed public key, and publishes `firmware-<version>.bin.sig` next to the binary. Rotating the key requires shipping a firmware that trusts the new key, signed with the old one.
+Create the `release` environment first (Settings → Environments) and limit it to `v*` tags, so only release runs can read the key. Commit the generated public key and keep the private key offline. The release workflow signs `firmware-<version>.bin` with `scripts/sign-firmware.sh`, checks the signature against the committed public key, and publishes `firmware-<version>.bin.sig` next to the binary. Rotating the key requires shipping a firmware that trusts the new key, signed with the old one.
 
 ### Device Controls
 
