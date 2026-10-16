@@ -7,7 +7,8 @@ public class Device
     public DashboardId DashboardId { get; set; } = DashboardId.Empty;
     public string DeviceIdentifier { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public string ApiKey { get; set; } = string.Empty;
+    /// <summary>SHA-256 of the device's API key (see <see cref="Services.DeviceApiKey"/>); the key itself is never stored.</summary>
+    public string ApiKeyHash { get; set; } = string.Empty;
     public DateTimeOffset PairedAt { get; set; }
     public DateTimeOffset? LastSeenAt { get; set; }
     public string? FirmwareVersion { get; set; }

@@ -47,7 +47,9 @@ bool parsePort(const String& value, int& port)
   return true;
 }
 
-bool parseServerUrl(String rawUrl, String& host, int& port, String& basePath, bool& useHttps)
+// Accepts the server address shown in the dashboard ("host[:port]"). A pasted http:// or
+// https:// prefix is ignored: the device always uses TLS on the device port.
+bool parseServerAddress(String rawUrl, String& host, int& port, String& basePath)
 {
   rawUrl.trim();
   if (rawUrl.indexOf(' ') >= 0 || rawUrl.indexOf('\t') >= 0
@@ -56,20 +58,9 @@ bool parseServerUrl(String rawUrl, String& host, int& port, String& basePath, bo
     return false;
   }
 
-  if (rawUrl.startsWith("https://"))
-  {
-    useHttps = true;
-    rawUrl = rawUrl.substring(8);
-  }
-  else if (rawUrl.startsWith("http://"))
-  {
-    useHttps = false;
-    rawUrl = rawUrl.substring(7);
-  }
-  else
-  {
-    return false;
-  }
+  if (rawUrl.startsWith("https://")) rawUrl = rawUrl.substring(8);
+  else if (rawUrl.startsWith("http://")) rawUrl = rawUrl.substring(7);
+  if (rawUrl.indexOf("://") >= 0) return false;
 
   const int slashIdx = rawUrl.indexOf('/');
   if (slashIdx >= 0)
@@ -83,7 +74,7 @@ bool parseServerUrl(String rawUrl, String& host, int& port, String& basePath, bo
     if (basePath == "/") basePath = "";
   }
 
-  port = useHttps ? 443 : 80;
+  port = DeviceServer::DefaultDevicePort;
   if (rawUrl.startsWith("["))
   {
     const int bracketIdx = rawUrl.indexOf(']');
@@ -213,10 +204,10 @@ DeviceConfig SetupPortal::run()
                     <div class="card-header">Dashboard</div>
                     <div class="card-body">
                         <div class="mb-3">
-                            <label for="server_url" class="form-label">Server URL</label>
+                            <label for="server_url" class="form-label">Server address</label>
                             <input type="text" class="form-control" name="server_url" id="server_url"
-                                placeholder="e.g. http://192.168.1.100:8129 or https://my.server.com">
-                            <div class="form-text">Full URL including protocol and port</div>
+                                placeholder="e.g. 192.168.1.100:8129">
+                            <div class="form-text">As shown in the dashboard when adding a device</div>
                         </div>
                         <div class="form-text">After applying, use any network that can reach the dashboard and enter the claim code shown on the display.</div>
                     </div>
@@ -376,22 +367,20 @@ DeviceConfig SetupPortal::run()
     const String pass{ server.arg(passParam) };
     String rawUrl{ server.arg(urlParam) };
 
-    bool useHttps = false;
     String host;
     String basePath;
     int port = 0;
-    if (!parseServerUrl(rawUrl, host, port, basePath, useHttps))
+    if (!parseServerAddress(rawUrl, host, port, basePath))
     {
       server.send(400, "text/plain",
-                  "Invalid server URL. Use an absolute http:// or https:// URL without credentials, query, or fragment.");
+                  "Invalid server address. Enter it as shown in the dashboard, e.g. 192.168.1.100:8129.");
       return;
     }
 
-    pendingConfig = { ssid, pass, host, port, basePath, "", claimCode, registrationToken, useHttps };
+    pendingConfig = { ssid, pass, host, port, basePath, "", claimCode, registrationToken, "" };
     _configStore.save(pendingConfig);
     _logger.println("Received configuration, starting WiFi connection...");
     _logger.print("Server: ");
-    _logger.print(useHttps ? "https://" : "http://");
     _logger.print(host);
     _logger.print(":");
     _logger.println(port);
@@ -466,7 +455,7 @@ DeviceConfig SetupPortal::run()
         String registrationError;
         auto announceResult = _deviceApi.announceDevice(
             pendingConfig.pairingCode, pendingConfig.registrationToken,
-            pendingConfig.dashboardUrl, pendingConfig.devicePort, pendingConfig.useHttps,
+            pendingConfig.dashboardUrl, pendingConfig.devicePort, pendingConfig.serverFingerprint,
             pendingConfig.dashboardBasePath, expiresInSeconds, registrationError);
         if (announceResult != PairingAttemptResult::Success)
         {
@@ -478,6 +467,8 @@ DeviceConfig SetupPortal::run()
           continue;
         }
 
+        // Keeps the certificate pinned by the announcement for every later connection.
+        _configStore.save(pendingConfig);
         dnsServer.stop();
         server.stop();
         WiFi.softAPdisconnect(true);
@@ -490,7 +481,7 @@ DeviceConfig SetupPortal::run()
         String apiKey;
         auto pairingResult = _deviceApi.waitForClaim(
             pendingConfig.pairingCode, pendingConfig.registrationToken,
-            pendingConfig.dashboardUrl, pendingConfig.devicePort, pendingConfig.useHttps,
+            pendingConfig.dashboardUrl, pendingConfig.devicePort, pendingConfig.serverFingerprint,
             pendingConfig.dashboardBasePath, expiresInSeconds, apiKey, registrationError);
         if (pairingResult == PairingAttemptResult::Success)
         {

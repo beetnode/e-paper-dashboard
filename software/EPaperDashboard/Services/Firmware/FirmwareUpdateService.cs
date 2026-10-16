@@ -17,9 +17,12 @@ public sealed class FirmwareUpdateService : BackgroundService
 
     private FirmwareReleaseInfo? _latestRelease;
     private string? _cachedBinaryPath;
-    private CachedMd5? _cachedMd5;
+    private CachedHashes? _cachedHashes;
 
-    private sealed record CachedMd5(string Path, string Hash);
+    // ECDSA P-256 signatures in DER form are at most 72 bytes; anything far larger is not a signature.
+    private const int MaxSignatureBytes = 256;
+
+    private sealed record CachedHashes(string Path, string Md5, string Sha256);
 
     public FirmwareUpdateService(
         IFirmwareReleaseProvider provider,
@@ -48,29 +51,64 @@ public sealed class FirmwareUpdateService : BackgroundService
 
     /// <summary>
     /// Lowercase hex MD5 of the ready cached binary, or null when none is ready.
-    /// Devices pass it to the OTA updater to verify the image before flashing.
-    /// Computed once per cached binary.
+    /// Only firmware without signature checks uses it; signing-aware firmware verifies SHA-256 and the signature.
     /// </summary>
-    public string? GetFirmwareMd5()
+    public string? GetFirmwareMd5() => GetReadyBinaryHashes()?.Md5;
+
+    /// <summary>
+    /// Lowercase hex SHA-256 of the ready cached binary, or null when none is ready.
+    /// Devices compare it with the image they received before checking the signature.
+    /// </summary>
+    public string? GetFirmwareSha256() => GetReadyBinaryHashes()?.Sha256;
+
+    /// <summary>
+    /// Base64 of the release's detached signature for the ready cached binary, or null when the
+    /// binary is not ready or the release published no signature. Devices refuse to flash without it.
+    /// </summary>
+    public string? GetFirmwareSignature()
     {
         var path = GetReadyBinaryPath();
         if (path is null)
             return null;
 
-        var cached = _cachedMd5;
-        if (cached?.Path == path)
-            return cached.Hash;
-
         try
         {
-            using var stream = File.OpenRead(path);
-            var hash = Convert.ToHexStringLower(MD5.HashData(stream));
-            _cachedMd5 = new CachedMd5(path, hash);
-            return hash;
+            var signaturePath = GetSignaturePath(path);
+            return File.Exists(signaturePath) ? Convert.ToBase64String(File.ReadAllBytes(signaturePath)) : null;
         }
         catch (IOException ex)
         {
-            _logger.LogWarning(ex, "Failed to compute MD5 of cached firmware binary {Path}", path);
+            _logger.LogWarning(ex, "Failed to read signature of cached firmware binary {Path}", path);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Hashes of the ready cached binary, computed once per cached binary.
+    /// </summary>
+    private CachedHashes? GetReadyBinaryHashes()
+    {
+        var path = GetReadyBinaryPath();
+        if (path is null)
+            return null;
+
+        var cached = _cachedHashes;
+        if (cached?.Path == path)
+            return cached;
+
+        try
+        {
+            var binary = File.ReadAllBytes(path);
+            var hashes = new CachedHashes(
+                path,
+                Convert.ToHexStringLower(MD5.HashData(binary)),
+                Convert.ToHexStringLower(SHA256.HashData(binary)));
+            _cachedHashes = hashes;
+            return hashes;
+        }
+        catch (IOException ex)
+        {
+            _logger.LogWarning(ex, "Failed to hash cached firmware binary {Path}", path);
             return null;
         }
     }
@@ -90,7 +128,7 @@ public sealed class FirmwareUpdateService : BackgroundService
             return null;
 
         // Download on demand
-        await DownloadAndCacheBinaryAsync(release.DownloadUrl, release.Version, cancellationToken);
+        await DownloadAndCacheBinaryAsync(release, cancellationToken);
         return GetReadyBinaryPath();
     }
 
@@ -173,6 +211,8 @@ public sealed class FirmwareUpdateService : BackgroundService
         if (IsOtaReady)
         {
             _logger.LogInformation("Firmware is up to date: {Version}", release.Version);
+            // Also retries a signature download that failed on an earlier check
+            await EnsureSignatureCachedAsync(release, cancellationToken);
             return;
         }
 
@@ -182,15 +222,52 @@ public sealed class FirmwareUpdateService : BackgroundService
         {
             _cachedBinaryPath = expectedPath;
             _logger.LogInformation("Firmware binary v{Version} restored from disk cache", release.Version);
+            await EnsureSignatureCachedAsync(release, cancellationToken);
         }
         else
         {
             // Also retries a download that failed on an earlier check of the same version
-            await DownloadAndCacheBinaryAsync(release.DownloadUrl, release.Version, cancellationToken);
+            await DownloadAndCacheBinaryAsync(release, cancellationToken);
         }
     }
 
     private string GetCachePath(string version) => Path.Combine(_firmwareCacheDir, $"firmware-{version}.bin");
+
+    private static string GetSignaturePath(string binaryPath) => binaryPath + ".sig";
+
+    /// <summary>
+    /// Caches the release's signature next to its binary. A release without one is still offered:
+    /// firmware without signature checks still installs it, signing-aware firmware refuses to.
+    /// </summary>
+    private async Task EnsureSignatureCachedAsync(FirmwareReleaseInfo release, CancellationToken cancellationToken)
+    {
+        var signaturePath = GetSignaturePath(GetCachePath(release.Version));
+        if (File.Exists(signaturePath))
+            return;
+
+        if (release.SignatureUrl is null)
+        {
+            _logger.LogWarning("Firmware release v{Version} has no signature; signing-aware devices will refuse to install it", release.Version);
+            return;
+        }
+
+        try
+        {
+            var signature = await _provider.DownloadFirmwareBinaryAsync(release.SignatureUrl, cancellationToken);
+            if (signature is null || signature.Length == 0 || signature.Length > MaxSignatureBytes)
+            {
+                _logger.LogWarning("Failed to download a valid signature for firmware v{Version}", release.Version);
+                return;
+            }
+
+            await File.WriteAllBytesAsync(signaturePath, signature, cancellationToken);
+            _logger.LogInformation("Firmware signature v{Version} cached", release.Version);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to download and cache firmware signature v{Version}", release.Version);
+        }
+    }
 
     /// <summary>
     /// The cached binary path, only when it belongs to the latest release. A binary left over
@@ -207,21 +284,23 @@ public sealed class FirmwareUpdateService : BackgroundService
         return path == GetCachePath(release.Version) && File.Exists(path) ? path : null;
     }
 
-    private async Task<byte[]?> DownloadAndCacheBinaryAsync(string downloadUrl, string version, CancellationToken cancellationToken)
+    private async Task<byte[]?> DownloadAndCacheBinaryAsync(FirmwareReleaseInfo release, CancellationToken cancellationToken)
     {
+        var version = release.Version;
         try
         {
             _logger.LogInformation("Downloading firmware binary v{Version}...", version);
 
-            var binary = await _provider.DownloadFirmwareBinaryAsync(downloadUrl, cancellationToken);
+            var binary = await _provider.DownloadFirmwareBinaryAsync(release.DownloadUrl!, cancellationToken);
             if (binary is null)
             {
                 _logger.LogWarning("Failed to download firmware binary");
                 return null;
             }
 
-            // Clean up old cached binaries
-            foreach (var oldFile in Directory.GetFiles(_firmwareCacheDir, "*.bin"))
+            // Clean up old cached binaries and their signatures
+            foreach (var oldFile in Directory.GetFiles(_firmwareCacheDir, "*.bin")
+                         .Concat(Directory.GetFiles(_firmwareCacheDir, "*.bin.sig")))
             {
                 try { File.Delete(oldFile); }
                 catch { /* best effort cleanup */ }
@@ -229,11 +308,12 @@ public sealed class FirmwareUpdateService : BackgroundService
 
             // Cache the new binary
             var cachePath = GetCachePath(version);
-            _cachedMd5 = null;
+            _cachedHashes = null;
             await File.WriteAllBytesAsync(cachePath, binary, cancellationToken);
             _cachedBinaryPath = cachePath;
 
             _logger.LogInformation("Firmware binary v{Version} cached successfully ({Size} bytes)", version, binary.Length);
+            await EnsureSignatureCachedAsync(release, cancellationToken);
             return binary;
         }
         catch (Exception ex)

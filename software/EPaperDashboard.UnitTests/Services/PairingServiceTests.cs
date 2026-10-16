@@ -24,122 +24,6 @@ public class PairingServiceTests
             timeProvider ?? new FakeTimeProvider(FixedNow), ImmediateUnitOfWork.Instance);
 
     [Fact]
-    public void CreatePairingSession_SetsCreatedAtToCurrentTime()
-    {
-        var repo = CreateRepo();
-        var sut = CreateSut(repo);
-
-        var session = sut.CreatePairingSession(UserId.New());
-
-        session.CreatedAt.Should().Be(FixedNow);
-    }
-
-    [Fact]
-    public void CreatePairingSession_SetsExpiryFiveMinutesAfterCreation()
-    {
-        var repo = CreateRepo();
-        var sut = CreateSut(repo);
-
-        var session = sut.CreatePairingSession(UserId.New());
-
-        session.ExpiresAt.Should().Be(FixedNow.AddMinutes(5));
-    }
-
-    [Fact]
-    public void CreatePairingSession_GeneratesSixCharacterUppercaseAlphanumericCode()
-    {
-        var repo = CreateRepo();
-        var sut = CreateSut(repo);
-
-        var session = sut.CreatePairingSession(UserId.New());
-
-        session.Code.Should().MatchRegex("^[0-9A-Z]{6}$");
-    }
-
-    [Fact]
-    public void CreatePairingSession_PersistsSessionViaRepository()
-    {
-        var repo = CreateRepo();
-        var sut = CreateSut(repo);
-
-        var session = sut.CreatePairingSession(UserId.New());
-
-        repo.Verify(r => r.Insert(session), Times.Once);
-        session.Status.Should().Be(PairingStatus.Pending);
-        session.IsCompleted.Should().BeFalse();
-    }
-
-    [Fact]
-    public void RegisterDevice_UnknownCode_ReturnsNull()
-    {
-        var repo = CreateRepo();
-        repo.Setup(r => r.FindByCode("BADCOD")).Returns((PairingSession?)null);
-        var sut = CreateSut(repo);
-
-        var result = sut.RegisterDevice("BADCOD", "device-1");
-
-        result.Should().BeNull();
-    }
-
-    [Fact]
-    public void RegisterDevice_ValidCode_CompletesSessionAndAssignsApiKey()
-    {
-        var repo = CreateRepo();
-        var session = new PairingSession { Code = "ABC123", Status = PairingStatus.Pending, ExpiresAt = FixedNow.AddMinutes(5) };
-        repo.Setup(r => r.FindByCode("ABC123")).Returns(session);
-        var sut = CreateSut(repo);
-
-        var result = sut.RegisterDevice("ABC123", "device-1");
-
-        result.Should().NotBeNull();
-        result!.Status.Should().Be(PairingStatus.Completed);
-        result.IsCompleted.Should().BeTrue();
-        result.DeviceIdentifier.Should().Be("device-1");
-        result.ApiKey.Should().NotBeNullOrEmpty();
-        repo.Verify(r => r.Update(session), Times.Once);
-    }
-
-    [Fact]
-    public void RegisterDevice_WithScreenDimensions_NormalizesWidthAsMaxAndHeightAsMin()
-    {
-        var repo = CreateRepo();
-        var session = new PairingSession { Code = "ABC123", ExpiresAt = FixedNow.AddMinutes(5) };
-        repo.Setup(r => r.FindByCode("ABC123")).Returns(session);
-        var sut = CreateSut(repo);
-
-        // portrait device reports width < height
-        var result = sut.RegisterDevice("ABC123", "device-1", screenWidth: 480, screenHeight: 800);
-
-        result!.ScreenWidth.Should().Be(800);
-        result.ScreenHeight.Should().Be(480);
-    }
-
-    [Fact]
-    public void RegisterDevice_WithoutScreenDimensions_LeavesScreenSizeUnset()
-    {
-        var repo = CreateRepo();
-        var session = new PairingSession { Code = "ABC123", ExpiresAt = FixedNow.AddMinutes(5) };
-        repo.Setup(r => r.FindByCode("ABC123")).Returns(session);
-        var sut = CreateSut(repo);
-
-        var result = sut.RegisterDevice("ABC123", "device-1");
-
-        result!.ScreenWidth.Should().BeNull();
-        result.ScreenHeight.Should().BeNull();
-    }
-
-    [Fact]
-    public void HasActiveSessions_DelegatesToRepositoryWithCurrentTime()
-    {
-        var repo = CreateRepo();
-        repo.Setup(r => r.HasActiveSessions(FixedNow)).Returns(true);
-        var sut = CreateSut(repo);
-
-        sut.HasActiveSessions().Should().BeTrue();
-        repo.Verify(r => r.HasActiveSessions(FixedNow), Times.Once);
-    }
-
-    [Fact]
     public void CleanupExpiredSessions_DelegatesToRepositoryWithCurrentTime()
     {
         var repo = CreateRepo();
@@ -205,12 +89,14 @@ public class PairingServiceTests
         claim.IsSuccess.Should().BeTrue();
         insertedDevice.Should().NotBeNull();
         insertedDevice!.UserId.Should().Be(userId);
-        insertedDevice.ApiKey.Should().NotBeNullOrWhiteSpace();
+        insertedDevice.ApiKeyHash.Should().MatchRegex("^[0-9a-f]{64}$");
         stored!.ExpiresAt.Should().Be(FixedNow.AddMinutes(2));
         wrongTokenStatus.Failure.Should().Be(PairingFailure.InvalidRegistrationToken);
         status.IsSuccess.Should().BeTrue();
         status.Value!.Status.Should().Be(PairingStatus.Completed);
-        status.Value.ApiKey.Should().Be(insertedDevice.ApiKey);
+        status.Value.ApiKey.Should().NotBeNullOrWhiteSpace();
+        insertedDevice.ApiKeyHash.Should().Be(DeviceApiKey.Hash(status.Value.ApiKey))
+            .And.NotBe(status.Value.ApiKey);
     }
 
     [Fact]

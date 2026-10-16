@@ -32,92 +32,9 @@ public class PairingController(
                 statusCode: StatusCodes.Status503ServiceUnavailable);
         }
 
-        return Ok(new PairingConfigurationResponse(clientUri!.AbsoluteUri.TrimEnd('/')));
-    }
-
-    [HttpPost("start")]
-    [Authorize]
-    public IActionResult StartPairing()
-    {
-        var session = _pairingService.CreatePairingSession(CurrentUserId);
-
-        return Ok(new StartPairingResponse
-        {
-            Code = session.Code,
-            ExpiresAt = session.ExpiresAt
-        });
-    }
-
-    [HttpPost("register")]
-    [AllowAnonymous]
-    [DeviceAccessible(RequireActivePairing = true)]
-    [EnableRateLimiting("PairingAnnounce")]
-    public IActionResult RegisterDevice([FromBody] RegisterDeviceRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.DeviceIdentifier))
-        {
-            return BadRequest("Code and DeviceIdentifier are required");
-        }
-
-        var session = _pairingService.GetPairingSessionByCode(request.Code);
-        if (session is null)
-        {
-            return NotFound("Invalid pairing code");
-        }
-
-        if (session.ExpiresAt < DateTimeOffset.UtcNow)
-        {
-            return BadRequest("Pairing code expired");
-        }
-
-        if (session.Status != PairingStatus.Pending)
-        {
-            return BadRequest("Pairing session is not in a valid state");
-        }
-
-        var existingDevice = _deviceService.GetDeviceByIdentifier(request.DeviceIdentifier);
-
-        if (existingDevice is not null && existingDevice.UserId != session.UserId)
-        {
-            return Conflict("Device is owned by another user and must be released before it can be paired");
-        }
-
-        var registered = _pairingService.RegisterDevice(
-            request.Code, request.DeviceIdentifier, request.ScreenWidth, request.ScreenHeight);
-
-        if (registered is null)
-        {
-            return StatusCode(500, "Failed to register device");
-        }
-
-        if (existingDevice is not null)
-        {
-            existingDevice.ApiKey = registered.ApiKey;
-            existingDevice.PairedAt = DateTimeOffset.UtcNow;
-            existingDevice.ScreenWidth = registered.ScreenWidth;
-            existingDevice.ScreenHeight = registered.ScreenHeight;
-
-            _deviceService.UpdateDevice(existingDevice);
-        }
-        else
-        {
-            var device = new Models.Device
-            {
-                UserId = registered.UserId,
-                DeviceIdentifier = registered.DeviceIdentifier!,
-                Name = request.DeviceName ?? registered.DeviceIdentifier!,
-                ApiKey = registered.ApiKey,
-                PairedAt = DateTimeOffset.UtcNow,
-                ScreenWidth = registered.ScreenWidth,
-                ScreenHeight = registered.ScreenHeight
-            };
-            _deviceService.AddDevice(device);
-        }
-
-        return Ok(new RegisterDeviceResponse
-        {
-            ApiKey = registered.ApiKey
-        });
+        // Devices reach the TLS device port directly on the dashboard's host, not CLIENT_URL itself.
+        var serverAddress = $"{clientUri!.Host}:{_environmentConfiguration.DevicePublicPort}";
+        return Ok(new PairingConfigurationResponse(clientUri.AbsoluteUri.TrimEnd('/'), serverAddress));
     }
 
     [HttpPost("announce")]
@@ -247,15 +164,7 @@ public class PairingController(
     }
 }
 
-public record PairingConfigurationResponse(string ClientUrl);
-
-public record StartPairingResponse
-{
-    public string Code { get; init; } = string.Empty;
-    public DateTimeOffset ExpiresAt { get; init; }
-}
-
-public record RegisterDeviceRequest(string Code, string DeviceIdentifier, string? DeviceName, int? ScreenWidth, int? ScreenHeight);
+public record PairingConfigurationResponse(string ClientUrl, string ServerAddress);
 
 public record AnnounceDeviceRequest(
     string Code,
@@ -274,11 +183,6 @@ public record ClaimDeviceResponse(string Id, string DeviceIdentifier, string Nam
 public record DeviceClaimStatusRequest(string Code, string RegistrationToken);
 
 public record DeviceClaimStatusResponse(string Status, string? ApiKey, DateTimeOffset ExpiresAt, int ExpiresInSeconds);
-
-public record RegisterDeviceResponse
-{
-    public string ApiKey { get; init; } = string.Empty;
-}
 
 public record PairingStatusResponse
 {

@@ -11,13 +11,18 @@ struct DeviceConfig {
   String dashboardApiKey;
   String pairingCode;
   String registrationToken;
-  bool useHttps;
+  // Hex SHA-256 of the server certificate pinned on first connection; empty until then.
+  String serverFingerprint;
 };
 
 struct ResponseHeaders {
+  // 0 when the status line or the header block could not be read completely.
+  int statusCode = 0;
   bool isSuccess = false;
+  unsigned long retryAfterSeconds = 0;
   String firmwareVersion;
-  String firmwareMd5;
+  String firmwareSha256;
+  String firmwareSignature;
   long contentLength = -1;
 };
 

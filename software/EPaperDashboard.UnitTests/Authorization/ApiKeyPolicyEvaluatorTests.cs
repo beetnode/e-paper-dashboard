@@ -45,7 +45,7 @@ public class ApiKeyPolicyEvaluatorTests
     public void Evaluate_ApiKeyMatchesNoDevice_ReturnsFalse()
     {
         var deviceRepository = new Mock<IDeviceRepository>();
-        deviceRepository.Setup(r => r.FindByApiKey("bad-key")).Returns((Device?)null);
+        deviceRepository.Setup(r => r.FindByApiKeyHash(DeviceApiKey.Hash("bad-key"))).Returns((Device?)null);
         var sut = CreateSut(deviceRepository);
         var context = new DefaultHttpContext();
         context.Request.Headers["X-Api-Key"] = "bad-key";
@@ -57,7 +57,7 @@ public class ApiKeyPolicyEvaluatorTests
     public void Evaluate_ApiKeyMatchesDevice_ReturnsTrue()
     {
         var deviceRepository = new Mock<IDeviceRepository>();
-        deviceRepository.Setup(r => r.FindByApiKey("good-key")).Returns(new Device { ApiKey = "good-key" });
+        deviceRepository.Setup(r => r.FindByApiKeyHash(DeviceApiKey.Hash("good-key"))).Returns(new Device { ApiKeyHash = DeviceApiKey.Hash("good-key") });
         var sut = CreateSut(deviceRepository);
         var context = new DefaultHttpContext();
         context.Request.Headers["X-Api-Key"] = "good-key";

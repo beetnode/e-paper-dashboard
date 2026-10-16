@@ -5,6 +5,7 @@
 namespace {
 constexpr size_t MaxPairingResponseBytes = 4096;
 constexpr unsigned long DefaultClaimExpirySeconds = 10UL * 60UL;
+constexpr const char* IdentityChangedMessage = "Server certificate changed";
 
 String pairingErrorMessage(const String& response, const String& fallback)
 {
@@ -31,7 +32,7 @@ String hostHeader(const String& host, int port)
 
 DeviceApi::DeviceApi(Logger& logger, Network& network) : _logger(logger), _network(network) {}
 
-bool DeviceApi::openSuccessfulResponse(const String& path, const DeviceConfig& config,
+bool DeviceApi::openSuccessfulResponse(const String& path, DeviceConfig& config,
                                        ResponseHeaders& headers)
 {
   for (int attempt = 1; attempt <= Retry::RequestAttempts; ++attempt)
@@ -59,7 +60,7 @@ bool DeviceApi::openSuccessfulResponse(const String& path, const DeviceConfig& c
   return false;
 }
 
-DeviceStatus DeviceApi::fetchDeviceStatus(const DeviceConfig& config)
+DeviceStatus DeviceApi::fetchDeviceStatus(DeviceConfig& config)
 {
   _logger.println("Fetching device configuration...");
 
@@ -99,7 +100,7 @@ DeviceStatus DeviceApi::fetchDeviceStatus(const DeviceConfig& config)
   return result;
 }
 
-bool DeviceApi::fetchAndDisplayImage(const DeviceConfig& config, DisplayManager& display)
+bool DeviceApi::fetchAndDisplayImage(DeviceConfig& config, DisplayManager& display)
 {
   _logger.println("Connecting to the remote server...");
 
@@ -166,11 +167,11 @@ bool DeviceApi::fetchAndDisplayImage(const DeviceConfig& config, DisplayManager&
 }
 
 bool DeviceApi::postPairingRequest(const String& path, const String& body,
-                                   const String& dashboardUrl, int devicePort, bool useHttps,
+                                   const String& dashboardUrl, int devicePort, String& serverFingerprint,
                                    const String& dashboardBasePath,
                                    int& httpStatus, unsigned long& retryAfterSeconds, String& response)
 {
-  if (!_network.connectTo(dashboardUrl, devicePort, useHttps))
+  if (!_network.connectTo(dashboardUrl, devicePort, serverFingerprint))
   {
     return false;
   }
@@ -185,29 +186,13 @@ bool DeviceApi::postPairingRequest(const String& path, const String& body,
 
   _network.send(postRequest);
 
-  httpStatus = 0;
-  retryAfterSeconds = 0;
-  while (_network.connected() || _network.available())
+  const ResponseHeaders headers = _network.readResponseHeaders();
+  httpStatus = headers.statusCode;
+  retryAfterSeconds = headers.retryAfterSeconds;
+  if (httpStatus == 0)
   {
-    String line = _network.readStringUntil('\n');
-    if (httpStatus == 0 && line.startsWith("HTTP/"))
-    {
-      int spaceIdx = line.indexOf(' ');
-      if (spaceIdx > 0)
-      {
-        httpStatus = line.substring(spaceIdx + 1).toInt();
-      }
-    }
-
-    if (line.startsWith("Retry-After:"))
-    {
-      retryAfterSeconds = line.substring(strlen("Retry-After:")).toInt();
-    }
-
-    if (line == "\r")
-    {
-      break;
-    }
+    _network.close();
+    return false;
   }
 
   String raw = "";
@@ -238,14 +223,12 @@ bool DeviceApi::postPairingRequest(const String& path, const String& body,
                  : raw;
   response.trim();
 
-  _logger.print("HTTP status: ");
-  _logger.println(httpStatus);
   return true;
 }
 
 PairingAttemptResult DeviceApi::announceDevice(
     const String& pairingCode, const String& registrationToken,
-    const String& dashboardUrl, int devicePort, bool useHttps,
+    const String& dashboardUrl, int devicePort, String& serverFingerprint,
     const String& dashboardBasePath, unsigned long& expiresInSeconds, String& errorOut)
 {
   _logger.println("Announcing device to dashboard...");
@@ -268,9 +251,14 @@ PairingAttemptResult DeviceApi::announceDevice(
   unsigned long retryAfterSeconds = 0;
   String response;
   if (!postPairingRequest("/api/pairing/announce", announceBody,
-                          dashboardUrl, devicePort, useHttps, dashboardBasePath,
+                          dashboardUrl, devicePort, serverFingerprint, dashboardBasePath,
                           httpStatus, retryAfterSeconds, response))
   {
+    if (_network.identityMismatch())
+    {
+      errorOut = IdentityChangedMessage;
+      return PairingAttemptResult::TerminalFailure;
+    }
     errorOut = "Could not connect to server";
     return PairingAttemptResult::RetryableFailure;
   }
@@ -295,7 +283,7 @@ PairingAttemptResult DeviceApi::announceDevice(
 
 PairingAttemptResult DeviceApi::waitForClaim(
     const String& pairingCode, const String& registrationToken,
-    const String& dashboardUrl, int devicePort, bool useHttps,
+    const String& dashboardUrl, int devicePort, String& serverFingerprint,
     const String& dashboardBasePath, unsigned long expiresInSeconds,
     String& apiKey, String& errorOut)
 {
@@ -318,9 +306,14 @@ PairingAttemptResult DeviceApi::waitForClaim(
     int httpStatus = 0;
     unsigned long retryAfterSeconds = 0;
     if (!postPairingRequest("/api/pairing/device-status", statusBody,
-                            dashboardUrl, devicePort, useHttps, dashboardBasePath,
+                            dashboardUrl, devicePort, serverFingerprint, dashboardBasePath,
                             httpStatus, retryAfterSeconds, response))
     {
+      if (_network.identityMismatch())
+      {
+        errorOut = IdentityChangedMessage;
+        return PairingAttemptResult::TerminalFailure;
+      }
       _logger.println("Pairing status temporarily unavailable; retrying...");
       continue;
     }
@@ -380,17 +373,17 @@ PairingAttemptResult DeviceApi::waitForClaim(
 
 PairingAttemptResult DeviceApi::registerWithDashboard(
     const String& pairingCode, const String& registrationToken,
-    const String& dashboardUrl, int devicePort, bool useHttps,
+    const String& dashboardUrl, int devicePort, String& serverFingerprint,
     const String& dashboardBasePath, String& apiKey, String& errorOut)
 {
   unsigned long expiresInSeconds = DefaultClaimExpirySeconds;
   auto result = announceDevice(pairingCode, registrationToken, dashboardUrl, devicePort,
-                               useHttps, dashboardBasePath, expiresInSeconds, errorOut);
+                               serverFingerprint, dashboardBasePath, expiresInSeconds, errorOut);
   if (result != PairingAttemptResult::Success)
   {
     return result;
   }
 
   return waitForClaim(pairingCode, registrationToken, dashboardUrl, devicePort,
-                      useHttps, dashboardBasePath, expiresInSeconds, apiKey, errorOut);
+                      serverFingerprint, dashboardBasePath, expiresInSeconds, apiKey, errorOut);
 }

@@ -30,6 +30,11 @@ namespace DisplayConst {
   constexpr uint16_t FrameBytes = FrameWidth * FrameHeight / 8;
 }
 
+namespace DeviceServer {
+  // The server's TLS device port, used when the entered address has no port.
+  constexpr int DefaultDevicePort = 8129;
+}
+
 namespace Retry {
   constexpr int RequestAttempts = 3;
   constexpr unsigned long RequestRetryDelayMs = 3000;
@@ -55,7 +60,7 @@ namespace StorageKey {
   constexpr const char* DashboardApiKey = "apikey";
   constexpr const char* PairingCode = "paircode";
   constexpr const char* RegistrationToken = "regtoken";
-  constexpr const char* UseHttps = "usehttps";
+  constexpr const char* ServerFingerprint = "srvfp";
   constexpr const char* OtaFailVersion = "otafailv";
   constexpr const char* OtaFailCount = "otafailc";
   constexpr const char* OtaPendingVersion = "otapendv";

@@ -88,7 +88,7 @@ void setup()
     String pairingError;
     auto pairingResult = deviceApi.registerWithDashboard(
         config.pairingCode, config.registrationToken,
-        config.dashboardUrl, config.devicePort, config.useHttps,
+        config.dashboardUrl, config.devicePort, config.serverFingerprint,
         config.dashboardBasePath, apiKey, pairingError);
     if (pairingResult != PairingAttemptResult::Success)
     {
@@ -131,13 +131,30 @@ void setup()
 
   uint64_t waitSeconds = Timing::FallbackRefreshSeconds;
 
+  const bool hadPinnedServer = config.serverFingerprint.length() > 0;
   auto status = deviceApi.fetchDeviceStatus(config);
   if (!status.success)
   {
-    logger.println("Dashboard unavailable, retrying after sleep");
+    if (network.identityMismatch())
+    {
+      // Like SSH, a changed server identity is never accepted silently.
+      logger.println("Server certificate changed, refusing to send credentials");
+      displayManager.showSuccess(
+          "Server Identity Changed",
+          "The server's certificate differs from\nthe one trusted when pairing.",
+          "Hold the button 10 s to pair again.");
+    }
+    else
+    {
+      logger.println("Dashboard unavailable, retrying after sleep");
+    }
     displayManager.powerOff();
     hardware.sleepAfterFailure();
     return;
+  }
+  if (!hadPinnedServer)
+  {
+    configStore.save(config);
   }
   otaUpdater.confirmUpdate();
 

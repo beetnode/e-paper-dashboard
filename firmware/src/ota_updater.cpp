@@ -19,7 +19,7 @@ bool OtaUpdater::isNewerVersion(const char* current, const String& available) co
   return avPatch > curPatch;
 }
 
-OtaFailure OtaUpdater::perform(const DeviceConfig& config, const String& version)
+OtaFailure OtaUpdater::perform(DeviceConfig& config, const String& version)
 {
   _logger.println("Starting OTA firmware update...");
 
@@ -46,10 +46,28 @@ OtaFailure OtaUpdater::perform(const DeviceConfig& config, const String& version
     return OtaFailure::Transient;
   }
 
+  // The release changed since the status check; the next wake picks up the new version.
+  if (headers.firmwareVersion.length() > 0 && headers.firmwareVersion != version)
+  {
+    _logger.printf("OTA: Server now offers v%s instead of v%s\n",
+                   headers.firmwareVersion.c_str(), version.c_str());
+    _network.close();
+    return OtaFailure::Transient;
+  }
+
   _logger.printf("OTA: Firmware size: %ld bytes\n", headers.contentLength);
 
   // Counted up front so a crash or power loss while flashing still uses up an attempt.
   _configStore.recordOtaFailure(version);
+
+  uint8_t expectedSha256[FirmwareSignature::Sha256Bytes];
+  if (!FirmwareSignature::parseSha256Hex(headers.firmwareSha256, expectedSha256)
+      || headers.firmwareSignature.length() == 0)
+  {
+    _logger.println("OTA: Server sent no SHA-256 or signature, refusing unsigned firmware");
+    _network.close();
+    return OtaFailure::Permanent;
+  }
 
   if (!Update.begin(headers.contentLength))
   {
@@ -58,40 +76,78 @@ OtaFailure OtaUpdater::perform(const DeviceConfig& config, const String& version
     return OtaFailure::Permanent;
   }
 
-  if (headers.firmwareMd5.length() == 32)
-  {
-    Update.setMD5(headers.firmwareMd5.c_str());
-  }
-  else
-  {
-    _logger.println("OTA: Server sent no MD5, skipping integrity check");
-  }
-
   _logger.println("OTA: Writing firmware...");
-  size_t written = Update.writeStream(_network.client());
+  FirmwareSignature::ImageHasher hasher;
+  const size_t written = streamImage(static_cast<size_t>(headers.contentLength), hasher);
   _logger.printf("OTA: Written %u bytes\n", written);
+  _network.close();
 
   if (written != (size_t)headers.contentLength)
   {
     _logger.printf("OTA: Size mismatch — expected %ld, written %u\n", headers.contentLength, written);
     Update.abort();
-    _network.close();
     _configStore.undoOtaFailure(version);
     return OtaFailure::Transient;
   }
+
+  // Nothing is marked bootable until both checks pass; Update.abort() keeps the running firmware.
+  uint8_t actualSha256[FirmwareSignature::Sha256Bytes];
+  if (!hasher.finish(actualSha256)
+      || memcmp(actualSha256, expectedSha256, sizeof(actualSha256)) != 0)
+  {
+    _logger.println("OTA: SHA-256 mismatch, discarding image");
+    Update.abort();
+    return OtaFailure::Permanent;
+  }
+
+  String signatureError;
+  if (!FirmwareSignature::verify(version, actualSha256, headers.firmwareSignature, signatureError))
+  {
+    _logger.printf("OTA: Signature check failed (%s), discarding image\n", signatureError.c_str());
+    Update.abort();
+    return OtaFailure::Permanent;
+  }
+  _logger.println("OTA: Signature verified");
 
   if (Update.end() && Update.isFinished())
   {
     _logger.println("OTA: Update successful! Rebooting...");
     _configStore.setOtaPending(version);
-    _network.close();
     delay(1000);
     ESP.restart();
   }
 
   _logger.printf("OTA: Update failed: %s\n", Update.errorString());
-  _network.close();
   return OtaFailure::Permanent;
+}
+
+size_t OtaUpdater::streamImage(size_t length, FirmwareSignature::ImageHasher& hasher)
+{
+  constexpr unsigned long StallTimeoutMs = 30000;
+  uint8_t buffer[1024];
+  size_t written = 0;
+  unsigned long lastDataAt = millis();
+
+  while (written < length)
+  {
+    const int available = _network.available();
+    if (available <= 0)
+    {
+      if (!_network.connected() || millis() - lastDataAt > StallTimeoutMs) break;
+      delay(1);
+      continue;
+    }
+
+    const size_t toRead = min(min(static_cast<size_t>(available), sizeof(buffer)), length - written);
+    const size_t bytesRead = _network.read(buffer, toRead);
+    if (bytesRead == 0) continue;
+
+    lastDataAt = millis();
+    hasher.update(buffer, bytesRead);
+    if (Update.write(buffer, bytesRead) != bytesRead) break;
+    written += bytesRead;
+  }
+  return written;
 }
 
 void OtaUpdater::verifyPendingUpdate()

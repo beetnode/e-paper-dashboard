@@ -95,6 +95,11 @@ if (validationResult.IsFailure)
 	Environment.Exit(1);
 }
 
+// The device port speaks TLS only; devices pin this certificate when they pair.
+var deviceCertificate = DeviceCertificateStore.LoadOrCreate(Path.Combine(environmentConfiguration.ConfigDir, "device-tls"));
+builder.WebHost.ConfigureKestrel(options =>
+	options.ConfigureHttpsDefaults(https => https.ServerCertificate = deviceCertificate));
+
 var dataProtectionKeysDir = environmentConfiguration.DataProtectionKeysDir;
 Directory.CreateDirectory(dataProtectionKeysDir);
 builder.Services.AddDataProtection()
@@ -350,6 +355,8 @@ app.Services.GetRequiredService<LegacyHomeAssistantSettingsMigration>().Run();
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 app.Services.GetRequiredService<SetupCodeProvider>().AnnounceIfPending(logger);
+logger.LogInformation("Device port {DevicePort} serves TLS with certificate SHA-256 {Fingerprint}",
+	devicePort, DeviceCertificateStore.Fingerprint(deviceCertificate));
 var strategy = app.Services.GetRequiredService<IDeploymentStrategy>();
 
 // Only loopback proxies are trusted: ingress requests are recognized by the Supervisor's own address.
@@ -357,11 +364,6 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
 	ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
 });
-
-app.UseCors(builder => builder
-	.AllowAnyOrigin()
-	.AllowAnyMethod()
-	.AllowAnyHeader());
 
 #if DEBUG
 if (app.Environment.IsDevelopment())
@@ -383,30 +385,15 @@ app.UseRateLimiter();
 app.Use(async (context, next) =>
 {
 	var isDevicePort = context.Connection.LocalPort == devicePort;
-	
+
+	if (!EPaperDashboard.Guards.DeviceAccessGuard.IsServedOnPort(context.GetEndpoint(), isDevicePort))
+	{
+		context.Response.StatusCode = 404;
+		return;
+	}
+
 	if (isDevicePort)
 	{
-		var endpoint = context.GetEndpoint();
-
-		if (!EPaperDashboard.Guards.DeviceAccessGuard.IsAccessible(endpoint))
-		{
-			context.Response.StatusCode = 404;
-			return;
-		}
-
-		if (EPaperDashboard.Guards.DeviceAccessGuard.RequiresActivePairing(endpoint))
-		{
-			var pairingService = context.RequestServices.GetRequiredService<PairingService>();
-			pairingService.CleanupExpiredSessions();
-
-			if (!pairingService.HasActiveSessions())
-			{
-				context.Response.StatusCode = 503;
-				await context.Response.WriteAsync("Pairing service unavailable");
-				return;
-			}
-		}
-
 		// Add latest firmware version header to all device-port responses, but only once the
 		// binary is cached: an uncached download can outlast the device's OTA timeout and
 		// burn its limited retries for that version.
@@ -422,22 +409,10 @@ app.Use(async (context, next) =>
 		}
 
 		// Track device firmware version and update last seen timestamp
-		if (context.Request.Headers.TryGetValue(HttpHeaderNames.DeviceFirmwareVersionHeaderName, out var deviceFwVersion)
-			&& context.Request.Headers.TryGetValue(HttpHeaderNames.DeviceIdHeaderName, out var deviceIdHeader))
-		{
-			var deviceService = context.RequestServices.GetRequiredService<DeviceService>();
-			var device = deviceService.GetDeviceByIdentifier(deviceIdHeader.ToString());
-			if (device is not null)
-			{
-				var fwStr = deviceFwVersion.ToString();
-				var lastSeenTracker = context.RequestServices.GetRequiredService<DeviceLastSeenTracker>();
-				if (lastSeenTracker.ShouldUpdate(device, fwStr))
-				{
-					lastSeenTracker.Apply(device, fwStr);
-					deviceService.UpdateDevice(device);
-				}
-			}
-		}
+		context.RequestServices.GetRequiredService<DeviceLastSeenTracker>().Record(
+			context.RequestServices.GetRequiredService<DeviceService>(),
+			context.Request.Headers[HttpHeaderNames.ApiKeyHeaderName].ToString(),
+			context.Request.Headers[HttpHeaderNames.DeviceFirmwareVersionHeaderName].ToString());
 	}
 
 	await next();

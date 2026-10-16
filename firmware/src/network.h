@@ -10,10 +10,14 @@ public:
   explicit Network(Logger& logger);
 
   bool connectToWiFi(const String& ssid, const String& password);
-  bool sendGetRequest(const String& url, const DeviceConfig& config);
+  bool sendGetRequest(const String& url, DeviceConfig& config);
   ResponseHeaders readResponseHeaders();
 
-  bool connectTo(const String& host, int port, bool useHttps = false);
+  // Opens a TLS connection and checks the server certificate against serverFingerprint.
+  // An empty serverFingerprint pins the certificate seen now (trust on first use).
+  bool connectTo(const String& host, int port, String& serverFingerprint);
+  // Whether the last connection was refused because the certificate differs from the pinned one.
+  bool identityMismatch() const { return _identityMismatch; }
   void send(const String& data);
   void setTimeout(int timeoutMs);
   void close();
@@ -27,9 +31,7 @@ public:
 
 private:
   Logger& _logger;
-  WiFiClient _client;
-  WiFiClientSecure _secureClient;
-  bool _useSecure = false;
-  WiFiClient& activeClient();
+  WiFiClientSecure _client;
+  bool _identityMismatch = false;
   bool waitForWiFi(const String& ssid, const String& password);
 };

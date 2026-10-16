@@ -21,4 +21,5 @@ public sealed class EnvironmentConfigurationWrapper : IEnvironmentConfiguration
     public string FirmwareGitHubRepo => EnvironmentConfiguration.FirmwareGitHubRepo;
     public string FirmwareAssetPattern => EnvironmentConfiguration.FirmwareAssetPattern;
     public TimeSpan FirmwareCheckInterval => EnvironmentConfiguration.FirmwareCheckInterval;
+    public int DevicePublicPort => EnvironmentConfiguration.DevicePublicPort;
 }

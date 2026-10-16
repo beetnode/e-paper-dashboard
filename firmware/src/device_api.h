@@ -16,18 +16,18 @@ class DeviceApi {
 public:
   DeviceApi(Logger& logger, Network& network);
 
-  DeviceStatus fetchDeviceStatus(const DeviceConfig& config);
-  bool fetchAndDisplayImage(const DeviceConfig& config, DisplayManager& display);
+  DeviceStatus fetchDeviceStatus(DeviceConfig& config);
+  bool fetchAndDisplayImage(DeviceConfig& config, DisplayManager& display);
   PairingAttemptResult announceDevice(const String& pairingCode, const String& registrationToken,
-                                      const String& dashboardUrl, int devicePort, bool useHttps,
+                                      const String& dashboardUrl, int devicePort, String& serverFingerprint,
                                       const String& dashboardBasePath,
                                       unsigned long& expiresInSeconds, String& errorOut);
   PairingAttemptResult waitForClaim(const String& pairingCode, const String& registrationToken,
-                                    const String& dashboardUrl, int devicePort, bool useHttps,
+                                    const String& dashboardUrl, int devicePort, String& serverFingerprint,
                                     const String& dashboardBasePath, unsigned long expiresInSeconds,
                                     String& apiKey, String& errorOut);
   PairingAttemptResult registerWithDashboard(const String& pairingCode, const String& registrationToken,
-                                             const String& dashboardUrl, int devicePort, bool useHttps,
+                                             const String& dashboardUrl, int devicePort, String& serverFingerprint,
                                              const String& dashboardBasePath,
                                              String& apiKey, String& errorOut);
 
@@ -36,9 +36,9 @@ private:
   Network& _network;
   // Sends a GET request, retrying connection failures and non-200 responses.
   // On success the response body is ready to be read from the network.
-  bool openSuccessfulResponse(const String& path, const DeviceConfig& config, ResponseHeaders& headers);
+  bool openSuccessfulResponse(const String& path, DeviceConfig& config, ResponseHeaders& headers);
   bool postPairingRequest(const String& path, const String& body,
-                          const String& dashboardUrl, int devicePort, bool useHttps,
+                          const String& dashboardUrl, int devicePort, String& serverFingerprint,
                           const String& dashboardBasePath,
                           int& httpStatus, unsigned long& retryAfterSeconds, String& response);
 };

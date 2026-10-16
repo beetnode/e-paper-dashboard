@@ -86,6 +86,14 @@ public class FirmwareApiController(FirmwareUpdateService firmwareUpdateService) 
         if (md5 is not null)
             Response.Headers[HttpHeaderNames.FirmwareMd5HeaderName] = md5;
 
+        var sha256 = firmwareUpdateService.GetFirmwareSha256();
+        if (sha256 is not null)
+            Response.Headers[HttpHeaderNames.FirmwareSha256HeaderName] = sha256;
+
+        var signature = firmwareUpdateService.GetFirmwareSignature();
+        if (signature is not null)
+            Response.Headers[HttpHeaderNames.FirmwareSignatureHeaderName] = signature;
+
         return PhysicalFile(path, "application/octet-stream", fileName);
     }
 }

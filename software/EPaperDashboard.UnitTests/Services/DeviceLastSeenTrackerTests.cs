@@ -1,5 +1,8 @@
+using EPaperDashboard.Utilities;
 using EPaperDashboard.Models;
+using EPaperDashboard.Data.Repositories;
 using EPaperDashboard.Services;
+using Moq;
 using FluentAssertions;
 using Microsoft.Extensions.Time.Testing;
 using Xunit;
@@ -67,5 +70,46 @@ public class DeviceLastSeenTrackerTests
 
         device.FirmwareVersion.Should().Be("2.0.0");
         device.LastSeenAt.Should().Be(Now);
+    }
+
+    [Fact]
+    public void Record_ValidApiKey_UpdatesThatDevice()
+    {
+        var device = new Device { Id = DeviceId.New(), FirmwareVersion = "0.7.0" };
+        var repo = new Mock<IDeviceRepository>();
+        repo.Setup(r => r.FindByApiKeyHash(DeviceApiKey.Hash("good-key"))).Returns(device);
+
+        CreateSut().Record(new DeviceService(repo.Object), "good-key", "0.8.0");
+
+        device.FirmwareVersion.Should().Be("0.8.0");
+        device.LastSeenAt.Should().Be(Now);
+        repo.Verify(r => r.Update(device), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("unknown-key")]
+    public void Record_WithoutValidApiKey_UpdatesNothing(string? apiKey)
+    {
+        var repo = new Mock<IDeviceRepository>();
+        repo.Setup(r => r.FindByApiKeyHash(It.IsAny<string>())).Returns((Device?)null);
+        repo.Setup(r => r.FindByIdentifier(It.IsAny<string>())).Returns(new Device { Id = DeviceId.New() });
+
+        CreateSut().Record(new DeviceService(repo.Object), apiKey, "0.8.0");
+
+        repo.Verify(r => r.Update(It.IsAny<Device>()), Times.Never);
+    }
+
+    [Fact]
+    public void Record_RecentlySeenWithSameFirmware_SkipsWrite()
+    {
+        var device = new Device { Id = DeviceId.New(), FirmwareVersion = "0.8.0", LastSeenAt = Now };
+        var repo = new Mock<IDeviceRepository>();
+        repo.Setup(r => r.FindByApiKeyHash(DeviceApiKey.Hash("good-key"))).Returns(device);
+
+        CreateSut().Record(new DeviceService(repo.Object), "good-key", "0.8.0");
+
+        repo.Verify(r => r.Update(It.IsAny<Device>()), Times.Never);
     }
 }

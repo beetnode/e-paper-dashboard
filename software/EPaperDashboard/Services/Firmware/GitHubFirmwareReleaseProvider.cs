@@ -53,26 +53,42 @@ public sealed class GitHubFirmwareReleaseProvider(
 
             // Find firmware binary asset matching the configured pattern
             string? downloadUrl = null;
+            string? signatureUrl = null;
             long? fileSize = null;
 
             if (root.TryGetProperty("assets", out var assets))
             {
+                string? binaryName = null;
                 foreach (var asset in assets.EnumerateArray())
                 {
                     var assetName = asset.GetProperty("name").GetString() ?? "";
                     if (MatchesAssetPattern(assetName))
                     {
+                        binaryName = assetName;
                         downloadUrl = asset.GetProperty("browser_download_url").GetString();
                         fileSize = asset.TryGetProperty("size", out var sizeEl) ? sizeEl.GetInt64() : null;
                         break;
                     }
                 }
+
+                if (binaryName is not null)
+                {
+                    var signatureName = SignatureAssetName(binaryName);
+                    foreach (var asset in assets.EnumerateArray())
+                    {
+                        if (string.Equals(asset.GetProperty("name").GetString(), signatureName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            signatureUrl = asset.GetProperty("browser_download_url").GetString();
+                            break;
+                        }
+                    }
+                }
             }
 
-            logger.LogInformation("Found GitHub release: v{Version} (asset: {HasAsset})",
-                version, downloadUrl is not null ? "available" : "not found");
+            logger.LogInformation("Found GitHub release: v{Version} (asset: {HasAsset}, signature: {HasSignature})",
+                version, downloadUrl is not null ? "available" : "not found", signatureUrl is not null ? "available" : "not found");
 
-            return new FirmwareReleaseInfo(version, releaseNotes, publishedAt, downloadUrl, fileSize);
+            return new FirmwareReleaseInfo(version, releaseNotes, publishedAt, downloadUrl, fileSize, signatureUrl);
         }
         catch (Exception ex)
         {
@@ -103,6 +119,8 @@ public sealed class GitHubFirmwareReleaseProvider(
             return null;
         }
     }
+
+    internal static string SignatureAssetName(string binaryAssetName) => binaryAssetName + ".sig";
 
     internal bool MatchesAssetPattern(string assetName)
     {

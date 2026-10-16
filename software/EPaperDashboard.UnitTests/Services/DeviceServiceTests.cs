@@ -14,7 +14,7 @@ public class DeviceServiceTests
     public void GetDeviceByApiKey_UnknownKey_ReturnsNull()
     {
         var repo = new Mock<IDeviceRepository>();
-        repo.Setup(r => r.FindByApiKey("nope")).Returns((Device?)null);
+        repo.Setup(r => r.FindByApiKeyHash(DeviceApiKey.Hash("nope"))).Returns((Device?)null);
         var sut = new DeviceService(repo.Object);
 
         var result = sut.GetDeviceByApiKey("nope");
@@ -27,7 +27,7 @@ public class DeviceServiceTests
     {
         var device = new Device { Id = DeviceId.New() };
         var repo = new Mock<IDeviceRepository>();
-        repo.Setup(r => r.FindByApiKey("key123")).Returns(device);
+        repo.Setup(r => r.FindByApiKeyHash(DeviceApiKey.Hash("key123"))).Returns(device);
         var sut = new DeviceService(repo.Object);
 
         var result = sut.GetDeviceByApiKey("key123");
@@ -77,7 +77,7 @@ public class DeviceServiceTests
     {
         var owner = new User { Id = UserId.New(), IsSuspended = true };
         var repo = new Mock<IDeviceRepository>();
-        repo.Setup(r => r.FindByApiKey("key")).Returns(new Device { UserId = owner.Id });
+        repo.Setup(r => r.FindByApiKeyHash(DeviceApiKey.Hash("key"))).Returns(new Device { UserId = owner.Id });
         var users = new Mock<IUserRepository>();
         users.Setup(r => r.FindById(owner.Id)).Returns(owner);
 
@@ -88,10 +88,33 @@ public class DeviceServiceTests
     public void GetDeviceByApiKey_OwnerWithoutAccountRecord_ReturnsDevice()
     {
         var repo = new Mock<IDeviceRepository>();
-        repo.Setup(r => r.FindByApiKey("key")).Returns(new Device { UserId = UserId.New() });
+        repo.Setup(r => r.FindByApiKeyHash(DeviceApiKey.Hash("key"))).Returns(new Device { UserId = UserId.New() });
         var users = new Mock<IUserRepository>();
         users.Setup(r => r.FindById(It.IsAny<UserId>())).Returns((User?)null);
 
         new DeviceService(repo.Object, users.Object).GetDeviceByApiKey("key").Should().NotBeNull();
+    }
+
+    [Fact]
+    public void GetDeviceByApiKey_LooksUpByHashOfPresentedKey()
+    {
+        var device = new Device { Id = DeviceId.New() };
+        var repo = new Mock<IDeviceRepository>();
+        repo.Setup(r => r.FindByApiKeyHash(It.IsAny<string>())).Returns((Device?)null);
+        repo.Setup(r => r.FindByApiKeyHash(DeviceApiKey.Hash("secret"))).Returns(device);
+        var sut = new DeviceService(repo.Object);
+
+        sut.GetDeviceByApiKey("secret").Should().BeSameAs(device);
+    }
+
+    [Fact]
+    public void GetDeviceByApiKey_LegacyRowStoringPlaintextKey_IsNotFound()
+    {
+        var repo = new Mock<IDeviceRepository>();
+        repo.Setup(r => r.FindByApiKeyHash(It.IsAny<string>())).Returns((Device?)null);
+        repo.Setup(r => r.FindByApiKeyHash("legacy-plaintext-key")).Returns(new Device { ApiKeyHash = "legacy-plaintext-key" });
+        var sut = new DeviceService(repo.Object);
+
+        sut.GetDeviceByApiKey("legacy-plaintext-key").Should().BeNull();
     }
 }

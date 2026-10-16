@@ -7,7 +7,7 @@ public interface IDeviceRepository
 {
     Device? FindById(DeviceId id);
     Device? FindByIdentifier(string deviceIdentifier);
-    Device? FindByApiKey(string apiKey);
+    Device? FindByApiKeyHash(string apiKeyHash);
     List<Device> FindByDashboardId(DashboardId dashboardId);
     List<Device> FindByUserId(UserId userId);
     void Insert(Device device);

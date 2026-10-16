@@ -137,9 +137,7 @@ import { Dashboard } from '../../models/types';
             <div>
               <h2 id="pairDeviceTitle" class="app-section-title">Pair a new device</h2>
               <p class="app-section-description">
-                {{ pairingMode() === 'device'
-                  ? 'The display creates the claim code. Keep this page open while you configure it.'
-                  : 'Legacy pairing for firmware older than 0.4.0.' }}
+                The display creates the claim code. Keep this page open while you configure it.
               </p>
             </div>
             <button type="button" class="btn btn-sm btn-outline-secondary" (click)="cancelPairing()">
@@ -147,60 +145,39 @@ import { Dashboard } from '../../models/types';
             </button>
           </div>
 
-          @if (pairingMode() === 'device') {
-            <div class="pairing-steps mt-3">
-              <div class="pairing-step">
-                Copy the server URL before leaving this network:
-                @if (serverUrl()) {
-                  <code>{{ serverUrl() }}</code>
-                } @else {
-                  <span class="text-danger">CLIENT_URL is not configured</span>
-                }
-                <button type="button" class="btn btn-sm btn-link p-1" (click)="copyServerUrl()" aria-label="Copy server URL">
-                  <i class="fa-solid" [ngClass]="serverUrlCopied() ? 'fa-check' : 'fa-copy'" aria-hidden="true"></i>
+          <div class="pairing-steps mt-3">
+            <div class="pairing-step">
+              Copy the server address before leaving this network:
+              @if (serverUrl()) {
+                <code>{{ serverUrl() }}</code>
+              } @else {
+                <span class="text-danger">CLIENT_URL is not configured</span>
+              }
+              <button type="button" class="btn btn-sm btn-link p-1" (click)="copyServerUrl()" aria-label="Copy server address">
+                <i class="fa-solid" [ngClass]="serverUrlCopied() ? 'fa-check' : 'fa-copy'" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div class="pairing-step">Scan the Wi-Fi QR on the display, open its setup page, then enter your home Wi-Fi and paste the server address. Submit once.</div>
+            <div class="pairing-step">
+              After submitting, reconnect to any network that can reach this dashboard. Enter the display code, then claim it.
+              <div class="input-group mt-2">
+                <input type="text" class="form-control font-monospace text-uppercase"
+                  aria-label="Device claim code" placeholder="ABC123" maxlength="6"
+                  autocomplete="one-time-code" [value]="pairingCode()" (input)="updateClaimCode($event)"
+                  [disabled]="isAwaitingDevice()">
+                <button type="button" class="btn btn-primary" (click)="claimDevice()"
+                  [disabled]="pairingCode().length !== 6 || isClaiming() || isAwaitingDevice() || !serverUrl()">
+                  {{ isClaiming() ? 'Claiming…' : isAwaitingDevice() ? 'Waiting for display…' : 'Claim device' }}
                 </button>
               </div>
-              <div class="pairing-step">Scan the Wi-Fi QR on the display, open its setup page, then enter your home Wi-Fi and paste the server URL. Submit once.</div>
-              <div class="pairing-step">
-                After submitting, reconnect to any network that can reach this dashboard. Enter the display code, then claim it.
-                <div class="input-group mt-2">
-                  <input type="text" class="form-control font-monospace text-uppercase"
-                    aria-label="Device claim code" placeholder="ABC123" maxlength="6"
-                    autocomplete="one-time-code" [value]="pairingCode()" (input)="updateClaimCode($event)"
-                    [disabled]="isAwaitingDevice()">
-                  <button type="button" class="btn btn-primary" (click)="claimDevice()"
-                    [disabled]="pairingCode().length !== 6 || isClaiming() || isAwaitingDevice() || !serverUrl()">
-                    {{ isClaiming() ? 'Claiming…' : isAwaitingDevice() ? 'Waiting for display…' : 'Claim device' }}
-                  </button>
+              @if (isAwaitingDevice()) {
+                <div class="small mt-2" role="status">
+                  <i class="fa-solid fa-spinner fa-spin me-1" aria-hidden="true"></i>
+                  Claim accepted. Waiting for the display to confirm receipt ({{ formattedPairingTime() }}).
                 </div>
-                @if (isAwaitingDevice()) {
-                  <div class="small mt-2" role="status">
-                    <i class="fa-solid fa-spinner fa-spin me-1" aria-hidden="true"></i>
-                    Claim accepted. Waiting for the display to confirm receipt ({{ formattedPairingTime() }}).
-                  </div>
-                }
-              </div>
+              }
             </div>
-            <button type="button" class="btn btn-sm btn-link align-self-start px-0" (click)="startLegacyPairing()">
-              Pair a display running firmware older than 0.4.0
-            </button>
-          } @else {
-            <div class="alert alert-warning mb-2" role="status">
-              Enter code <strong class="font-monospace fs-5">{{ pairingCode() }}</strong> in the display setup portal.
-              <button type="button" class="btn btn-sm btn-link" (click)="copyPairingCode()" aria-label="Copy legacy pairing code">
-                <i class="fa-solid" [ngClass]="pairingCodeCopied() ? 'fa-check' : 'fa-copy'" aria-hidden="true"></i>
-              </button>
-              The code expires in {{ formattedPairingTime() }}.
-            </div>
-            <div class="pairing-steps">
-              <div class="pairing-step">Copy server URL <code>{{ serverUrl() }}</code> and pairing code <strong>{{ pairingCode() }}</strong>.</div>
-              <div class="pairing-step">Connect to the display setup Wi-Fi and enter home Wi-Fi, the server URL, and pairing code.</div>
-              <div class="pairing-step"><i class="fa-solid fa-spinner fa-spin me-1" aria-hidden="true"></i>Waiting for the display to register.</div>
-            </div>
-            <button type="button" class="btn btn-sm btn-link align-self-start px-0" (click)="useCurrentPairing()">
-              Back to current pairing
-            </button>
-          }
+          </div>
         </div>
       </section>
     }
@@ -369,10 +346,8 @@ export class DeviceListComponent implements OnDestroy {
 
   readonly isPairingActive = signal(false);
   readonly pairingCode = signal('');
-  readonly pairingMode = signal<'device' | 'legacy'>('device');
   readonly isClaiming = signal(false);
   readonly isAwaitingDevice = signal(false);
-  readonly pairingCodeCopied = signal(false);
   readonly pairingTimeRemaining = signal(0);
   readonly serverUrlCopied = signal(false);
 
@@ -427,7 +402,7 @@ export class DeviceListComponent implements OnDestroy {
 
   private loadPairingConfiguration(): void {
     this.deviceService.getPairingConfiguration().subscribe({
-      next: (configuration) => this.serverUrl.set(configuration.clientUrl),
+      next: (configuration) => this.serverUrl.set(configuration.serverAddress),
       error: () => this.serverUrl.set('')
     });
   }
@@ -541,7 +516,6 @@ export class DeviceListComponent implements OnDestroy {
 
   startPairing(): void {
     this.stopPairingTimers();
-    this.pairingMode.set('device');
     this.pairingCode.set('');
     this.isAwaitingDevice.set(false);
     this.isPairingActive.set(true);
@@ -553,39 +527,7 @@ export class DeviceListComponent implements OnDestroy {
     this.isPairingActive.set(false);
     this.pairingCode.set('');
     this.isAwaitingDevice.set(false);
-    this.pairingMode.set('device');
-    this.pairingCodeCopied.set(false);
     this.serverUrlCopied.set(false);
-  }
-
-  startLegacyPairing(): void {
-    this.deviceService.startPairing().subscribe({
-      next: (response) => {
-        this.stopPairingTimers();
-        this.pairingMode.set('legacy');
-        this.pairingCode.set(response.code);
-        this.pairingExpiresAt = new Date(response.expiresAt);
-        this.startLegacyPairingTimers();
-      },
-      error: err => this.toastService.httpError(err, 'Could not start legacy pairing.')
-    });
-  }
-
-  useCurrentPairing(): void {
-    this.stopPairingTimers();
-    this.pairingMode.set('device');
-    this.pairingCode.set('');
-  }
-
-  async copyPairingCode(): Promise<void> {
-    const code = this.pairingCode();
-    if (!code) return;
-
-    const success = await this.clipboardService.copy(code);
-    if (success) {
-      this.pairingCodeCopied.set(true);
-      setTimeout(() => this.pairingCodeCopied.set(false), 2000);
-    }
   }
 
   updateClaimCode(event: Event): void {
@@ -636,30 +578,6 @@ export class DeviceListComponent implements OnDestroy {
     if (dMaj !== lMaj) return dMaj < lMaj;
     if (dMin !== lMin) return dMin < lMin;
     return dPat < lPat;
-  }
-
-  private startLegacyPairingTimers(): void {
-    this.updatePairingTime();
-    this.pairingTimer = setInterval(() => {
-      this.updatePairingTime();
-      if (this.pairingTimeRemaining() <= 0) {
-        this.cancelPairing();
-        this.toastService.info('Legacy pairing code expired.');
-      }
-    }, 1000);
-    this.pairingStatusTimer = setInterval(() => {
-      const code = this.pairingCode();
-      if (!code) return;
-      this.deviceService.getPairingStatus(code).subscribe({
-        next: (response) => {
-          if (response.status === 'completed') {
-            this.cancelPairing();
-            this.loadDevices();
-            this.toastService.success('Device paired.');
-          }
-        }
-      });
-    }, 2000);
   }
 
   private startDeviceAcknowledgementPolling(code: string, acknowledgementExpiresAt: string): void {

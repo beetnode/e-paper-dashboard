@@ -12,12 +12,12 @@ std::optional<DeviceConfig> ConfigStore::load() const
       prefs.getString(StorageKey::Ssid, ""),
       prefs.getString(StorageKey::Password, ""),
       prefs.getString(StorageKey::DashboardUrl, ""),
-      prefs.getInt(StorageKey::DevicePort, 8129),
+      prefs.getInt(StorageKey::DevicePort, DeviceServer::DefaultDevicePort),
       prefs.getString(StorageKey::DashboardBasePath, ""),
       prefs.getString(StorageKey::DashboardApiKey, ""),
       prefs.getString(StorageKey::PairingCode, ""),
       prefs.getString(StorageKey::RegistrationToken, ""),
-      prefs.getBool(StorageKey::UseHttps, false)};
+      prefs.getString(StorageKey::ServerFingerprint, "")};
   prefs.end();
 
   if (config.ssid.length() == 0 || config.dashboardUrl.length() == 0)
@@ -39,7 +39,7 @@ void ConfigStore::save(const DeviceConfig& config) const
   prefs.putString(StorageKey::DashboardApiKey, config.dashboardApiKey);
   prefs.putString(StorageKey::PairingCode, config.pairingCode);
   prefs.putString(StorageKey::RegistrationToken, config.registrationToken);
-  prefs.putBool(StorageKey::UseHttps, config.useHttps);
+  prefs.putString(StorageKey::ServerFingerprint, config.serverFingerprint);
   prefs.end();
 }
 

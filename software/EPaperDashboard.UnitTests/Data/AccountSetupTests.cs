@@ -107,8 +107,8 @@ public sealed class AccountSetupTests : IDisposable
         var devices = new LiteDbDeviceRepository(context);
         var sessions = new LiteDbPairingSessionRepository(context);
         var (alice, bob) = (UserId.New(), UserId.New());
-        devices.Insert(new Device { UserId = alice, DeviceIdentifier = "a", ApiKey = "ka" });
-        devices.Insert(new Device { UserId = bob, DeviceIdentifier = "b", ApiKey = "kb" });
+        devices.Insert(new Device { UserId = alice, DeviceIdentifier = "a", ApiKeyHash = DeviceApiKey.Hash("ka") });
+        devices.Insert(new Device { UserId = bob, DeviceIdentifier = "b", ApiKeyHash = DeviceApiKey.Hash("kb") });
         sessions.Insert(new PairingSession { UserId = alice, Code = "AAAAAA" });
         sessions.Insert(new PairingSession { UserId = bob, Code = "BBBBBB" });
 

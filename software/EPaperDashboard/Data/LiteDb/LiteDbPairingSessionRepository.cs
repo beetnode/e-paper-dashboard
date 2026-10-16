@@ -28,7 +28,4 @@ internal sealed class LiteDbPairingSessionRepository(LiteDbContext context) : IP
 
     public void DeleteByUserId(UserId userId) =>
         context.PairingSessions.DeleteMany(s => s.UserId == userId);
-
-    public bool HasActiveSessions(DateTimeOffset now) =>
-        context.PairingSessions.Exists(s => !s.IsCompleted && s.ExpiresAt > now);
 }

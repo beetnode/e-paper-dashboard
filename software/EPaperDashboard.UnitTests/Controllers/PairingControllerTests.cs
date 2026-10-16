@@ -18,11 +18,12 @@ public class PairingControllerTests
     private readonly Mock<IDeviceRepository> _deviceRepository = new();
     private readonly FakeTimeProvider _timeProvider = new(new DateTimeOffset(2026, 3, 17, 8, 0, 0, TimeSpan.Zero));
 
-    private PairingController CreateSut(Uri? clientUri = null)
+    private PairingController CreateSut(Uri? clientUri = null, int devicePublicPort = 8129)
     {
         var deviceService = new DeviceService(_deviceRepository.Object);
         var configuration = new Mock<IEnvironmentConfiguration>();
         configuration.SetupGet(c => c.ClientUri).Returns(clientUri ?? new Uri("http://dashboard.local:8129"));
+        configuration.SetupGet(c => c.DevicePublicPort).Returns(devicePublicPort);
         return new PairingController(
             new PairingService(
                 _pairingSessionRepository.Object,
@@ -45,142 +46,19 @@ public class PairingControllerTests
         response.ClientUrl.Should().Be("https://devices.example.com/dashboard");
     }
 
-    [Fact]
-    public void StartPairing_ReturnsCodeAndExpiry()
+    [Theory]
+    [InlineData("http://192.168.1.10:8128", 8129, "192.168.1.10:8129")]
+    [InlineData("https://izboard.example.com/dashboard", 9443, "izboard.example.com:9443")]
+    [InlineData("http://[fd00::10]:8128", 8129, "[fd00::10]:8129")]
+    public void GetPairingConfiguration_ServerAddressIsClientHostWithDevicePort(string clientUrl, int devicePort, string expected)
     {
-        var sut = CreateSut().WithUser(UserId.New());
+        var sut = CreateSut(new Uri(clientUrl), devicePort);
 
-        var result = sut.StartPairing();
+        var result = sut.GetPairingConfiguration();
 
-        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
-        var response = ok.Value.Should().BeOfType<StartPairingResponse>().Subject;
-        response.Code.Should().MatchRegex("^[0-9A-Z]{6}$");
-        response.ExpiresAt.Should().Be(_timeProvider.GetUtcNow().AddMinutes(5));
-    }
-
-    [Fact]
-    public void RegisterDevice_MissingCodeOrIdentifier_ReturnsBadRequest()
-    {
-        var sut = CreateSut();
-
-        var result = sut.RegisterDevice(new RegisterDeviceRequest("", "device-1", null, null, null));
-
-        result.Should().BeOfType<BadRequestObjectResult>();
-    }
-
-    [Fact]
-    public void RegisterDevice_UnknownCode_ReturnsNotFound()
-    {
-        _pairingSessionRepository.Setup(r => r.FindByCode("BADCOD")).Returns((PairingSession?)null);
-        var sut = CreateSut();
-
-        var result = sut.RegisterDevice(new RegisterDeviceRequest("BADCOD", "device-1", null, null, null));
-
-        result.Should().BeOfType<NotFoundObjectResult>();
-    }
-
-    [Fact]
-    public void RegisterDevice_ExpiredCode_ReturnsBadRequest()
-    {
-        var session = new PairingSession { Code = "ABC123", ExpiresAt = _timeProvider.GetUtcNow().AddMinutes(-1) };
-        _pairingSessionRepository.Setup(r => r.FindByCode("ABC123")).Returns(session);
-        var sut = CreateSut();
-
-        var result = sut.RegisterDevice(new RegisterDeviceRequest("ABC123", "device-1", null, null, null));
-
-        result.Should().BeOfType<BadRequestObjectResult>();
-    }
-
-    [Fact]
-    public void RegisterDevice_SessionAlreadyCompleted_ReturnsBadRequest()
-    {
-        var session = new PairingSession
-        {
-            Code = "ABC123",
-            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5),
-            Status = PairingStatus.Completed
-        };
-        _pairingSessionRepository.Setup(r => r.FindByCode("ABC123")).Returns(session);
-        var sut = CreateSut();
-
-        var result = sut.RegisterDevice(new RegisterDeviceRequest("ABC123", "device-1", null, null, null));
-
-        result.Should().BeOfType<BadRequestObjectResult>();
-    }
-
-    [Fact]
-    public void RegisterDevice_NewDevice_CreatesDeviceRecord()
-    {
-        var session = new PairingSession
-        {
-            Code = "ABC123",
-            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5),
-            Status = PairingStatus.Pending,
-            UserId = UserId.New()
-        };
-        _pairingSessionRepository.Setup(r => r.FindByCode("ABC123")).Returns(session);
-        _deviceRepository.Setup(r => r.FindByIdentifier("device-1")).Returns((Device?)null);
-        var sut = CreateSut();
-
-        var result = sut.RegisterDevice(new RegisterDeviceRequest("ABC123", "device-1", "My Device", null, null));
-
-        result.Should().BeOfType<OkObjectResult>();
-        _deviceRepository.Verify(r => r.Insert(It.Is<Device>(d =>
-            d.DeviceIdentifier == "device-1" && d.Name == "My Device" && d.UserId == session.UserId)), Times.Once);
-    }
-
-    [Fact]
-    public void RegisterDevice_ExistingDeviceReRegisteredBySameOwner_UpdatesDeviceButKeepsDashboardAssignment()
-    {
-        var userId = UserId.New();
-        var existingDashboardId = DashboardId.New();
-        var session = new PairingSession
-        {
-            Code = "ABC123",
-            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5),
-            Status = PairingStatus.Pending,
-            UserId = userId
-        };
-        var existingDevice = new Device { UserId = userId, DeviceIdentifier = "device-1", DashboardId = existingDashboardId };
-        _pairingSessionRepository.Setup(r => r.FindByCode("ABC123")).Returns(session);
-        _deviceRepository.Setup(r => r.FindByIdentifier("device-1")).Returns(existingDevice);
-        var sut = CreateSut();
-
-        sut.RegisterDevice(new RegisterDeviceRequest("ABC123", "device-1", null, null, null));
-
-        existingDevice.DashboardId.Should().Be(existingDashboardId);
-        _deviceRepository.Verify(r => r.Update(existingDevice), Times.Once);
-    }
-
-    [Fact]
-    public void RegisterDevice_ExistingDeviceClaimedByNewOwner_ReturnsConflict()
-    {
-        var previousOwnerId = UserId.New();
-        var newOwnerId = UserId.New();
-        var session = new PairingSession
-        {
-            Code = "ABC123",
-            ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(5),
-            Status = PairingStatus.Pending,
-            UserId = newOwnerId
-        };
-        var existingDevice = new Device
-        {
-            UserId = previousOwnerId,
-            DeviceIdentifier = "device-1",
-            DashboardId = DashboardId.New(),
-            FirmwareVersion = "1.0.0",
-            LastSeenAt = _timeProvider.GetUtcNow()
-        };
-        _pairingSessionRepository.Setup(r => r.FindByCode("ABC123")).Returns(session);
-        _deviceRepository.Setup(r => r.FindByIdentifier("device-1")).Returns(existingDevice);
-        var sut = CreateSut();
-
-        var result = sut.RegisterDevice(new RegisterDeviceRequest("ABC123", "device-1", null, null, null));
-
-        result.Should().BeOfType<ConflictObjectResult>();
-        existingDevice.UserId.Should().Be(previousOwnerId);
-        _deviceRepository.Verify(r => r.Update(It.IsAny<Device>()), Times.Never);
+        var response = result.Should().BeOfType<OkObjectResult>().Subject.Value
+            .Should().BeOfType<PairingConfigurationResponse>().Subject;
+        response.ServerAddress.Should().Be(expected);
     }
 
     [Fact]
